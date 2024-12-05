@@ -30,8 +30,8 @@ dev = ["pytest",
        "mkdocs-jupyter"]
 
 [project.urls]
-Homepage = "https://tsc-tools.github.io/tonik"
-Issues = "https://github.com/tsc-tools/tonik/issues"
+Homepage = "https://github.com/tsc-tools/aitana"
+Issues = "https://github.com/tsc-tools/aitana/issues"
 
 
 [tool.pytest.ini_options]
