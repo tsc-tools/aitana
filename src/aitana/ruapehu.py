@@ -11,7 +11,7 @@ class CraterLake(object):
         self.startdate = startdate
         self.enddate = enddate
 
-    def temperature(self, resample: int = "D", interpolate: str = None, exclude1995: bool = True, dropna: bool = True) -> pd.DataFrame:
+    def temperature(self, resample: str = "D", interpolate: str = None, exclude1995: bool = True, dropna: bool = True) -> pd.DataFrame:
         """
         Read crater lake temperature from Tilde (https://tilde.geonet.org.nz).
 
@@ -107,7 +107,8 @@ class CraterLake(object):
         # change annoying temp label and drop old column
         return df
 
-    def water_analyte(self, analyte: str) -> pd.DataFrame:
+    def water_analyte(self, analyte: str, resample: str = None, interpolate: str = None,
+                      exclude1995: bool = True) -> pd.DataFrame:
         """
         Download water analyte data from Tilde (https://tilde.geonet.org.nz).
 
@@ -118,6 +119,14 @@ class CraterLake(object):
                     'Al, 'As', 'B', 'Br', 'Ca', 'Cl', 'Cs', 'F',
                     'Fe', 'H2S', 'K', 'Li', 'Mg', 'NH3', 'NO3-N', 'Na',
                     'PO4-P', 'Rb', 'SO4', 'SiO2', 'd18O', 'd2H', 'ph'
+            resample : str
+                Resample the data to a given interval. This can be anything
+                allowed by :pandas.DataFrame.resample:. 
+            interpolate : str
+                Interpolate between points. This can be anything allowed by
+                :pandas.DataFrame.interpolate:.
+            exclude1995 : bool
+                Exclude data from 1995 when there wasn't a lake.
         Returns:
         --------
             pandas.DataFrame
@@ -143,6 +152,17 @@ class CraterLake(object):
                             sensor="MC04")
         df = df.combine_first(df1)
         df = df.combine_first(df2)
+        if resample is not None:
+            df = df.resample(resample).mean()
+
+        if interpolate is not None:
+            df = df.interpolate(interpolate)
+
+        if exclude1995:
+            cond1 = df.index <= "1995-09-20 00:00:00"
+            cond2 = df.index >= "2000-01-01 00:00:00"
+            df = df[(cond1) | (cond2)]
+
         df = df[df.index <= str(self.enddate)]
         if self.startdate is not None:
             df = df[df.index >= str(self.startdate)]
