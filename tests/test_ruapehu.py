@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 import pytest
 from aitana.ruapehu import CraterLake, Gas, Seismicity, eruptions
@@ -48,3 +49,13 @@ def test_eruptions():
     e2 = eruptions(min_size=3, dec_interval='14D')
     assert e1.shape == (293, 5)
     assert e2.shape == (57, 5)
+
+
+def test_rsam():
+    tstart = datetime(2023, 12, 1)
+    tend = datetime(2023, 12, 31)
+    g = Seismicity(tstart, tend)
+    rsam = g.rsam('NZ.FWVZ.10.HHZ')
+    assert len(os.listdir(g.feature_dir)) == 3
+    assert os.listdir(g.cache_dir) == ['2023']
+    assert rsam.shape == (30*144, 1)

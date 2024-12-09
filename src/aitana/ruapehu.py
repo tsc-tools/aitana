@@ -1,5 +1,9 @@
+import os
 from datetime import datetime
 import pandas as pd
+from zizou import DataSource, S3Waveforms, RSAM
+from tonik import Storage
+from obspy import UTCDateTime
 
 from aitana.tilde import tilde_request
 from aitana.wfs import wfs_request
@@ -245,6 +249,10 @@ class Seismicity(object):
     def __init__(self, startdate: datetime, enddate: datetime):
         self.startdate = startdate
         self.enddate = enddate
+        self.cache_dir = os.path.join(os.environ.get(
+            "HOME", "/tmp"), "aitana_cache")
+        self.feature_dir = os.path.join(os.environ.get(
+            "HOME", "/tmp"), "aitana_features")
 
     def regional(self):
         """
@@ -287,6 +295,48 @@ class Seismicity(object):
                 idxs.append(i)
         cat_tmp.drop(idxs, inplace=True)
         return cat_tmp
+
+    def rsam(self, station: str = "NZ.FWVZ.10.HHZ") -> pd.DataFrame:
+        """
+        Compute RSAM for a given station.
+
+        Parameters:
+        -----------
+            station : str
+                The station to compute RSAM for in the form "NET.STA.LOC.CHA".
+
+        Returns:
+        --------
+            pandas.DataFrame
+                A dataframe with the RSAM values.
+        """
+        fdsnurls = ["https://service.geonet.org.nz",
+                    "https://service-nrt.geonet.org.nz"]
+        s3bucket = "geonet-open-data"
+        fout = os.path.join(
+            self.feature_dir, f"{station}_rsam_{str(self.startdate)}_{str(self.enddate)}.csv")
+        if os.path.exists(fout):
+            return pd.read_csv(fout, index_col=0, parse_dates=True)
+        s3client = S3Waveforms(s3bucket, fdsnurls, staxml_dir=self.feature_dir)
+        ds = DataSource(clients=[s3client],
+                        chunk_size=86400, cache_dir=self.cache_dir)
+        net, sta, loc, cha = station.split(".")
+        r = RSAM(interval=600)
+        s = Storage('aitana_rsam', rootdir=self.feature_dir,
+                    starttime=self.startdate, endtime=self.enddate)
+        store = s.get_substore(net, sta, loc, cha)
+        for trace in ds.get_waveforms(net, sta, loc, cha, UTCDateTime(self.startdate),
+                                      UTCDateTime(self.enddate), cache=True):
+            if not trace:
+                continue
+            else:
+                print(trace)
+            xds = r.compute(trace)
+            store.save(xds)
+        rsam_xds = store('rsam')
+        rsam_df = rsam_xds.to_dataframe()
+        rsam_df.to_csv(fout)
+        return rsam_df
 
 
 def eruptions(min_size: int = 0, dec_interval: str = None) -> pd.DataFrame:
