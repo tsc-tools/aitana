@@ -1,12 +1,11 @@
 import os
 from datetime import datetime
 import pandas as pd
-from zizou import DataSource, S3Waveforms, RSAM
-from tonik import Storage
-from obspy import UTCDateTime
+import numpy as np
 
 from aitana.tilde import tilde_request
 from aitana.wfs import wfs_request
+from aitana import get_data
 
 
 class CraterLake(object):
@@ -296,47 +295,51 @@ class Seismicity(object):
         cat_tmp.drop(idxs, inplace=True)
         return cat_tmp
 
-    def rsam(self, station: str = "NZ.FWVZ.10.HHZ") -> pd.DataFrame:
+    def daily_rsam(self, update=False) -> pd.DataFrame:
         """
-        Compute RSAM for a given station.
-
-        Parameters:
-        -----------
-            station : str
-                The station to compute RSAM for in the form "NET.STA.LOC.CHA".
+        Load RSAM values from DRZ, MAVZ and FWVZ combined by scaling
+        MAVZ and FWVZ RSAM values with DRZ.
 
         Returns:
         --------
-            pandas.DataFrame
-                A dataframe with the RSAM values.
+            :param df: Dataframe with RSAM values.
+            :type df: :class:`pandas.DataFrame`
         """
-        fdsnurls = ["https://service.geonet.org.nz",
-                    "https://service-nrt.geonet.org.nz"]
-        s3bucket = "geonet-open-data"
-        fout = os.path.join(
-            self.feature_dir, f"{station}_rsam_{str(self.startdate)}_{str(self.enddate)}.csv")
-        if os.path.exists(fout):
-            return pd.read_csv(fout, index_col=0, parse_dates=True)
-        s3client = S3Waveforms(s3bucket, fdsnurls, staxml_dir=self.feature_dir)
-        ds = DataSource(clients=[s3client],
-                        chunk_size=86400, cache_dir=self.cache_dir)
-        net, sta, loc, cha = station.split(".")
-        r = RSAM(interval=600)
-        s = Storage('aitana_rsam', rootdir=self.feature_dir,
-                    starttime=self.startdate, endtime=self.enddate)
-        store = s.get_substore(net, sta, loc, cha)
-        for trace in ds.get_waveforms(net, sta, loc, cha, UTCDateTime(self.startdate),
-                                      UTCDateTime(self.enddate), cache=True):
-            if not trace:
-                continue
-            else:
-                print(trace)
-            xds = r.compute(trace)
-            store.save(xds)
-        rsam_xds = store('rsam')
-        rsam_df = rsam_xds.to_dataframe()
-        rsam_df.to_csv(fout)
-        return rsam_df
+        df = pd.read_csv(get_data("data/ruapehu_rsam.csv"),
+                         parse_dates=True, index_col=0)
+        if self.enddate > df.index[-1] and update:
+            df_drz = pd.read_csv(
+                get_data("data/DRZ_scaled_MAVZ.csv"), parse_dates=True, index_col=0
+            )
+            df_drz.rename(columns={"RSAM": "obs"}, inplace=True)
+            url = "http://kaizen.gns.cri.nz:9157/feature?name=rsam&"
+            url += "starttime={}&endtime={}&volcano=Ruapehu&site=FWVZ"
+            try:
+                df_fwvz = pd.read_csv(
+                    url.format(self.startdate.isoformat(),
+                               self.enddate.isoformat()),
+                    parse_dates=True,
+                    index_col=0,
+                    date_format="ISO8601",
+                )
+            except Exception as e:
+                print(url.format(self.startdate.isoformat(),
+                      self.enddate.isoformat()))
+                raise e
+            df_fwvz["rsam"] = np.where(
+                df_fwvz["rsam"] > 1e30, np.nan, df_fwvz["rsam"])
+            df_fwvz_daily = df_fwvz.resample("1D").mean()
+            df_fwvz_daily_scaled = -2.3945 + 3.5062 * df_fwvz_daily
+            df_fwvz_daily_scaled.rename(columns={"rsam": "obs"}, inplace=True)
+            df = df_drz.combine_first(df_fwvz_daily_scaled)
+            # remove duplicated dates:
+            df = df.loc[~df.index.duplicated(), :]
+            if self.enddate is not None:
+                df = df[df.index <= str(self.enddate)]
+            if self.startdate is not None:
+                df = df[df.index >= str(self.startdate)]
+            df.to_csv(get_data("data/ruapehu_rsam.csv"))
+        return df
 
 
 def eruptions(min_size: int = 0, dec_interval: str = None) -> pd.DataFrame:

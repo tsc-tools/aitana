@@ -52,10 +52,8 @@ def test_eruptions():
 
 
 def test_rsam():
-    tstart = datetime(2023, 12, 1)
-    tend = datetime(2023, 12, 31)
+    tstart = datetime(2007, 1, 1)
+    tend = datetime(2024, 11, 30)
     g = Seismicity(tstart, tend)
-    rsam = g.rsam('NZ.FWVZ.10.HHZ')
-    assert len(os.listdir(g.feature_dir)) == 3
-    assert os.listdir(g.cache_dir) == ['2023']
-    assert rsam.shape == (30*144, 1)
+    rsam = g.daily_rsam()
+    assert rsam.shape == (6158, 1)
