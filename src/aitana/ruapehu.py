@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 import numpy as np
 
@@ -307,6 +307,8 @@ class Seismicity(object):
         """
         df = pd.read_csv(get_data("data/ruapehu_rsam.csv"),
                          parse_dates=True, index_col=0)
+        if self.enddate.tzinfo is not None:
+            df.index = df.index.tz_localize(timezone.utc)
         if self.enddate > df.index[-1] and update:
             df_drz = pd.read_csv(
                 get_data("data/DRZ_scaled_MAVZ.csv"), parse_dates=True, index_col=0

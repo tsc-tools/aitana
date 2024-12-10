@@ -1,6 +1,4 @@
-import os
-from datetime import datetime
-import pytest
+from datetime import datetime, timezone
 from aitana.ruapehu import CraterLake, Gas, Seismicity, eruptions
 
 
@@ -57,3 +55,9 @@ def test_rsam():
     g = Seismicity(tstart, tend)
     rsam = g.daily_rsam()
     assert rsam.shape == (6158, 1)
+
+    tstart = datetime(2023, 11, 1, tzinfo=timezone.utc)
+    tend = datetime(2023, 11, 30, tzinfo=timezone.utc)
+    g = Seismicity(tstart, tend)
+    rsam = g.daily_rsam()
+    assert rsam.shape == (30, 1)
