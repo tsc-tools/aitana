@@ -313,11 +313,10 @@ class Seismicity(object):
             )
             df_drz.rename(columns={"RSAM": "obs"}, inplace=True)
             url = "http://kaizen.gns.cri.nz:9157/feature?name=rsam&"
-            url += "starttime={}&endtime={}&volcano=Ruapehu&site=FWVZ"
+            url += "starttime=2007-01-01T00:00:00&endtime={}&volcano=Ruapehu&site=FWVZ"
             try:
                 df_fwvz = pd.read_csv(
-                    url.format(self.startdate.isoformat(),
-                               self.enddate.isoformat()),
+                    url.format(self.enddate.isoformat()),
                     parse_dates=True,
                     index_col=0,
                     date_format="ISO8601",
@@ -334,11 +333,9 @@ class Seismicity(object):
             df = df_drz.combine_first(df_fwvz_daily_scaled)
             # remove duplicated dates:
             df = df.loc[~df.index.duplicated(), :]
-            if self.enddate is not None:
-                df = df[df.index <= str(self.enddate)]
-            if self.startdate is not None:
-                df = df[df.index >= str(self.startdate)]
             df.to_csv(get_data("data/ruapehu_rsam.csv"))
+        df = df[df.index <= str(self.enddate)]
+        df = df[df.index >= str(self.startdate)]
         return df
 
 
