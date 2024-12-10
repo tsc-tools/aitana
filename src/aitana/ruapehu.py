@@ -135,26 +135,27 @@ class CraterLake(object):
             pandas.DataFrame
                 A dataframe with the water analyte time series.
         """
-        df = tilde_request(startdate=max(self.startdate, datetime(1964, 5, 9)),
-                           enddate=self.enddate,
-                           domain="manualcollect",
-                           name=f"lake-{analyte}-conc",
-                           station="RU001",
-                           sensor="MC01")
-        df1 = tilde_request(startdate=max(self.startdate, datetime(1964, 5, 9)),
-                            enddate=self.enddate,
-                            domain="manualcollect",
-                            name=f"lake-{analyte}-conc",
-                            station="RU001",
-                            sensor="MC03")
-        df2 = tilde_request(startdate=max(self.startdate, datetime(1964, 5, 9)),
-                            enddate=self.enddate,
-                            domain="manualcollect",
-                            name=f"lake-{analyte}-conc",
-                            station="RU001",
-                            sensor="MC04")
-        df = df.combine_first(df1)
-        df = df.combine_first(df2)
+        dataframes = []
+        sensors = ["MC01", "MC03", "MC04"]
+        for sensor in sensors:
+            try:
+                df = tilde_request(startdate=max(self.startdate, datetime(1964, 5, 9)),
+                                   enddate=self.enddate,
+                                   domain="manualcollect",
+                                   name=f"lake-{analyte}-conc",
+                                   station="RU001",
+                                   sensor=sensor)
+            except ValueError:
+                continue
+            if len(df) > 0:
+                dataframes.append(df)
+        if len(dataframes) == 0:
+            raise ValueError(
+                f"No data found for {analyte} between {self.startdate} and {self.enddate}")
+        df = dataframes[0]
+        if len(dataframes) > 1:
+            for df1 in dataframes[1:]:
+                df = df.combine_first(df1)
         if resample is not None:
             df = df.resample(resample).mean()
 
@@ -179,34 +180,26 @@ class Gas(object):
         self.enddate = enddate
 
     def so2(self) -> pd.DataFrame:
-        df_cospec = tilde_request(startdate=max(self.startdate, datetime(2003, 5, 27)),
-                                  enddate=self.enddate,
-                                  domain="manualcollect",
-                                  name="plume-SO2-gasflux",
-                                  method="cospec",
-                                  station="RU000", sensor="MC01")
-        df_contouring = tilde_request(startdate=max(self.startdate, datetime(2004, 4, 21)),
-                                      enddate=self.enddate,
-                                      domain="manualcollect",
-                                      name="plume-SO2-gasflux",
-                                      method="contouring",
-                                      station="RU000", sensor="MC01")
-        df_flyspec = tilde_request(startdate=max(self.startdate, datetime(2008, 8, 11)),
+        dataframes = []
+        for method in ["cospec", "contouring", "flyspec", "mobile-doas"]:
+            try:
+                df = tilde_request(startdate=max(self.startdate, datetime(2003, 5, 27)),
                                    enddate=self.enddate,
                                    domain="manualcollect",
                                    name="plume-SO2-gasflux",
-                                   method="flyspec",
+                                   method=method,
                                    station="RU000", sensor="MC01")
-        df_mobiledoas = tilde_request(startdate=max(self.startdate, datetime(2023, 8, 23)),
-                                      enddate=self.enddate,
-                                      domain="manualcollect",
-                                      name="plume-SO2-gasflux",
-                                      method="mobile-doas",
-                                      station="RU000", sensor="MC01")
-        df = df_cospec
-        df = df.combine_first(df_contouring)
-        df = df.combine_first(df_flyspec)
-        df = df.combine_first(df_mobiledoas)
+            except ValueError:
+                continue
+            if len(df) > 0:
+                dataframes.append(df)
+        if len(dataframes) == 0:
+            raise ValueError(
+                f"No data found for SO2 between {self.startdate} and {self.enddate}")
+        df = dataframes[0]
+        if len(dataframes) > 1:
+            for df1 in dataframes[1:]:
+                df = df.combine_first(df1)
         df['obs'] *= 86.4
         df['err'] *= 86.4
         df = df[df.index <= str(self.enddate)]

@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+
+import pytest
+
 from aitana.ruapehu import CraterLake, Gas, Seismicity, eruptions
 
 
@@ -28,6 +31,15 @@ def test_gas():
 
     df = g.h2s()
     assert df.obs.loc['2023-12-20T21:30:00'] == 0.
+
+    tstart = datetime(2021, 1, 1)
+    tend = datetime(2021, 12, 31)
+    g = Gas(tstart, tend)
+    df = g.so2()
+    assert df.shape == (5, 2)
+
+    with pytest.raises(ValueError):
+        Gas(datetime(2021, 10, 1), datetime(2021, 10, 3)).so2()
 
 
 def test_seismicity():
