@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime
+import inspect
 import os
 import pandas as pd
 from functools import wraps
@@ -35,6 +36,14 @@ def generate_cache_filename(func_name, args, kwargs):
     return f"{func_name}_{hashed_name}"  # Use .pkl for cached dataframes
 
 
+def _is_class_method(func):
+    """
+    Check if a function is a class method.
+    """
+    func_params = list(inspect.signature(func).parameters)
+    return func_params and func_params[0] == 'self'
+
+
 def cache_dataframe(cache_dir: str = ""):
     """
     Decorator to cache pandas DataFrames, handle date ranges, and persist the cache to disk.
@@ -57,9 +66,7 @@ def cache_dataframe(cache_dir: str = ""):
                 if os.path.exists(cache_file):
                     os.remove(cache_file)
 
-            # Check if the function is a method and should use class attributes
-            instance = args[0] if args and hasattr(
-                args[0], '__class__') else None
+            instance = args[0] if _is_class_method(func) else None
 
             if instance is not None:
                 # Use instance attributes if not explicitly provided
