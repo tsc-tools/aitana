@@ -3,8 +3,8 @@ import pandas as pd
 
 
 def wfs_request(
-    startdate: datetime,
-    enddate: datetime,
+    start_date: datetime,
+    end_date: datetime,
     polygon: str = None,
     radius: int = None,
     center_point: str = None,
@@ -33,12 +33,12 @@ def wfs_request(
     wfs_url = "http://wfs.geonet.org.nz/geonet/ows?service=WFS&version=1.0.0"
     if polygon is None and radius is None:
         raise ValueError("Either polygon or radius must be provided.")
-    startdate = startdate.strftime("%Y-%m-%dT%H:%M:%S.0Z")
+    start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S.0Z")
     url = wfs_url
     url += (
         "&request=GetFeature&typeName=geonet:quake_search_v1&outputFormat=csv"
     )
-    url += f"&cql_filter=origintime>={startdate}"
+    url += f"&cql_filter=origintime>={start_date}"
 
     if radius is not None:
         url += (
@@ -47,13 +47,11 @@ def wfs_request(
     if polygon is not None:
         url += f"+AND+WITHIN(origin_geom,POLYGON(({polygon})))+AND+depth<{maxdepth}"
 
-    cat = pd.read_csv(url, parse_dates=["origintime"])
-    cat.sort_values(["origintime"], ascending=True, inplace=True)
-    cat = cat.reset_index()
-    cat = cat[cat.origintime <= str(enddate)]
+    cat = pd.read_csv(url, parse_dates=["origintime"], index_col="origintime")
+    cat.sort_index(inplace=True)
     if cat.size == 0:
         msg = "There are no earthquakes available for"
-        msg += f"the selected date range ({str(startdate)}, {str(enddate)}) in "
+        msg += f"the selected date range ({str(start_date)}, {str(end_date)}) in "
         if radius is not None:
             msg += "a radius of {} m".format(radius)
         if polygon is not None:

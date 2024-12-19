@@ -6,23 +6,26 @@ import numpy as np
 from aitana.tilde import tilde_request
 from aitana.wfs import wfs_request
 from aitana import get_data
+from aitana.util import cache_dataframe, gradient, reindex, eqRate
 
 
 class CraterLake(object):
 
-    def __init__(self, startdate: datetime, enddate: datetime):
-        self.startdate = startdate
-        self.enddate = enddate
+    def __init__(self, start_date: datetime, end_date: datetime):
+        self.start_date = start_date
+        self.end_date = end_date
 
-    def temperature(self, resample: str = "D", interpolate: str = None, exclude1995: bool = True, dropna: bool = True) -> pd.DataFrame:
+    @cache_dataframe()
+    def temperature(self, resample: str = "D", interpolate: str = None,
+                    exclude1995: bool = True, dropna: bool = True) -> pd.DataFrame:
         """
         Read crater lake temperature from Tilde (https://tilde.geonet.org.nz).
 
         Parameters:
         -----------
-            :param enddate: The latest date of the time-series.
+            :param end_date: The latest date of the time-series.
                             Mainly needed for testing.
-            :type enddate: :class:`datetime.datetime`
+            :type end_date: :class:`datetime.datetime`
             :param resample: Average over resampling interval and
                             linearly interpolate in between. The
                             interval should be one of 'D', 'W',
@@ -39,19 +42,19 @@ class CraterLake(object):
             :type df: :class:`pandas.Dataframe`
         """
         # read in datalogger temperature data
-        df = tilde_request(startdate=max(self.startdate, datetime(2019, 5, 21, 4, 30, 0)), enddate=self.enddate,
+        df = tilde_request(start_date=datetime(2019, 5, 21, 4, 30, 0), end_date=self.end_date,
                            domain="envirosensor",
                            name="lake-temperature",
                            station="RU001", sensor="04")
 
-        df1 = tilde_request(startdate=max(self.startdate, datetime(1993, 12, 11)), enddate=self.enddate,
+        df1 = tilde_request(start_date=datetime(1993, 12, 11), end_date=self.end_date,
                             domain="envirosensor",
                             name="lake-temperature",
                             station="RU001", sensor="01")
 
         # Read in the manual temperatures
         # water analysis lab, thermometer
-        dfmc1 = tilde_request(startdate=max(self.startdate, datetime(1954, 2, 14)), enddate=self.enddate,
+        dfmc1 = tilde_request(start_date=datetime(1954, 2, 14), end_date=self.end_date,
                               domain="manualcollect",
                               name="lake-temperature",
                               station="RU001",
@@ -59,7 +62,7 @@ class CraterLake(object):
                               sensor="MC01")
 
         # water analysis lab, thermocouple
-        dfmc1_2 = tilde_request(startdate=max(self.startdate, datetime(1991, 1, 13)), enddate=self.enddate,
+        dfmc1_2 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
                                 domain="manualcollect",
                                 name="lake-temperature",
                                 station="RU001",
@@ -67,7 +70,7 @@ class CraterLake(object):
                                 sensor="MC01")
 
         # thermocouple 1
-        dfmc3 = tilde_request(startdate=max(self.startdate, datetime(1998, 3, 17)), enddate=self.enddate,
+        dfmc3 = tilde_request(start_date=datetime(1998, 3, 17), end_date=self.end_date,
                               domain="manualcollect",
                               name="lake-temperature",
                               station="RU001",
@@ -75,7 +78,7 @@ class CraterLake(object):
                               sensor="MC03")
 
         # thermocouple 2
-        dfmc4 = tilde_request(startdate=max(self.startdate, datetime(1991, 1, 13)), enddate=self.enddate,
+        dfmc4 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
                               domain="manualcollect",
                               name="lake-temperature",
                               station="RU001",
@@ -99,17 +102,14 @@ class CraterLake(object):
             cond1 = df.index <= "1995-09-20 00:00:00"
             cond2 = df.index >= "2000-01-01 00:00:00"
             df = df[(cond1) | (cond2)]
-        df = df[df.index <= str(self.enddate)]
-        if self.startdate is not None:
-            df = df[df.index >= str(self.startdate)]
-
         # get rid of nans
         if dropna:
             df.dropna(inplace=True)
-
         # change annoying temp label and drop old column
+        df.rename(columns={" t (C)": "obs"}, inplace=True)
         return df
 
+    @cache_dataframe()
     def water_analyte(self, analyte: str, resample: str = None, interpolate: str = None,
                       exclude1995: bool = True) -> pd.DataFrame:
         """
@@ -139,8 +139,8 @@ class CraterLake(object):
         sensors = ["MC01", "MC03", "MC04"]
         for sensor in sensors:
             try:
-                df = tilde_request(startdate=max(self.startdate, datetime(1964, 5, 9)),
-                                   enddate=self.enddate,
+                df = tilde_request(start_date=datetime(1964, 5, 9),
+                                   end_date=self.end_date,
                                    domain="manualcollect",
                                    name=f"lake-{analyte}-conc",
                                    station="RU001",
@@ -151,7 +151,7 @@ class CraterLake(object):
                 dataframes.append(df)
         if len(dataframes) == 0:
             raise ValueError(
-                f"No data found for {analyte} between {self.startdate} and {self.enddate}")
+                f"No data found for {analyte} between {self.start_date} and {self.end_date}")
         df = dataframes[0]
         if len(dataframes) > 1:
             for df1 in dataframes[1:]:
@@ -166,25 +166,22 @@ class CraterLake(object):
             cond1 = df.index <= "1995-09-20 00:00:00"
             cond2 = df.index >= "2000-01-01 00:00:00"
             df = df[(cond1) | (cond2)]
-
-        df = df[df.index <= str(self.enddate)]
-        if self.startdate is not None:
-            df = df[df.index >= str(self.startdate)]
         return df
 
 
 class Gas(object):
 
-    def __init__(self, startdate: datetime, enddate: datetime):
-        self.startdate = startdate
-        self.enddate = enddate
+    def __init__(self, start_date: datetime, end_date: datetime):
+        self.start_date = start_date
+        self.end_date = end_date
 
+    @cache_dataframe()
     def so2(self) -> pd.DataFrame:
         dataframes = []
         for method in ["cospec", "contouring", "flyspec", "mobile-doas"]:
             try:
-                df = tilde_request(startdate=max(self.startdate, datetime(2003, 5, 27)),
-                                   enddate=self.enddate,
+                df = tilde_request(start_date=datetime(2003, 5, 27),
+                                   end_date=self.end_date,
                                    domain="manualcollect",
                                    name="plume-SO2-gasflux",
                                    method=method,
@@ -195,57 +192,57 @@ class Gas(object):
                 dataframes.append(df)
         if len(dataframes) == 0:
             raise ValueError(
-                f"No data found for SO2 between {self.startdate} and {self.enddate}")
+                f"No data found for SO2 between {self.start_date} and {self.end_date}")
         df = dataframes[0]
         if len(dataframes) > 1:
             for df1 in dataframes[1:]:
                 df = df.combine_first(df1)
         df['obs'] *= 86.4
         df['err'] *= 86.4
-        df = df[df.index <= str(self.enddate)]
-        if self.startdate is not None:
-            df = df[df.index >= str(self.startdate)]
         return df
 
+    @cache_dataframe()
     def co2(self) -> pd.DataFrame:
-        df = tilde_request(startdate=max(self.startdate, datetime(2003, 5, 27)),
-                           enddate=self.enddate,
+        df = tilde_request(start_date=max(self.start_date, datetime(2003, 5, 27)),
+                           end_date=self.end_date,
                            domain="manualcollect",
                            name="plume-CO2-gasflux",
                            method="contouring",
                            station="RU000", sensor="MC01")
         df['obs'] *= 86.4
         df['err'] *= 86.4
-        df = df[df.index <= str(self.enddate)]
-        if self.startdate is not None:
-            df = df[df.index >= str(self.startdate)]
+        df = df[df.index <= str(self.end_date)]
+        if self.start_date is not None:
+            df = df[df.index >= str(self.start_date)]
         return df
 
+    @cache_dataframe()
     def h2s(self) -> pd.DataFrame:
-        df = tilde_request(startdate=max(self.startdate, datetime(2004, 4, 21)),
-                           enddate=self.enddate,
+        df = tilde_request(start_date=max(self.start_date, datetime(2004, 4, 21)),
+                           end_date=self.end_date,
                            domain="manualcollect",
                            name="plume-H2S-gasflux",
                            method="contouring",
                            station="RU000", sensor="MC01")
         df['obs'] *= 86.4
         df['err'] *= 86.4
-        df = df[df.index <= str(self.enddate)]
-        if self.startdate is not None:
-            df = df[df.index >= str(self.startdate)]
+        df = df[df.index <= str(self.end_date)]
+        if self.start_date is not None:
+            df = df[df.index >= str(self.start_date)]
         return df
 
 
 class Seismicity(object):
 
-    def __init__(self, startdate: datetime, enddate: datetime):
-        self.startdate = startdate
-        self.enddate = enddate
+    def __init__(self, start_date: datetime, end_date: datetime):
+        self.start_date = start_date
+        self.end_date = end_date
         self.cache_dir = os.path.join(os.environ.get(
             "HOME", "/tmp"), "aitana_cache")
         self.feature_dir = os.path.join(os.environ.get(
             "HOME", "/tmp"), "aitana_features")
 
+    @cache_dataframe()
     def regional(self):
         """
         Load an earthquake catalogue for an area containing Waiouru and National Park.
@@ -254,15 +251,16 @@ class Seismicity(object):
         polygon = (
             "175.32+-39.50,+175.32+-39.18,+175.77+-39.18,+175.77+-39.50,+175.32+-39.50"
         )
-        return wfs_request(self.startdate, self.enddate, polygon=polygon)
+        return wfs_request(self.start_date, self.end_date, polygon=polygon)
 
+    @cache_dataframe()
     def cone(self):
         """
         Load an earthquake catalogue for an area of 7 km around the summit.
         """
         radius = 7000
         center_point = "175.57+-39.28"
-        return wfs_request(self.startdate, self.enddate, radius=radius, center_point=center_point)
+        return wfs_request(self.start_date, self.end_date, radius=radius, center_point=center_point)
 
     def rm_duplicates(self, cat1: pd.DataFrame, cat2: pd.DataFrame) -> pd.DataFrame:
         """
@@ -285,7 +283,8 @@ class Seismicity(object):
         for i in range(cat_tmp.shape[0]):
             if cat_tmp.iloc[i].publicid in cat2.publicid.values:
                 idxs.append(i)
-        cat_tmp.drop(idxs, inplace=True)
+        dates_to_drop = cat_tmp.index[idxs]
+        cat_tmp.drop(dates_to_drop, inplace=True)
         return cat_tmp
 
     def daily_rsam(self, update=False) -> pd.DataFrame:
@@ -300,9 +299,9 @@ class Seismicity(object):
         """
         df = pd.read_csv(get_data("data/ruapehu_rsam.csv"),
                          parse_dates=True, index_col=0)
-        if self.enddate.tzinfo is not None:
+        if self.end_date.tzinfo is not None:
             df.index = df.index.tz_localize(timezone.utc)
-        if self.enddate > df.index[-1] and update:
+        if self.end_date > df.index[-1] and update:
             df_drz = pd.read_csv(
                 get_data("data/DRZ_scaled_MAVZ.csv"), parse_dates=True, index_col=0
             )
@@ -311,14 +310,14 @@ class Seismicity(object):
             url += "starttime=2007-01-01T00:00:00&endtime={}&volcano=Ruapehu&site=FWVZ"
             try:
                 df_fwvz = pd.read_csv(
-                    url.format(self.enddate.isoformat()),
+                    url.format(self.end_date.isoformat()),
                     parse_dates=True,
                     index_col=0,
                     date_format="ISO8601",
                 )
             except Exception as e:
-                print(url.format(self.startdate.isoformat(),
-                      self.enddate.isoformat()))
+                print(url.format(self.start_date.isoformat(),
+                      self.end_date.isoformat()))
                 raise e
             df_fwvz["rsam"] = np.where(
                 df_fwvz["rsam"] > 1e30, np.nan, df_fwvz["rsam"])
@@ -329,11 +328,12 @@ class Seismicity(object):
             # remove duplicated dates:
             df = df.loc[~df.index.duplicated(), :]
             df.to_csv(get_data("data/ruapehu_rsam.csv"))
-        df = df[df.index <= str(self.enddate)]
-        df = df[df.index >= str(self.startdate)]
+        df = df[df.index <= str(self.end_date)]
+        df = df[df.index >= str(self.start_date)]
         return df
 
 
+@cache_dataframe()
 def eruptions(min_size: int = 0, dec_interval: str = None) -> pd.DataFrame:
     """
     This function loads the eruption catalogue for Mt. Ruapehu and declusters
@@ -382,4 +382,76 @@ def eruptions(min_size: int = 0, dec_interval: str = None) -> pd.DataFrame:
         scaled_eruptions = scaled_eruptions[(
             scaled_eruptions.delta >= dec_interval)]
         scaled_eruptions = scaled_eruptions.drop(columns=["delta", "tvalue"])
+    scaled_eruptions = scaled_eruptions.tz_localize('utc')
     return scaled_eruptions
+
+
+@cache_dataframe()
+def load_all(
+    fill_method="interpolate",
+    end_date=datetime.now(timezone.utc),
+):
+    end_date = end_date.replace(tzinfo=timezone.utc)
+    cols = {}
+
+    # load crater lake data
+    rcl = CraterLake(start_date=datetime(1954, 1, 1), end_date=end_date)
+    dft = rcl.temperature()
+    grad = gradient(dft)
+    new_dates = pd.date_range(dft.index[0], end_date, freq="D")
+    cols["TemperatureBin"] = reindex(dft, new_dates, fill_method=fill_method)
+    cols["GradientBin"] = reindex(grad, new_dates, fill_method=fill_method)
+    mg = rcl.water_analyte("Mg")
+    dmg = gradient(mg, period="90D")
+    cols["Mg"] = reindex(dmg, new_dates, fill_method=fill_method)
+    so4 = rcl.water_analyte("SO4")
+    dso4 = gradient(so4, period="90D")
+    cols["SO4"] = reindex(dso4, new_dates, fill_method=fill_method)
+    cl = rcl.water_analyte("Cl")
+    mg_cl = mg / cl
+    dmg_cl = gradient(mg_cl, period="90D")
+    cols["Mg_ClBin"] = reindex(dmg_cl, new_dates, fill_method=fill_method)
+    na = rcl.water_analyte("Na")
+    mg_na = mg / na
+    dmg_na = gradient(mg_na, period="90D")
+    cols["Mg_Na"] = reindex(dmg_na, new_dates, fill_method=fill_method)
+    k = rcl.water_analyte("K")
+    mg_k = mg / k
+    dmg_k = gradient(mg_k, period="90D")
+    cols["Mg_K"] = reindex(dmg_k, new_dates, fill_method=fill_method)
+    al = rcl.water_analyte("Al")
+    mg_al = mg / al
+    dmg_al = gradient(mg_al, period="90D")
+    cols["Mg_Al"] = reindex(dmg_al, new_dates, fill_method=fill_method)
+
+    # Load gas data
+    rg = Gas(start_date=datetime(1954, 1, 1), end_date=end_date)
+    co2 = rg.co2()
+    co2 = co2.groupby(pd.Grouper(freq="1D")).median()
+    cols["CO2"] = reindex(co2, new_dates, fill_method=fill_method)
+    so2 = rg.so2()
+    so2 = so2.groupby(pd.Grouper(freq="1D")).median()
+    cols["SO2"] = reindex(so2, new_dates, fill_method=fill_method)
+    h2s = rg.h2s()
+    h2s = h2s.groupby(pd.Grouper(freq="1D")).median()
+    cols["H2S"] = reindex(h2s, new_dates, fill_method=fill_method)
+    cs = co2 / so2
+    dcs = gradient(cs, period="90D")
+    cols["CO2_SO2"] = reindex(dcs, new_dates, fill_method=fill_method)
+
+    # Load seismic data
+    rs = Seismicity(start_date=datetime(2015, 1, 1), end_date=end_date)
+    cat_outer = rs.regional()
+    cat_inner = rs.cone()
+    cat_outer = rs.rm_duplicates(cat_outer, cat_inner)
+    eqr_outer = eqRate(cat_outer, fixed_time=7).resample(
+        "D").mean().interpolate()
+    eqr_inner = eqRate(cat_inner, fixed_time=7).resample(
+        "D").mean().interpolate()
+    cols["Eqr_outer"] = reindex(eqr_outer, new_dates, fill_method=fill_method)
+    cols["Eqr_inner"] = reindex(eqr_inner, new_dates, fill_method=fill_method)
+    rsam = rs.daily_rsam()
+    cols["RSAM"] = reindex(rsam, new_dates, fill_method=fill_method)
+    rsam100 = rsam.rolling(window="100D", min_periods=1).max()
+    cols["RSAM100"] = reindex(rsam100, new_dates, fill_method=fill_method)
+    return pd.DataFrame(cols, index=new_dates)

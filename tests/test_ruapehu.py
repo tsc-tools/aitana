@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from aitana.ruapehu import CraterLake, Gas, Seismicity, eruptions
+from aitana.ruapehu import CraterLake, Gas, Seismicity, eruptions, load_all
 
 
 def test_crater_lake():
@@ -49,14 +49,16 @@ def test_seismicity():
     cat1 = g.regional()
     cat2 = g.cone()
     cat3 = g.rm_duplicates(cat1, cat2)
-    assert cat1.shape == (41, 22)
-    assert cat2.shape == (10, 22)
-    assert cat3.shape == (31, 22)
+    assert cat1.shape == (41, 20)
+    assert cat2.shape == (10, 20)
+    assert cat3.shape == (31, 20)
 
 
 def test_eruptions():
-    e1 = eruptions(min_size=3)
-    e2 = eruptions(min_size=3, dec_interval='14D')
+    e1 = eruptions(min_size=3,
+                   end_date=datetime(2024, 11, 30, tzinfo=timezone.utc))
+    e2 = eruptions(min_size=3, dec_interval='14D',
+                   end_date=datetime(2024, 11, 30, tzinfo=timezone.utc))
     assert e1.shape == (293, 5)
     assert e2.shape == (57, 5)
 
@@ -73,3 +75,9 @@ def test_rsam():
     g = Seismicity(tstart, tend)
     rsam = g.daily_rsam()
     assert rsam.shape == (30, 1)
+
+
+def test_load_all():
+    end_date = datetime(2024, 11, 30)
+    df = load_all(end_date=end_date)
+    assert df.iloc[-1].isnull().sum() == 0

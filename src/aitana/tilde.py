@@ -5,8 +5,8 @@ import pandas as pd
 
 
 def tilde_request(
-    startdate: datetime,
-    enddate: datetime,
+    start_date: datetime,
+    end_date: datetime,
     domain: str,
     name: str,
     station: str,
@@ -33,9 +33,9 @@ def tilde_request(
         The sensor of the data (e.g. 'MC01')
     aspect : str
         The aspect of the data (e.g. 'nil')
-    startdate : date
+    start_date : date
         The start date of the data
-    enddate : date
+    end_date : date
         The end date of the data
 
     Returns
@@ -47,15 +47,15 @@ def tilde_request(
     # split the request into historic and latest data
     get_historic = True
     get_latest = False
-    startdate = startdate.astimezone(timezone.utc)
-    enddate = enddate.astimezone(timezone.utc)
-    _tstart = str(startdate.date())
-    _tend = str(enddate.date())
+    start_date = start_date.astimezone(timezone.utc)
+    end_date = end_date.astimezone(timezone.utc)
+    _tstart = str(start_date.date())
+    _tend = str(end_date.date())
     _today = datetime.now(timezone.utc).date()
-    if enddate.date() > (_today - timedelta(days=29)):
-        _tend = str((enddate.date() - timedelta(days=29)))
+    if end_date.date() > (_today - timedelta(days=29)):
+        _tend = str((end_date.date() - timedelta(days=29)))
         get_latest = True
-    if startdate.date() > (_today - timedelta(days=29)):
+    if start_date.date() > (_today - timedelta(days=29)):
         get_historic = False
 
     assert get_historic or get_latest, "Check start and end dates."
@@ -98,4 +98,4 @@ def tilde_request(
         df = df_latest
     df.rename(columns={"value": "obs", "error": "err"}, inplace=True)
     df.index.name = "dt"
-    return df.loc[startdate:enddate]
+    return df.loc[start_date:end_date]
