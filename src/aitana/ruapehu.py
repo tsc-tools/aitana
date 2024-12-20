@@ -329,6 +329,8 @@ class Seismicity(object):
             # remove duplicated dates:
             df = df.loc[~df.index.duplicated(), :]
             df.to_csv(get_data("data/ruapehu_rsam.csv"))
+            if self.end_date.tzinfo is not None:
+                df.index = df.index.tz_localize(timezone.utc)
         df = df[df.index <= str(self.end_date)]
         df = df[df.index >= str(self.start_date)]
         return df

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -68,13 +68,21 @@ def test_rsam():
     tend = datetime(2024, 11, 30)
     g = Seismicity(tstart, tend)
     rsam = g.daily_rsam()
-    assert rsam.shape == (6158, 1)
+    assert rsam.shape == (6159, 1)
 
     tstart = datetime(2023, 11, 1, tzinfo=timezone.utc)
     tend = datetime(2023, 11, 30, tzinfo=timezone.utc)
     g = Seismicity(tstart, tend)
     rsam = g.daily_rsam()
     assert rsam.shape == (30, 1)
+
+    # test local rsam server
+    # tstart = datetime(2023, 11, 1, tzinfo=timezone.utc)
+    # tend = datetime.now(timezone.utc)
+    # tstart = tend - timedelta(days=30)
+    # g = Seismicity(tstart, tend)
+    # rsam = g.daily_rsam(update=True)
+    # print(rsam)
 
 
 def test_load_all():
