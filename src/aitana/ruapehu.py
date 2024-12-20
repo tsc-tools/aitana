@@ -306,18 +306,19 @@ class Seismicity(object):
                 get_data("data/DRZ_scaled_MAVZ.csv"), parse_dates=True, index_col=0
             )
             df_drz.rename(columns={"RSAM": "obs"}, inplace=True)
-            url = "http://kaizen.gns.cri.nz:9157/feature?name=rsam&"
-            url += "starttime=2007-01-01T00:00:00&endtime={}&volcano=Ruapehu&site=FWVZ"
+            url = "http://kaizen.gns.cri.nz:9157/feature?name=rsam"
+            url += "&starttime=2007-01-01T00:00:00"
+            url += f"&endtime={self.end_date.isoformat().split('+')[0]}"
+            url += "&volcano=Ruapehu&site=FWVZ"
             try:
                 df_fwvz = pd.read_csv(
-                    url.format(self.end_date.isoformat()),
+                    url,
                     parse_dates=True,
                     index_col=0,
                     date_format="ISO8601",
                 )
             except Exception as e:
-                print(url.format(self.start_date.isoformat(),
-                      self.end_date.isoformat()))
+                print(url)
                 raise e
             df_fwvz["rsam"] = np.where(
                 df_fwvz["rsam"] > 1e30, np.nan, df_fwvz["rsam"])
