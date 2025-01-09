@@ -18,6 +18,18 @@ def test_crater_lake():
     df = rcl.water_analyte('Mg')
     assert df.obs.loc['2022-12-21'] - 362.0 < 0.001
 
+    tstart = datetime(2010, 11, 18)
+    tend = datetime(2010, 11, 19)
+    rcl = CraterLake(tstart, tend)
+    df = rcl.water_level()
+    assert df.obs.loc['2010-11-18'].mean() - 1.241 < 0.001
+
+    tstart = datetime(2021, 5, 8)
+    tend = datetime(2021, 5, 9)
+    rcl = CraterLake(tstart, tend)
+    df = rcl.water_level()
+    assert df.obs.loc['2021-05-08'].mean() - 1.269 < 0.001
+
 
 def test_gas():
     tstart = datetime(2023, 12, 20)

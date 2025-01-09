@@ -23,9 +23,6 @@ class CraterLake(object):
 
         Parameters:
         -----------
-            :param end_date: The latest date of the time-series.
-                            Mainly needed for testing.
-            :type end_date: :class:`datetime.datetime`
             :param resample: Average over resampling interval and
                             linearly interpolate in between. The
                             interval should be one of 'D', 'W',
@@ -107,6 +104,30 @@ class CraterLake(object):
             df.dropna(inplace=True)
         # change annoying temp label and drop old column
         df.rename(columns={" t (C)": "obs"}, inplace=True)
+        return df
+
+    @cache_dataframe()
+    def water_level(self):
+        """
+        Read crater lake water level from Tilde (https://tilde.geonet.org.nz).
+        """
+        sensors = ['02', '03']
+        dataframes = []
+        for sensor in sensors:
+            try:
+                df = tilde_request(start_date=datetime(2009, 4, 15, 2, 0, 0), end_date=self.end_date,
+                                   domain="envirosensor",
+                                   name="lake-height",
+                                   station="RU001", sensor=sensor)
+            except ValueError:
+                continue
+            if len(df) > 0:
+                dataframes.append(df)
+
+        df = dataframes[0]
+        if len(dataframes) > 1:
+            for df1 in dataframes[1:]:
+                df = df.combine_first(df1)
         return df
 
     @cache_dataframe()
@@ -211,9 +232,6 @@ class Gas(object):
                            station="RU000", sensor="MC01")
         df['obs'] *= 86.4
         df['err'] *= 86.4
-        df = df[df.index <= str(self.end_date)]
-        if self.start_date is not None:
-            df = df[df.index >= str(self.start_date)]
         return df
 
     @cache_dataframe()
@@ -226,9 +244,6 @@ class Gas(object):
                            station="RU000", sensor="MC01")
         df['obs'] *= 86.4
         df['err'] *= 86.4
-        df = df[df.index <= str(self.end_date)]
-        if self.start_date is not None:
-            df = df[df.index >= str(self.start_date)]
         return df
 
 
