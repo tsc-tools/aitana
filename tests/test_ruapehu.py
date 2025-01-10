@@ -61,9 +61,9 @@ def test_seismicity():
     cat1 = g.regional()
     cat2 = g.cone()
     cat3 = g.rm_duplicates(cat1, cat2)
-    assert cat1.shape == (41, 20)
+    assert cat1.shape == (43, 20)
     assert cat2.shape == (10, 20)
-    assert cat3.shape == (31, 20)
+    assert cat3.shape == (33, 20)
 
 
 def test_eruptions():

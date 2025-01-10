@@ -130,7 +130,8 @@ def cache_dataframe(cache_dir: str = ""):
                 logger.debug(f"Saving cache to {cache_file}")
                 cached_df.to_csv(cache_file)
             # Return the relevant slice of the cached DataFrame
-            return_df = cached_df.loc[start_date:end_date]
+            return_df = cached_df.loc[start_date:end_date.replace(
+                hour=23, minute=59, second=59)]
             if return_df.empty:
                 raise ValueError("No data available for the given date range.")
             return return_df
