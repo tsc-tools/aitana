@@ -195,7 +195,7 @@ class CraterLake(object):
                 A dataframe with the water analyte time series.
         """
         dataframes = []
-        sensors = ["MC01", "MC03", "MC04"]
+        sensors = ["MC03", "MC04", "MC01"]
         for sensor in sensors:
             try:
                 df = tilde_request(start_date=datetime(1964, 5, 9),
