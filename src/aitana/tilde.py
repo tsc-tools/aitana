@@ -98,4 +98,4 @@ def tilde_request(
         df = df_latest
     df.rename(columns={"value": "obs", "error": "err"}, inplace=True)
     df.index.name = "dt"
-    return df.loc[start_date:end_date]
+    return df.loc[start_date:end_date.replace(hour=23, minute=59, second=59)]
