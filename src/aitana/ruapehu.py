@@ -38,55 +38,93 @@ class CraterLake(object):
             :param df: A dataframe with the temperature time series.
             :type df: :class:`pandas.Dataframe`
         """
+        dataframes = []
         # read in datalogger temperature data
-        df = tilde_request(start_date=datetime(2019, 5, 21, 4, 30, 0), end_date=self.end_date,
-                           domain="envirosensor",
-                           name="lake-temperature",
-                           station="RU001", sensor="04")
+        try:
+            df = tilde_request(start_date=datetime(2019, 5, 21, 4, 30, 0), end_date=self.end_date,
+                               domain="envirosensor",
+                               name="lake-temperature",
+                               station="RU001", sensor="04")
+        except ValueError:
+            pass
+        else:
+            dataframes.append(df)
 
-        df1 = tilde_request(start_date=datetime(1993, 12, 11), end_date=self.end_date,
-                            domain="envirosensor",
-                            name="lake-temperature",
-                            station="RU001", sensor="01")
+        try:
+            df1 = tilde_request(start_date=datetime(1993, 12, 11), end_date=self.end_date,
+                                domain="envirosensor",
+                                name="lake-temperature",
+                                station="RU001", sensor="01")
+        except ValueError:
+            pass
+        else:
+            dataframes.append(df1)
 
         # Read in the manual temperatures
         # water analysis lab, thermometer
-        dfmc1 = tilde_request(start_date=datetime(1954, 2, 14), end_date=self.end_date,
-                              domain="manualcollect",
-                              name="lake-temperature",
-                              station="RU001",
-                              method="thermometer",
-                              sensor="MC01")
+        try:
+            dfmc1 = tilde_request(start_date=datetime(1954, 2, 14), end_date=self.end_date,
+                                  domain="manualcollect",
+                                  name="lake-temperature",
+                                  station="RU001",
+                                  method="thermometer",
+                                  sensor="MC01")
+        except ValueError:
+            pass
+        else:
+            if len(dfmc1) > 0:
+                dataframes.append(dfmc1)
 
         # water analysis lab, thermocouple
-        dfmc1_2 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
-                                domain="manualcollect",
-                                name="lake-temperature",
-                                station="RU001",
-                                method="thermocouple",
-                                sensor="MC01")
+        try:
+            dfmc1_2 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
+                                    domain="manualcollect",
+                                    name="lake-temperature",
+                                    station="RU001",
+                                    method="thermocouple",
+                                    sensor="MC01")
+        except ValueError:
+            pass
+        else:
+            if len(dfmc1_2) > 0:
+                dataframes.append(dfmc1_2)
 
         # thermocouple 1
-        dfmc3 = tilde_request(start_date=datetime(1998, 3, 17), end_date=self.end_date,
-                              domain="manualcollect",
-                              name="lake-temperature",
-                              station="RU001",
-                              method="thermocouple",
-                              sensor="MC03")
+        try:
+            dfmc3 = tilde_request(start_date=datetime(1998, 3, 17), end_date=self.end_date,
+                                  domain="manualcollect",
+                                  name="lake-temperature",
+                                  station="RU001",
+                                  method="thermocouple",
+                                  sensor="MC03")
+        except ValueError:
+            pass
+        else:
+            if len(dfmc3) > 0:
+                dataframes.append(dfmc3)
 
         # thermocouple 2
-        dfmc4 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
-                              domain="manualcollect",
-                              name="lake-temperature",
-                              station="RU001",
-                              method="thermocouple",
-                              sensor="MC04")
+        try:
+            dfmc4 = tilde_request(start_date=datetime(1991, 1, 13), end_date=self.end_date,
+                                  domain="manualcollect",
+                                  name="lake-temperature",
+                                  station="RU001",
+                                  method="thermocouple",
+                                  sensor="MC04")
+        except ValueError:
+            pass
+        else:
+            if len(dfmc4) > 0:
+                dataframes.append(dfmc4)
 
-        df = df.combine_first(df1)
-        df = df.combine_first(dfmc1)
-        df = df.combine_first(dfmc1_2)
-        df = df.combine_first(dfmc3)
-        df = df.combine_first(dfmc4)
+        if len(dataframes) == 0:
+            raise ValueError(
+                f"No data found for lake temperature between {self.start_date} and {self.end_date}")
+
+        df = dataframes[0]
+        if len(dataframes) > 1:
+            for df1 in dataframes[1:]:
+                df = df.combine_first(df1)
 
         if resample is not None:
             df = df.resample("D").mean()
