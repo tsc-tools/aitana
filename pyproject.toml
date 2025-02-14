@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aitana"
-version = "0.0.15"
+version = "0.1.0"
 authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
@@ -21,6 +21,7 @@ dependencies = [
     "pandas>=1.3",
     "requests",
     "matplotlib",
+    "statsmodels",
 ]
 
 [too.hatch.build]
