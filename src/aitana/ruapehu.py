@@ -290,10 +290,6 @@ class Seismicity(object):
     def __init__(self, start_date: datetime, end_date: datetime):
         self.start_date = start_date
         self.end_date = end_date
-        self.cache_dir = os.path.join(os.environ.get(
-            "HOME", "/tmp"), "aitana_cache")
-        self.feature_dir = os.path.join(os.environ.get(
-            "HOME", "/tmp"), "aitana_features")
 
     @cache_dataframe()
     def regional(self):
