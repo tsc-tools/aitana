@@ -20,7 +20,7 @@ pip install -U aitana
 
 ## Documentation
 
-Learn more about aitana in its official [documentation](https://tsc-tools.github.io/aitana.github.io/)
+Learn more about aitana in its official [documentation](https://tsc-tools.github.io/aitana/)
 Try out a [Jupyter notebook](https://github.com/tsc-tools/aitana/blob/main/docs/aitana_example.ipynb)
 
 ## Get in touch
