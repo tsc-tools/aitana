@@ -1,0 +1,18 @@
+site_name: Aitana
+nav:
+  - Home: index.md
+  - User Guide: aitana_example.ipynb
+  - API: api.md
+theme: readthedocs
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: auto 
+            heading_level: 1
+            parameter_headings: false 
+            show_root_toc_entry: true 
+  - mkdocs-jupyter:
