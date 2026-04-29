@@ -1,0 +1,9 @@
+name: whakaari_bayesian_network
+channels:
+    - conda-forge
+dependencies:
+    - python=3.11
+    - git
+    - pip
+    - pip:
+        - git+https://github.com/yannikbehr/Whakaari-probabilistic-eruption-forecasting.git@pgmpy

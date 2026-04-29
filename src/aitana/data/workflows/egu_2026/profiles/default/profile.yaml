@@ -1,0 +1,4 @@
+software-deployment-method:
+  - apptainer
+  - conda
+conda-prefix: /opt/conda/envs

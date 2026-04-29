@@ -1,0 +1,5 @@
+name: egu_poster 
+channels:
+  - conda-forge
+dependencies:
+  - tectonic

@@ -1,0 +1,11 @@
+.claude/memory/
+__pycache__
+dist/
+site/# pixi environments
+.pixi/*
+!.pixi/config.toml
+src/aitana/data/workflows/egu_2026/.conda/
+src/aitana/data/workflows/egu_2026/.cache/
+src/aitana/data/workflows/egu_2026/.snakemake/
+*.png
+*.pdf
