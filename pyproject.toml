@@ -33,7 +33,7 @@ dependencies = [
     "statsmodels>=0.14.6,<0.15",
     "obspy>=1.4.2,<2",
     "snakemake>=9.16.3,<10",
-    "tonik>=0.1.23,<0.2"]
+    "tonik<=0.1.22"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
