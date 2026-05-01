@@ -27,7 +27,7 @@
 		"--security-opt", "apparmor=unconfined",
 		"--device=/dev/fuse"
 	],
-	"mounts": ["source=${localEnv:HOME}/.pypirc,target=/home/vscode/.pypirc,type=bind,consistency=cached"],
+	"mounts": ["source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached"],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "pip install -e '.[dev]'",
 
