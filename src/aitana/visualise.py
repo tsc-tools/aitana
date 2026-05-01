@@ -5,7 +5,6 @@ import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import pandas as pd
-import plotly.express as px
 
 from aitana import whakaari
 
@@ -22,35 +21,6 @@ STYLE_OVERRIDES = {
 def set_style():
     plt.style.use(STYLE)
     plt.rcParams.update(STYLE_OVERRIDES)
-
-
-def earthquake_map(cat, size_max=17, zoom=10):
-    """
-    Plot earthquake epicenters on an interactive map.
-    :param cat: A pandas dataframe with the earthquake catalogue. It
-                must have at least the columns 'latitude', 'longitude',
-                'depth', and 'magnitude'.
-    :type cat: :class:`pandas.DataFrame`
-    :returns: 2D interactive map.
-    :rtype: :class:`plotly.graph_objs.Figure`
-    """
-
-    # since magnitude is used for the size of the symbols
-    # it can't be negative
-    cat.where(cat.loc[:, ("magnitude",)] > 0.0, other=0.1, inplace=True)
-    cat.loc[:, ("magnitude_scaled",)] = cat.magnitude / 10
-    # px.set_mapbox_access_token(open(get_data("data/.mapbox_token")).read())
-    fig = px.scatter_map(
-        cat,
-        lat="latitude",
-        lon="longitude",
-        color="depth",
-        size="magnitude_scaled",
-        color_continuous_scale=px.colors.cyclical.IceFire,
-        size_max=size_max,
-        zoom=zoom,
-    )
-    return fig
 
 
 def trellis_plot(
