@@ -91,6 +91,39 @@ volcanobench clean whakaari ./results
 |---|---|---|
 | `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
 
+### Running the EGU 2026 workflow with Docker
+
+`scripts/run_egu2026.sh` is a convenience wrapper that builds the project's Docker image,
+installs Aitana from source inside the container, and runs the bundled `egu2026` workflow —
+no local Python environment needed.
+
+**Prerequisites:** Docker must be installed and running.
+
+```bash
+# Run with defaults (output → ./egu_2026_output, all available cores)
+./scripts/run_egu2026.sh
+
+# Custom output directory and core count
+./scripts/run_egu2026.sh -o /data/results -c 8
+
+# Show help
+./scripts/run_egu2026.sh -h
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-o OUTDIR` | `./egu_2026_output` | Directory for workflow outputs |
+| `-c CORES` | all logical CPUs | Snakemake parallelism |
+
+The Docker image (`aitana-workflow`) is built from `docker/Dockerfile` on first run and
+cached by Docker. Conda environments for individual workflow rules are cached in a named
+Docker volume (`aitana-conda-envs`) and reused across runs, so subsequent invocations are
+significantly faster.
+
+The poster-generation step uses Apptainer inside Docker (to run an Inkscape container),
+which requires elevated capabilities (`SYS_ADMIN`, `/dev/fuse`). These are passed
+automatically by the script.
+
 ### Registering your own workflow
 
 Any Python package can register a workflow by exposing a `WorkflowDescriptor` instance
