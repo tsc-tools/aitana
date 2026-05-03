@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="description" content="None" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>Aitana</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Home";
+        var mkdocs_page_input_path = "index.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="." class="icon icon-home"> Aitana
+        </a>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Home</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#what-is-implemented">What is implemented</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#what-is-planned-in-progress">What is planned / in progress</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#dependencies">Dependencies</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#volcanobench-cli">volcanobench CLI</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#get-in-touch">Get in touch</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="aitana_example/">How to use aitana</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="api/">API</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href=".">Aitana</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Home</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="aitana-volcano-monitoring-benchmarking-framework">Aitana: volcano monitoring benchmarking framework</h1>
+<p>Aitana (named after the great football midfielder
+<a href="https://en.wikipedia.org/wiki/Aitana_Bonmat%C3%AD">Aitana Bonmati</a>) is a Python library
+intended as a prototype implementation of a validation and benchmarking framework for
+AI/ML in volcano monitoring.</p>
+<p>Operational uptake of machine learning in volcano observatories remains limited because of
+three structural problems: no community-accepted benchmark datasets, poor reproducibility,
+and insufficient uncertainty quantification. Aitana is a prototype addressing these gaps.</p>
+<h2 id="what-is-implemented">What is implemented</h2>
+<ul>
+<li><strong>Data access</strong> — time-series data from three New Zealand volcanoes
+  (<a href="https://volcano.si.edu/volcano.cfm?vn=241100">Ruapehu</a>,
+  <a href="https://volcano.si.edu/volcano.cfm?vn=241040">Whakaari/White Island</a>,
+  <a href="https://volcano.si.edu/volcano.cfm?vn=241070">Taupo</a>) via the GeoNet TILDE API and WFS,
+  with transparent disk caching and incremental date-range updates.</li>
+<li><strong>Pre-processing</strong> — RSAM access for Ruapehu and Whakaari; seismic waveform retrieval,
+  validation, gap-filling, and instrument response removal (<code>seismic_waveforms</code>); moving-window
+  earthquake rate and gradient estimation (<code>util</code>).</li>
+<li><strong>Evaluation</strong> — ROC curves, threshold evaluation (TP/FP/TN/FN), and forecasted-rate
+  computation with pre-eruption windows (<code>scoring</code>).</li>
+<li><strong>State-space models</strong> — Kalman-filter models for multi-sensor SO₂ fusion and
+  trend estimation (<code>assimilate</code>).</li>
+<li><strong>Benchmarking CLI</strong> — <code>volcanobench</code> drives Snakemake workflows for end-to-end
+  benchmarking (download → feature extraction → model training → forecast scoring).
+  One workflow is bundled: a Bayesian network vs decision tree benchmark for Whakaari/White Island.</li>
+</ul>
+<h2 id="what-is-planned-in-progress">What is planned / in progress</h2>
+<ul>
+<li>Shared implementations of DSAR, spectrograms, and swarm detection.</li>
+<li>Temporal cross-validation schemes.</li>
+<li>Proper scoring rules (log-likelihood, CRPS, reliability diagrams).</li>
+<li>Containerised or environment-locked pipelines (Docker / Apptainer / pixi).</li>
+<li>Semantic versioning of datasets and evaluation protocols.</li>
+<li>Integration with community tools (SeisBench, WOVOdat formats).</li>
+</ul>
+<h2 id="dependencies">Dependencies</h2>
+<ul>
+<li>pandas, requests, matplotlib, statsmodels</li>
+<li>obspy (seismic waveform processing)</li>
+<li>snakemake (workflow execution)</li>
+<li>tonik</li>
+</ul>
+<h2 id="installation">Installation</h2>
+<pre><code>pip install -U aitana
+</code></pre>
+<h2 id="volcanobench-cli"><code>volcanobench</code> CLI</h2>
+<p>The <code>volcanobench</code> command drives Snakemake benchmarking workflows bundled with Aitana
+or registered by third-party packages via the <code>volcanobench.workflows</code> entry-point group.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>volcanobench list</code></td>
+<td>List all registered workflows (name, volcano, description).</td>
+</tr>
+<tr>
+<td><code>volcanobench run &lt;volcano&gt; &lt;outdir&gt;</code></td>
+<td>Run every registered workflow for a volcano.</td>
+</tr>
+<tr>
+<td><code>volcanobench clean &lt;volcano&gt; &lt;outdir&gt;</code></td>
+<td>Delete all outputs produced by the workflow.</td>
+</tr>
+</tbody>
+</table>
+<p><code>volcanobench run</code> accepts <code>--cores N</code> (default <code>1</code>) to control Snakemake parallelism.</p>
+<h2 id="get-in-touch">Get in touch</h2>
+<p>Report bugs, suggest features, view the source code, and ask questions <a href="https://github.com/tsc-tools/aitana/issues">on GitHub</a>.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="aitana_example/" class="btn btn-neutral float-right" title="How to use aitana">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+    
+      <span><a href="aitana_example/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
+
+<!--
+MkDocs version : 1.6.1
+Build Date UTC : 2026-05-03 19:25:02.767002+00:00
+-->
