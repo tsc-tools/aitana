@@ -1,8 +1,29 @@
 ## API Documentation
 
-::: aitana.whakaari 
+### Data access
+
+::: aitana.whakaari
 ::: aitana.ruapehu
-::: aitana.util
-::: aitana.assimilate
 ::: aitana.tilde
 ::: aitana.wfs
+
+### Utilities
+
+::: aitana.util
+
+### Evaluation and scoring
+
+::: aitana.scoring
+
+### State-space models
+
+::: aitana.assimilate
+
+### Visualisation
+
+::: aitana.visualise
+
+### CLI and workflows
+
+::: aitana.volcanobench
+::: aitana.logging_config
