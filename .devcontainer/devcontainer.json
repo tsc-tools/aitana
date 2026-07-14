@@ -28,11 +28,11 @@
 		"--device=/dev/fuse"
 	],
 	"mounts": [
-		"source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume",
+		"source=${localWorkspaceFolderBasename}-venv,target=/home/bayes/.venv,type=volume",
 		"source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached"
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "pixi install",
+	"postCreateCommand": "uv sync",
 
 	"customizations": {
 		"vscode": {

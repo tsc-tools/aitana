@@ -30,5 +30,9 @@ exclude = [
   "src/aitana/volcanoes/data/RSAM_NZ.WIZ.10.HHZ.csv",
 ]
 
+[tool.uv.sources]
+aitana-access = { workspace = true }
+aitana-features = { workspace = true }
+
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

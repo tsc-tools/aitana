@@ -2,9 +2,8 @@
 __pycache__
 dist/
 site/
-# pixi environments
-.pixi/*
-!.pixi/config.toml
+# uv environment
+.venv/
 src/aitana/data/workflows/egu_2026/.conda/
 src/aitana/data/workflows/egu_2026/.cache/
 src/aitana/data/workflows/egu_2026/.snakemake/

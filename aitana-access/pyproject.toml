@@ -28,5 +28,8 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
 
+[tool.uv.sources]
+aitana-storage = { workspace = true }
+
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

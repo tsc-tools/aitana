@@ -30,5 +30,9 @@ volcanobench = "aitana.bench.volcanobench:app"
 [project.entry-points."volcanobench.workflows"]
 whakaari_bn_2026 = "aitana.bench.workflows.whakaari_bn_2026:workflow"
 
+[tool.uv.sources]
+aitana-volcanoes = { workspace = true }
+aitana-storage = { workspace = true }
+
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

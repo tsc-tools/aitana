@@ -46,10 +46,17 @@ RUN apt-get update --yes && \
     rm /tmp/apptainer.deb
 
 
-# Install pixi system-wide
-RUN curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=/usr/local PIXI_NO_PATH_UPDATE=1 bash
+# Install uv system-wide
+RUN curl -fsSL https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
+
+# Keep the virtual environment outside the bind-mounted workspace: it's
+# platform-specific and this path lets a named volume mounted here inherit
+# bayes ownership from the image, instead of the root ownership Docker gives
+# a volume mounted inside the bind-mounted workspace.
+ENV UV_PROJECT_ENVIRONMENT=$HOME/.venv
 
 USER bayes
-RUN echo 'eval "$(pixi completion -s bash)"' >> ${HOME}/.bashrc
+RUN mkdir -p $HOME/.venv && \
+    echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
 
 EXPOSE 8003
