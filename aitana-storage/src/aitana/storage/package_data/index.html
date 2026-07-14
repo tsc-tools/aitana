@@ -1,0 +1,214 @@
+<!-- TonikAPI index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TonikAPI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+      line-height: 1.6;
+    }
+    header {
+      background-color: #007ACC;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+    }
+    section {
+      background-color: #fff;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #007ACC;
+    }
+    code {
+      background-color: #eef;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: #eef;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    a.button {
+      display: inline-block;
+      padding: 10px 15px;
+      margin: 5px 0;
+      font-size: 14px;
+      text-decoration: none;
+      background-color: #007ACC;
+      color: #fff;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #666;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TonikAPI</h1>
+    <p>Query, transform, and extract features from multidimensional data stores</p>
+  </header>
+
+  <section>
+    <h2>Overview</h2>
+    <p>
+      TonikAPI is designed for efficient retrieval, transformation, and feature extraction of time-series and spectrogram-like data stored in hierarchical formats. It supports subdirectory traversal, resampling, log-scaling, and normalization.
+    </p>
+    <p>
+      This API is especially suited for applications in seismology, geophysics, and related fields.
+    </p>
+  </section>
+
+  <section>
+    <h2>Endpoints</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Endpoint</th>
+          <th>Method</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>/feature</code></td>
+          <td>GET</td>
+          <td>Returns time series or spectrogram features for a given group, variable, and time range.</td>
+        </tr>
+        <tr>
+          <td><code>/inventory</code></td>
+          <td>GET</td>
+          <td>Lists available datasets or subdirectories within a group.</td>
+        </tr>
+        <tr>
+          <td><code>/labels</code></td>
+          <td>GET</td>
+          <td>Fetches labels associated with a dataset for a specified time range.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Feature Request Example</h2>
+    <p>Example query for retrieving a feature:</p>
+    <pre>GET /feature?path=testgroup&amp;name=rms&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true</pre>
+    <p>
+      <a class="button" href="#" onclick="alert('Simulate API call using curl or your browser.')">Try Feature Query</a>
+    </p>
+    <pre>curl "http://localhost:8003/feature?path=testgroup&amp;name=rms&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true"</pre>
+  </section>
+
+  <section>
+    <h2>Inventory</h2>
+    <p>
+      The <code>/inventory</code> endpoint returns a fully nested dictionary of all available datasets within a group.
+      Every feature leaf carries metadata so you know exactly what data is available before making a feature request.
+    </p>
+
+    <h3>Tree view (default)</h3>
+    <p>Returns the complete hierarchy as nested dicts. Each feature is a dict with record metadata and a ready-to-use request URL:</p>
+    <pre>GET /inventory?path=testgroup</pre>
+    <pre><code>{
+  "testgroup": {
+    "WIZ": {
+      "00": {
+        "HHZ": {
+          "rsam": {
+            "name": "rsam",
+            "recordCount": 1440,
+            "earliestRecord": "2023-01-01T00:00:00",
+            "latestRecord":   "2023-01-10T23:50:00",
+            "url": "http://localhost:8003/feature?path=testgroup,WIZ,00,HHZ&amp;name=rsam&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-10T23:50:00"
+          },
+          ...
+        }
+      }
+    }
+  }
+}</code></pre>
+
+    <h3>Flat view</h3>
+    <p>Pass <code>tree=false</code> to list only the top-level subdirectories:</p>
+    <pre>GET /inventory?path=testgroup&amp;tree=false</pre>
+
+    <h3>Subdir view</h3>
+    <p>Pass a comma-separated <code>path</code> to list features at a specific location. Returns the same feature metadata dicts:</p>
+    <pre>GET /inventory?path=testgroup,WIZ,00,HHZ</pre>
+
+    <h3>Feature metadata fields</h3>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>string</td><td>Feature name</td></tr>
+        <tr><td><code>recordCount</code></td><td>integer</td><td>Total number of time-series records on disk</td></tr>
+        <tr><td><code>earliestRecord</code></td><td>ISO 8601 string</td><td>Timestamp of the first record</td></tr>
+        <tr><td><code>latestRecord</code></td><td>ISO 8601 string</td><td>Timestamp of the last record</td></tr>
+        <tr><td><code>url</code></td><td>string</td><td>Ready-to-use URL to request the full feature time series via <code>/feature</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Labels</h2>
+    <p>Query labels associated with a dataset for a specified time range:</p>
+    <pre>GET /labels?path=testgroup&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00</pre>
+  </section>
+
+  <section>
+    <h2>Python Example</h2>
+    <p>You can query the TonikAPI directly from Python using <code>requests</code>:</p>
+    <pre><code>import requests
+
+params = {
+    "path": "testgroup",
+    "name": "rms",
+    "starttime": "2023-01-01T00:00:00",
+    "endtime": "2023-01-02T00:00:00",
+    "resolution": "1h",
+    "log": "true",
+    "normalise": "true"
+}
+
+response = requests.get("http://localhost:8003/feature", params=params)
+with open("rms_feature.csv", "w") as f:
+    f.write(response.text)
+</code></pre>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 TonikAPI. Built with precision using FastAPI + Pandas + Xarray.</p>
+  </footer>
+</body>
+</html>

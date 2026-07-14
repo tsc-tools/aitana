@@ -28,10 +28,11 @@
 		"--device=/dev/fuse"
 	],
 	"mounts": [
+		"source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume",
 		"source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached"
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "pip install -e '.[dev]'",
+	"postCreateCommand": "pixi install",
 
 	"customizations": {
 		"vscode": {
@@ -40,7 +41,8 @@
 				"ms-toolsai.jupyter",
 				"charliermarsh.ruff",
 				"snakemake.snakemake-lang",
-				"anthropic.claude-code"
+				"anthropic.claude-code",
+				"renan-r-santos.pixi-code"
 			]
 		}
 	}

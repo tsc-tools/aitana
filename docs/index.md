@@ -41,7 +41,7 @@ and insufficient uncertainty quantification. Aitana is a prototype addressing th
 - pandas, requests, matplotlib, statsmodels
 - obspy (seismic waveform processing)
 - snakemake (workflow execution)
-- tonik
+- aitana-storage
 
 ## Installation
 

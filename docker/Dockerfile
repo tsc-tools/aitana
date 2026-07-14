@@ -46,6 +46,10 @@ RUN apt-get update --yes && \
     rm /tmp/apptainer.deb
 
 
+# Install pixi system-wide
+RUN curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=/usr/local PIXI_NO_PATH_UPDATE=1 bash
+
 USER bayes
+RUN echo 'eval "$(pixi completion -s bash)"' >> ${HOME}/.bashrc
 
 EXPOSE 8003

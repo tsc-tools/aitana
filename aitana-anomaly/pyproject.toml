@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aitana-anomaly"
+version = "0.1.0"
+authors = [
+  { name="Yannik Behr", email="y.behr@gns.cri.nz" },
+]
+description = "Anomaly detection in time-series data"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "aitana-volcanoes>=0.1.0",
+    "aitana-features>=0.1.0",
+    "aitana-access>=0.1.0",
+    "aitana-storage>=0.1.0",
+    "snakemake>=9.16.3,<10",
+    "typer>=0.25,<1",
+    "matplotlib>=3.10.8,<4",
+    "torch",
+    "h5netcdf",
+    "scikit-fuzzy",
+    "scikit-learn",
+    "pyyaml",
+    "scatseisnet",
+    "tqdm",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aitana"]
+
+[project.urls]
+Homepage = "https://github.com/tsc-tools/aitana"

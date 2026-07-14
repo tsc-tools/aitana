@@ -1,7 +1,8 @@
 .claude/memory/
 __pycache__
 dist/
-site/# pixi environments
+site/
+# pixi environments
 .pixi/*
 !.pixi/config.toml
 src/aitana/data/workflows/egu_2026/.conda/
@@ -9,3 +10,11 @@ src/aitana/data/workflows/egu_2026/.cache/
 src/aitana/data/workflows/egu_2026/.snakemake/
 *.png
 *.pdf
+aitana-volcanoes/src/aitana/volcanoes/data/RSAM_NZ.WIZ.10.HHZ.csv
+aitana-volcanoes/src/aitana/volcanoes/data/ruapehu_rsam.csv
+.vscode/settings.json
+.vscode/launch.json
+.devcontainer/devcontainer-lock.json
+sandbox.ipynb
+file.tar
+.cache/mkdocs-jupyter/420337ba48befbcb635ec031a7d75be7d7746c272cd29ffdd968828c2bf81fc6.json

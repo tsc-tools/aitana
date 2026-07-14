@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from aitana.whakaari import Gas, Seismicity, eruptions, load_all
+from aitana.volcanoes.whakaari import Gas, Seismicity, eruptions, load_all
 
 
 def test_gas():

@@ -4,7 +4,7 @@ import inspect
 import pandas as pd
 import numpy as np
 
-from aitana.util import cache_dataframe, eqRate
+from aitana.access.util import cache_dataframe, eqRate
 
 
 class DataFetcher:

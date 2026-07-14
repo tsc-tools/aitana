@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 import pandas as pd
 import pytest
 
-from aitana.ruapehu import (CraterLake,
+from aitana.volcanoes.ruapehu import (CraterLake,
                             Gas,
                             Seismicity,
                             eruptions,

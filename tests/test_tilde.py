@@ -1,5 +1,5 @@
 from datetime import datetime
-from aitana.tilde import tilde_request
+from aitana.access.tilde import tilde_request
 
 
 def test_tilde_request():

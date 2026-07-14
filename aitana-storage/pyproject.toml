@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aitana-storage"
+version = "0.1.0"
+authors = [
+  { name="Yannik Behr", email="y.behr@gns.cri.nz" },
+  { name="Christof Mueller", email="c.mueller@gns.cri.nz" }
+]
+description = "Store time series data as HDF5 files and access them through an API."
+requires-python = ">=3.11"
+
+dependencies = [
+  "xarray[io,accel,parallel]>=2025.6.1,<2026",
+  "datashader>=0.18.2,<0.19",
+  "h5py>=3.15.1,<4",
+  "pandas>=2.3.3,<3",
+  "h5netcdf>=1.7.3,<2",
+  "uvicorn[standard]>=0.40.0,<0.41",
+  "fastapi>=0.128.0,<0.129",
+  "matplotlib>=3.10.8,<4",
+  "zarr>=3.1.5,<4",
+  "s3fs>=2025.12.0,<2026",
+  "torch>=2.10.0,<3"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aitana"]
+
+[tool.hatch.build]
+include = ["src/aitana/storage/package_data/**"]
+
+[project.scripts]
+tonik_api = "aitana.storage.api:main"
+test_data = "aitana.storage.utils:main"
+grafana_annotations = "aitana.storage.grafana_annotations:main"
+
+[project.urls]
+Homepage = "https://github.com/tsc-tools/aitana"
