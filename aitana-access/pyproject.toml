@@ -9,6 +9,7 @@ authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
 description = "Pure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms)."
+readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "pandas>=2.3.3,<3",
