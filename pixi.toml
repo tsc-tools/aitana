@@ -27,3 +27,4 @@ mkdocs = ">=1.6.1,<2"
 mkdocstrings = { version = ">=1.0.4,<2", extras = ["python"] }
 plotly = ">=6.5.0,<7"
 ipykernel = ">=6.31.0,<7"
+pip-audit = "*"
