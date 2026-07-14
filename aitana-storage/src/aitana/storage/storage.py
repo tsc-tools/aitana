@@ -6,8 +6,12 @@ import threading
 from typing import Optional
 
 import numpy as np
-import torch
 import xarray as xr
+
+try:
+    import torch
+except ImportError:
+    torch = None
 
 from .ingest import IngestWorker, enqueue_dataset
 from .xarray2netcdf import xarray2netcdf
@@ -454,6 +458,10 @@ class Storage(Path):
         ...     # batch is a 2D tensor with shape [batch_size, num_features]
         ...     pass
         """
+        if torch is None:
+            raise ImportError(
+                "PyTorch is required for to_pytorch(). "
+                "Install it with: pip install aitana-storage[pytorch]")
         return TonikDataset(self, features, window_size, stride)
 
 
