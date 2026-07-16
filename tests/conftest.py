@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 import requests
 import xarray as xr
+from aitana.access import seismic
 from aitana.access.seismic import SDSWaveforms
 from aitana.access.seismic import SeismicData as DataSource
 from aitana.storage import Storage, generate_test_data, get_labels
@@ -246,10 +247,9 @@ def setup_sds():
         url = "https://zenodo.org/records/14942280/files/zizou_test_data.tar.gz"
         download_and_extract_tar(url, test_data_dir)
     sds_dir = os.path.join(test_data_dir, "sds_test")
+    seismic.STAXML_DIR = sds_dir
     fdsn_urls = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")
-    sdsc = SDSWaveforms(
-        sds_dir=sds_dir, fdsn_urls=fdsn_urls, staxml_dir=sds_dir, fill_value=np.nan
-    )
+    sdsc = SDSWaveforms(sds_dir=sds_dir, fdsn_urls=fdsn_urls, fill_value=np.nan)
     ds = DataSource(clients=[sdsc])
     return sds_dir, ds
 
@@ -258,6 +258,7 @@ def setup_sds():
 def setup_temporary_sds(tmp_path_factory):
     sds_dir = tmp_path_factory.mktemp("aws_test_tmp", numbered=True)
     shutil.copy(Path(__file__).parent / "data" / "MAVZ.xml", sds_dir)
+    seismic.STAXML_DIR = sds_dir
     return sds_dir
 
 

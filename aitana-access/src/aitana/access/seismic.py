@@ -6,13 +6,17 @@ from datetime import timedelta
 
 import fsspec
 import numpy as np
+from aitana.access.util import test_signal
 from obspy import Inventory, Stream, Trace, UTCDateTime, read, read_inventory
 from obspy.clients.fdsn import Client as FDSN_Client
 from obspy.clients.filesystem.sds import Client as SDS_Client
 
-from aitana.access.util import test_signal
-
 logger = logging.getLogger(__name__)
+
+STAXML_DIR = os.environ.get(
+    "AITANA_STAXML_DIR",
+    os.path.join(os.environ["HOME"], ".aitana-access-instrument-response"),
+)
 
 
 class PostProcessException(Exception):
@@ -252,19 +256,18 @@ def get_instrument_response(
     net,
     site,
     loc,
-    staxml_dir="./instrument_response",
     fdsn_urls=("https://service.geonet.org.nz"),
 ):
     """
     Retrieve instrument response file in STATIONXML format.
     """
     fn = "{:s}.xml".format(site)
-    fn = os.path.join(staxml_dir, fn)
+    fn = os.path.join(STAXML_DIR, fn)
     try:
         inv = read_inventory(fn, format="STATIONXML")
     except FileNotFoundError:
         try:
-            os.makedirs(staxml_dir)
+            os.makedirs(STAXML_DIR, exist_ok=True)
         except FileExistsError:
             pass
         for url in fdsn_urls:
@@ -290,13 +293,12 @@ class WaveformBaseclass:
 
 
 class SDSWaveforms(WaveformBaseclass):
-    def __init__(self, sds_dir, fdsn_urls, staxml_dir, fill_value=np.nan):
+    def __init__(self, sds_dir, fdsn_urls, fill_value=np.nan):
         """
         Get seismic waveforms from a local SDS archive.
         """
         self.client = SDS_Client(sds_dir)
         self.fdsn_urls = fdsn_urls
-        self.staxml_dir = staxml_dir
         self.fill_value = fill_value
 
     def get_waveforms(self, net, site, loc, comp, startdate, enddate):
@@ -307,9 +309,7 @@ class SDSWaveforms(WaveformBaseclass):
                            traces will not be padded.
         :type fill_value: int, float, 'interpolate', np.nan, or None
         """
-        inv = get_instrument_response(
-            net, site, loc, staxml_dir=self.staxml_dir, fdsn_urls=self.fdsn_urls
-        )
+        inv = get_instrument_response(net, site, loc, fdsn_urls=self.fdsn_urls)
 
         st = self.client.get_waveforms(
             net, site, loc, comp, startdate, enddate, dtype="float64"
@@ -443,11 +443,15 @@ class FDSNWaveforms(WaveformBaseclass):
         self.fill_value = fill_value
 
     def get_waveforms(self, net, site, loc, comp, startdate, enddate):
-        st = self.client.get_waveforms(
-            net, site, loc, comp, startdate, enddate, attach_response=True
-        )
+        st = self.client.get_waveforms(net, site, loc, comp, startdate, enddate)
         # Prepare seismic time series
-        st.remove_sensitivity()
+        inv = get_instrument_response(
+            net,
+            site,
+            loc,
+            fdsn_urls=(self.client.base_url,),
+        )
+        st.remove_sensitivity(inv)
         # in case stream has more than one trace
         st.merge(fill_value=self.fill_value)
         if self.fill_value != "interpolate":
@@ -462,14 +466,12 @@ class FDSNWaveforms(WaveformBaseclass):
 
 
 class S3Waveforms(WaveformBaseclass):
-    def __init__(self, staxml_dir, debug=False, fill_value=np.nan):
+    def __init__(self, debug=False, fill_value=np.nan):
         """
         Get seismic waveforms from GeoNet's open data archive on AWS S3.
 
         Parameters
         ----------
-        staxml_dir : str
-            Directory where the station metadata in STATIONXML format is stored.
         debug : bool
             If True, debug messages will be printed to the console.
         fill_value : int, float, 'interpolate', np.nan, or None
@@ -485,7 +487,6 @@ class S3Waveforms(WaveformBaseclass):
             "https://service.geonet.org.nz",
             "https://service-nrt.geonet.org.nz",
         ]
-        self.staxml_dir = staxml_dir
         self.debug = debug
         self.fill_value = fill_value
         self.bucket = "geonet-open-data"
@@ -552,9 +553,7 @@ class S3Waveforms(WaveformBaseclass):
             t_end = min(t_end, end)
 
         st.merge(fill_value=self.fill_value)
-        inv = get_instrument_response(
-            net, site, loc, staxml_dir=self.staxml_dir, fdsn_urls=self.fdsn_urls
-        )
+        inv = get_instrument_response(net, site, loc, fdsn_urls=self.fdsn_urls)
         inv_dt = inv.select(
             location=loc, channel=comp, starttime=t_start, endtime=t_end
         )

@@ -76,9 +76,7 @@ def test_get_waveforms(setup_sds):
     """
     sds_dir, _ = setup_sds
     fdsn_urls = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")
-    sdsc = SDSWaveforms(
-        sds_dir=sds_dir, fdsn_urls=fdsn_urls, staxml_dir=sds_dir, fill_value=np.nan
-    )
+    sdsc = SDSWaveforms(sds_dir=sds_dir, fdsn_urls=fdsn_urls, fill_value=np.nan)
     fdsn_clients = []
     for url in fdsn_urls:
         fdsn_clients.append(FDSNWaveforms(url=url, fill_value=np.nan))
@@ -103,9 +101,7 @@ def test_with_gaps(setup_sds):
     fdsn_urls = (
         ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz"),
     )
-    sdsc = SDSWaveforms(
-        sds_dir=sds_dir, fdsn_urls=fdsn_urls, staxml_dir=sds_dir, fill_value=np.nan
-    )
+    sdsc = SDSWaveforms(sds_dir=sds_dir, fdsn_urls=fdsn_urls, fill_value=np.nan)
     ds1 = DataSource(clients=[sdsc])
     starttime = UTCDateTime(2010, 11, 26, 0, 0, 0)
     endtime = starttime + 86400.0
@@ -144,9 +140,7 @@ def test_start_endtime(setup_sds):
     fdsn_urls = (
         ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz"),
     )
-    sdsc = SDSWaveforms(
-        sds_dir=sds_dir, fdsn_urls=fdsn_urls, staxml_dir=sds_dir, fill_value=np.nan
-    )
+    sdsc = SDSWaveforms(sds_dir=sds_dir, fdsn_urls=fdsn_urls, fill_value=np.nan)
     ds = DataSource(clients=[sdsc])
     starttime = UTCDateTime(year=2013, julday=240)
     endtime = starttime + 86400.0
@@ -178,9 +172,7 @@ def test_missing_station_metadata_sds(setup_sds):
     """
     sds_dir, _ = setup_sds
     fdsn_urls = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")
-    sdsc = SDSWaveforms(
-        sds_dir=sds_dir, fdsn_urls=fdsn_urls, staxml_dir=sds_dir, fill_value=np.nan
-    )
+    sdsc = SDSWaveforms(sds_dir=sds_dir, fdsn_urls=fdsn_urls, fill_value=np.nan)
     ds = DataSource(clients=[sdsc], chunk_size=86400.0)
     starttime = UTCDateTime(2019, 4, 17)
     endtime = UTCDateTime(2019, 4, 20)
@@ -235,7 +227,7 @@ def test_aws_backend(setup_temporary_sds):
     test_data2.write(fd, format="MSEED")
     fd.close()
     client.upload_file(Filename=filename, Bucket=bucket_name, Key=key2)
-    awsc = S3Waveforms(staxml_dir=sds_dir, fill_value=np.nan)
+    awsc = S3Waveforms(fill_value=np.nan)
     awsc.bucket = bucket_name
 
     ds = DataSource(clients=[awsc])
