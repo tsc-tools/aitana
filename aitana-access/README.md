@@ -57,7 +57,7 @@ from obspy import UTCDateTime
 from aitana.access.seismic import SeismicData, FDSNWaveforms, S3Waveforms
 
 clients = [
-    S3Waveforms(staxml_dir="./staxml"),
+    S3Waveforms(),
     FDSNWaveforms(url="https://service.geonet.org.nz"),
 ]
 ds = SeismicData(clients)
