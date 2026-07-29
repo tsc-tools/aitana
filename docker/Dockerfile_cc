@@ -1,0 +1,71 @@
+# ~/.claude-container/Dockerfile
+#
+# Hardened sandbox for running Claude Code unattended on long tasks.
+# Guardrails baked into the image (see scripts/run_claude_sandboxed.sh for
+# the capability/resource limits applied at `docker run` time):
+#   - claude runs as a non-root user, created at build time with UID/GID
+#     matching the current user 
+#   - all outbound traffic from that user is forced through a local
+#     allowlisting proxy started by init-firewall.sh and enforced with
+#     iptables -- the claude user has no direct network access at all
+ARG D_UID="1001"
+ARG D_GID="1001"
+
+FROM debian:bookworm-slim
+
+ARG D_UID
+ARG D_GID
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git iptables tinyproxy \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code with the native installer, then relocate the binary
+# out of /root so it's still reachable once we're no longer root.
+RUN curl -fsSL https://claude.ai/install.sh | bash -s 2.1.92 && \
+    cp "$(readlink -f /root/.local/bin/claude)" /usr/local/bin/claude && \
+    chmod 755 /usr/local/bin/claude && \
+    rm -rf /root/.local
+
+# Quarto: renders .qmd reports to HTML, including executed Python code
+# blocks (via the Jupyter engine below). The .deb bundles its own Pandoc
+# and Deno, so no extra system deps are required.
+RUN curl -fsSL -o /tmp/quarto.deb \
+      https://github.com/quarto-dev/quarto-cli/releases/download/v1.9.38/quarto-1.9.38-linux-amd64.deb && \
+    apt-get update && apt-get install -y --no-install-recommends /tmp/quarto.deb && \
+    rm -f /tmp/quarto.deb && rm -rf /var/lib/apt/lists/*
+
+# Python + uv, so quarto's Jupyter engine can execute this workspace's code.
+# The workspace pins requires-python >=3.11,<3.13 (see uv.lock); bookworm's
+# system python3 (3.11) satisfies that, so uv can use it directly instead
+# of fetching its own interpreter build at runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
+# proxyuser: the only account allowed to reach the network directly. It
+# runs tinyproxy and enforces the domain allowlist (see init-firewall.sh);
+# nothing else uses this account.
+RUN groupadd -g 2000 proxyuser && \
+    useradd -u 2000 -g 2000 -M -s /usr/sbin/nologin proxyuser
+
+RUN groupadd -g "$D_GID" claude && \
+    useradd -m -u "$D_UID" -g "$D_GID" -s /bin/bash claude && \
+    mkdir -p /workspace && chown claude:claude /workspace
+
+COPY docker/init-firewall.sh /usr/local/sbin/init-firewall.sh
+COPY docker/entrypoint.sh /usr/local/sbin/entrypoint.sh
+RUN chmod 750 /usr/local/sbin/init-firewall.sh /usr/local/sbin/entrypoint.sh
+
+# Claude Code's background-session supervisor doesn't reliably inherit
+# process env, so the proxy vars also need to live in settings.json.
+# https://code.claude.com/docs/en/network-config.md
+COPY docker/claude-settings.json /home/claude/.claude/settings.json
+RUN chown -R claude:claude /home/claude/.claude && \
+    chmod 700 /home/claude/.claude && \
+    chmod 600 /home/claude/.claude/settings.json
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/sbin/entrypoint.sh"]
