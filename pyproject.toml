@@ -20,6 +20,9 @@ dev = [
   "mkdocstrings[python]>=1.0.4,<2",
   "plotly>=6.5.0,<7",
   "ipykernel>=6.31.0,<7",
+  "pyyaml",
+  "nbclient",
+  "nbformat",
   "pip-audit",
 ]
 
