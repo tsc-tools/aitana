@@ -45,6 +45,10 @@ RUN apt-get update --yes && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     rm /tmp/apptainer.deb
 
+# Install Node.js (for npx) via conda-forge
+RUN conda install -y -n base -c conda-forge nodejs=24.18.0 && \
+    conda clean -afy && \
+    fix-permissions /opt/conda
 
 # Install uv system-wide
 RUN curl -fsSL https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
