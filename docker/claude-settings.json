@@ -4,5 +4,8 @@
     "HTTP_PROXY": "http://127.0.0.1:8888",
     "DISABLE_TELEMETRY": "1",
     "DO_NOT_TRACK": "1"
+  },
+  "permissions": {
+    "defaultmode": "auto"
   }
 }
