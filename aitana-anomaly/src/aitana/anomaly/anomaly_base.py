@@ -283,3 +283,24 @@ class AnomalyDetectionBaseClass(object):
         """
         msg = "'compute_anomaly_index' is not implemented yet"
         raise NotImplementedError(msg)
+
+    @staticmethod
+    def normalize_score(raw_scores, reference_scores):
+        """
+        Percentile rank (ECDF) of raw_scores against a reference distribution.
+
+        Parameters
+        ----------
+        raw_scores : array-like
+            Scores to normalize (e.g. from the evaluation period).
+        reference_scores : array-like
+            Reference distribution from a quiet period.
+
+        Returns
+        -------
+        np.ndarray
+            Values in [0, 1]; 1.0 means the score exceeds all reference scores.
+        """
+        raw = np.asarray(raw_scores, dtype=float)
+        ref = np.sort(np.asarray(reference_scores, dtype=float))
+        return np.searchsorted(ref, raw, side="right") / len(ref)
