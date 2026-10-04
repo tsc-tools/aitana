@@ -28,6 +28,10 @@ dev = [
 
 [tool.pytest.ini_options]
 log_cli = true
+addopts = "--import-mode=importlib"
+# Per-package tests run in isolation via each package's hatch env;
+# the root `tests/` holds cross-package integration tests.
+testpaths = ["aitana-*/tests", "tests"]
 
 [tool.importlinter]
 root_packages = ["aitana"]

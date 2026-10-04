@@ -12,7 +12,7 @@ description = "Pure I/O access layer for volcano monitoring data (GeoNet TILDE, 
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "pandas>=2.3.3,<3",
+    "pandas>=2.3.3,<4",
     "requests>=2.32.5,<3",
     "obspy>=1.4.2,<2",
     "fsspec>=2024.0.0",
@@ -27,6 +27,18 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
+
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest",
+  "httpx",
+  "moto[s3]",
+]
+[[tool.hatch.envs.test.matrix]]
+python = ["3.11", "3.12", "3.13"]
+
+[tool.hatch.envs.test.scripts]
+run-pytest = "pytest tests {args}"
 
 [tool.uv.sources]
 aitana-storage = { workspace = true }
