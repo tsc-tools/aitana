@@ -17,7 +17,9 @@
 	"features": {
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
 	},
-
+	"containerEnv": {
+	    "CLAUDE_CONFIG_DIR": "/home/bayes/.claude"
+  	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	//'forwardPorts': [8050],
 	// Required for Apptainer (user namespaces inside Docker)
@@ -29,7 +31,8 @@
 	],
 	"mounts": [
 		"source=${localWorkspaceFolderBasename}-venv,target=/home/bayes/.venv,type=volume",
-		"source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached"
+		"source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.claude,target=/home/bayes/.claude,type=bind"
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "uv sync",
@@ -42,7 +45,16 @@
 				"charliermarsh.ruff",
 				"snakemake.snakemake-lang",
 				"anthropic.claude-code"
-			]
+			],
+		"settings": {
+        	"python.defaultInterpreterPath": "/home/bayes/.venv/bin/python",
+        	"python.terminal.activateEnvironment": true,
+        	"python.editor.formatOnSave": true,
+        	"python.editor.defaultFormatter": "charliermarsh.ruff",
+        	"python.editor.codeActionsOnSave": {
+          		"source.fixAll.ruff": "always",
+          		"source.organizeImports.ruff": "always" 
+        	}
 		}
 	}
 	// Configure tool-specific properties.
