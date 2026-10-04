@@ -40,5 +40,18 @@ tonik_api = "aitana.storage.api:main"
 test_data = "aitana.storage.utils:main"
 grafana_annotations = "aitana.storage.grafana_annotations:main"
 
+[tool.hatch.envs.test]
+dependencies = [
+  "coverage[toml]",
+  "pytest",
+  "httpx"
+]
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.11", "3.12", "3.13"]
+
+[tool.hatch.envs.test.scripts]
+run-pytest = "pytest tests"
+
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

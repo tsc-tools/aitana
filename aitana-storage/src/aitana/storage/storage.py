@@ -445,7 +445,7 @@ class Storage(Path):
         :param stride: Step size between consecutive windows (default: 1)
         :type stride: int
         :return: PyTorch Dataset instance
-        :rtype: TonikDataset
+        :rtype: AitanaDataset
 
         >>> import datetime
         >>> from torch.utils.data import DataLoader
@@ -462,10 +462,10 @@ class Storage(Path):
             raise ImportError(
                 "PyTorch is required for to_pytorch(). "
                 "Install it with: pip install aitana-storage[pytorch]")
-        return TonikDataset(self, features, window_size, stride)
+        return AitanaDataset(self, features, window_size, stride)
 
 
-class TonikDataset:
+class AitanaDataset:
     """
     PyTorch Dataset wrapper for Tonik Storage.
 

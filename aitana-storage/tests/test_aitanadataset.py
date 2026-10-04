@@ -3,7 +3,8 @@ from datetime import datetime
 import numpy as np
 
 from aitana.storage import Storage, generate_test_data
-import torch
+
+torch = pytest.importorskip("torch")
 from torch.utils.data import DataLoader
 
 

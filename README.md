@@ -81,7 +81,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
 ### `aitana-storage`
 - `Storage` — hierarchical feature archives (site/sensor/channel) backed by NetCDF or Zarr,
   with gap filling, incremental merging and time-range queries.
-- `TonikDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
+- `AitanaDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
   configurable stride.
 - `tonik_api` — FastAPI service exposing `/feature`, `/inventory` and `/labels`.
 - `grafana_annotations` — post stored labels to Grafana, or read annotations back.
