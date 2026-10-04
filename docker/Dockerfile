@@ -23,8 +23,12 @@ RUN groupadd -g $D_GID bayes && \
     useradd -m -s /bin/bash -N -u $D_UID -G bayes bayes && \
     chmod a+rx /usr/local/bin/fix-permissions && \
     mkdir $HOME/data && \
+    mkdir $HOME/.venv && \
+    mkdir $HOME/.claude && \
     fix-permissions $HOME && \
     fix-permissions $HOME/data && \
+    fix-permissions $HOME/.venv && \
+    fix-permissions $HOME/.claude && \
     fix-permissions /opt/conda && \
     echo "bayes:100000:65536" >> /etc/subuid && \
     echo "bayes:100000:65536" >> /etc/subgid
@@ -45,6 +49,14 @@ RUN apt-get update --yes && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     rm /tmp/apptainer.deb
 
+# Quarto: renders .qmd reports to HTML, including executed Python code
+# blocks (via the Jupyter engine below). The .deb bundles its own Pandoc
+# and Deno, so no extra system deps are required.
+RUN curl -fsSL -o /tmp/quarto.deb \
+      https://github.com/quarto-dev/quarto-cli/releases/download/v1.9.38/quarto-1.9.38-linux-amd64.deb && \
+    apt-get update && apt-get install -y --no-install-recommends /tmp/quarto.deb && \
+    rm -f /tmp/quarto.deb && rm -rf /var/lib/apt/lists/*
+
 # Install Node.js (for npx) via conda-forge
 RUN conda install -y -n base -c conda-forge nodejs=24.18.0 && \
     conda clean -afy && \
@@ -60,7 +72,7 @@ RUN curl -fsSL https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin U
 ENV UV_PROJECT_ENVIRONMENT=$HOME/.venv
 
 USER bayes
-RUN mkdir -p $HOME/.venv && \
-    echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
+RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
+
 
 EXPOSE 8003
