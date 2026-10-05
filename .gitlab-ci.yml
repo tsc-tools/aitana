@@ -2,7 +2,7 @@ variables:
   PACKAGE: "aitana-storage"
   IMAGE: "${AWS_SHARED_SERVICES_ECR}/volcanology/aitana:${PACKAGE}-$CI_COMMIT_BRANCH"
   APP_NAME: "tonik-$CI_COMMIT_BRANCH"
-  APP_SERVER: "Benioff"
+  APP_SERVER: "Vulkan"
   TEAM: "Volcano"
   API_PORT: "8053"
 
