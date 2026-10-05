@@ -4,7 +4,7 @@ variables:
   APP_NAME: "tonik-$CI_COMMIT_BRANCH"
   APP_SERVER: "Benioff"
   TEAM: "Volcano"
-  API_PORT: "8048"
+  API_PORT: "8053"
 
 stages:
   - build
