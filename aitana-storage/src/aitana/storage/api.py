@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from argparse import ArgumentParser
 from datetime import datetime
 from typing import Annotated, List, Union, Optional
@@ -154,7 +153,10 @@ class TonikAPI:
             d, units='hours since 1970-01-01 00:00:00.0', calendar='gregorian')
         return freq, dates, spec
 
-    async def inventory(self, request: Request, path: str, tree: bool = True) -> InventoryReturnType:
+    async def inventory(self, request: Request, path: Optional[str] = None, tree: bool = True) -> InventoryReturnType:
+        if path is None:
+            return sorted(d for d in os.listdir(self.rootdir)
+                         if os.path.isdir(os.path.join(self.rootdir, d)))
         group, subdir = parse_path(path)
         sg = Storage(group, rootdir=self.rootdir,
                      create=False, backend=self.backend)

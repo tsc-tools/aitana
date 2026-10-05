@@ -223,7 +223,7 @@ def test_aggregate1DFeature(setup_storage_api):
 
 
 def test_inventory(setup_storage_api):
-    client, fq = setup_storage_api
+    client, _ = setup_storage_api
     expected_feature_names = sorted(
         [
             "sonogram",
@@ -276,6 +276,13 @@ def test_inventory(setup_storage_api):
         assert required_keys.issubset(feat.keys())
         assert feat["recordCount"] > 0
         assert "MDR" in feat["url"] and "00" in feat["url"] and "BHZ" in feat["url"]
+    # --- return groups if no path is given ---
+    params = {}
+    with client.stream("GET", "/inventory", params=params) as r:
+        r.read()
+        txt = r.text
+    result_test = json.loads(txt)
+    assert sorted(result_test) == ["volcanoes"]
 
 
 def test_labels(setup_storage_api):
