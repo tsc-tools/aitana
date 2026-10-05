@@ -76,3 +76,18 @@ RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
 
 
 EXPOSE 8003
+
+# Operational image: the devcontainer bind-mounts the workspace and runs
+# `uv sync` via postCreateCommand instead, so this stage is skipped there
+# (devcontainer.json builds with --target base).
+FROM base AS operational
+
+USER root
+COPY --chown=bayes:bayes . /home/bayes/aitana
+USER bayes
+WORKDIR /home/bayes/aitana
+RUN uv sync --frozen --no-dev
+
+ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
+
+CMD ["tonik_api"]
