@@ -146,6 +146,9 @@ class Path(object):
         :rtype: dict
         """
         filename = self.feature_path(feature)
+        # NOTE: the writers pre-allocate the datetime axis from
+        # `archive_starttime`, so count/earliest describe the allocated axis
+        # rather than the records actually stored.
         with xr.open_dataset(filename, group='original', engine=self.engine) as ds:
             dt = ds[feature].coords['datetime']
             count = int(dt.sizes['datetime'])
@@ -289,6 +292,8 @@ class Storage(Path):
 
     def _build_feature_dict_with_url(self, feature_path, feature_name, base_url=None):
         """Build a feature info dict with metadata and an optional pre-built request URL."""
+        # NOTE: same caveat as `get_feature_info`: count/earliest reflect the
+        # axis pre-allocated from `archive_starttime`, not the stored records.
         with xr.open_dataset(feature_path, group='original', engine=self.engine) as ds:
             dt = ds[feature_name].coords['datetime']
             count = int(dt.sizes['datetime'])

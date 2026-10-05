@@ -107,7 +107,7 @@
         <tr>
           <td><code>/inventory</code></td>
           <td>GET</td>
-          <td>Lists available datasets or subdirectories within a group.</td>
+          <td>Lists available groups, or the datasets and subdirectories within a group.</td>
         </tr>
         <tr>
           <td><code>/labels</code></td>
@@ -121,11 +121,11 @@
   <section>
     <h2>Feature Request Example</h2>
     <p>Example query for retrieving a feature:</p>
-    <pre>GET /feature?path=testgroup&amp;name=rms&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true</pre>
+    <pre>GET /feature?path=testgroup&amp;name=rsam&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true</pre>
     <p>
       <a class="button" href="#" onclick="alert('Simulate API call using curl or your browser.')">Try Feature Query</a>
     </p>
-    <pre>curl "http://localhost:8003/feature?path=testgroup&amp;name=rms&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true"</pre>
+    <pre>curl "http://localhost:8003/feature?path=testgroup&amp;name=rsam&amp;starttime=2023-01-01T00:00:00&amp;endtime=2023-01-02T00:00:00&amp;resolution=1h&amp;log=true&amp;normalise=true"</pre>
   </section>
 
   <section>
@@ -134,6 +134,11 @@
       The <code>/inventory</code> endpoint returns a fully nested dictionary of all available datasets within a group.
       Every feature leaf carries metadata so you know exactly what data is available before making a feature request.
     </p>
+
+    <h3>List groups</h3>
+    <p>Omit <code>path</code> to get a sorted list of all available groups (<code>tree</code> is ignored):</p>
+    <pre>GET /inventory</pre>
+    <pre><code>["testgroup", "volcanoes"]</code></pre>
 
     <h3>Tree view (default)</h3>
     <p>Returns the complete hierarchy as nested dicts. Each feature is a dict with record metadata and a ready-to-use request URL:</p>
@@ -193,7 +198,7 @@
 
 params = {
     "path": "testgroup",
-    "name": "rms",
+    "name": "rsam",
     "starttime": "2023-01-01T00:00:00",
     "endtime": "2023-01-02T00:00:00",
     "resolution": "1h",
@@ -202,7 +207,7 @@ params = {
 }
 
 response = requests.get("http://localhost:8003/feature", params=params)
-with open("rms_feature.csv", "w") as f:
+with open("rsam_feature.csv", "w") as f:
     f.write(response.text)
 </code></pre>
   </section>

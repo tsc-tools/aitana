@@ -77,9 +77,12 @@ class TonikAPI:
         group, subdir = parse_path(path)
         _st = self.preprocess_datetime(starttime)
         _et = self.preprocess_datetime(endtime)
-        g = Storage(group, rootdir=self.rootdir,
-                    starttime=_st, endtime=_et,
-                    create=False, backend=self.backend)
+        try:
+            g = Storage(group, rootdir=self.rootdir,
+                        starttime=_st, endtime=_et,
+                        create=False, backend=self.backend)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Group {group} not found.")
         c = g
         if subdir:
             c = g.get_substore(*subdir)
@@ -114,6 +117,8 @@ class TonikAPI:
             output = df.to_csv(index=False,
                                columns=['dates', 'freqs', 'feature'])
         else:
+            # NOTE: `log` and `normalise` are currently ignored for 1D
+            # features; they are only applied in the 2D branch above.
             df = pd.DataFrame(data=feat.to_pandas(), columns=[feat.name])
             df['dates'] = df.index
             if resolution != 'full':
@@ -158,8 +163,11 @@ class TonikAPI:
             return sorted(d for d in os.listdir(self.rootdir)
                          if os.path.isdir(os.path.join(self.rootdir, d)))
         group, subdir = parse_path(path)
-        sg = Storage(group, rootdir=self.rootdir,
-                     create=False, backend=self.backend)
+        try:
+            sg = Storage(group, rootdir=self.rootdir,
+                         create=False, backend=self.backend)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Group {group} not found.")
         try:
             c = sg.get_substore(*subdir) if subdir else sg
         except TypeError:
@@ -197,9 +205,12 @@ class TonikAPI:
         group, subdir = parse_path(path)
         _st = self.preprocess_datetime(starttime)
         _et = self.preprocess_datetime(endtime)
-        sg = Storage(group, rootdir=self.rootdir,
-                     starttime=_st, endtime=_et, create=False,
-                     backend=self.backend)
+        try:
+            sg = Storage(group, rootdir=self.rootdir,
+                         starttime=_st, endtime=_et, create=False,
+                         backend=self.backend)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Group {group} not found.")
         try:
             c = sg.get_substore(*subdir) if subdir else sg
         except TypeError:

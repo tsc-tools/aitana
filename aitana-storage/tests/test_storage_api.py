@@ -30,6 +30,18 @@ def test_errors(setup_storage_api):
     assert r.status_code == 404
 
 
+def test_unknown_group(setup_storage_api):
+    client, l = setup_storage_api
+    times = {"starttime": str(l.starttime), "endtime": str(l.endtime)}
+    for endpoint, params in [
+        ("/inventory", {"path": "doesnt_exist"}),
+        ("/feature", {"path": "doesnt_exist", "name": "rsam", **times}),
+        ("/labels", {"path": "doesnt_exist", **times}),
+    ]:
+        r = client.get(endpoint, params=params)
+        assert r.status_code == 404, endpoint
+
+
 def test_read_1Dfeature(setup_storage_api):
     client, l = setup_storage_api
     params = {

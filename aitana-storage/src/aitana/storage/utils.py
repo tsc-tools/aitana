@@ -370,6 +370,16 @@ def main():
     logger.info("Saving labels to " + st1.path + '/labels.json')
     st1.save_labels(labels)
 
+    # Generate the data used by the examples in package_data/index.html
+    tg_start = datetime(2023, 1, 1)
+    tg = Storage('testgroup', rootdir=rootdir, archive_starttime=tg_start)
+    xdf_tg = generate_test_data(
+        dim=1, ndays=10, tstart=tg_start, add_nans=False, seed=42)
+    logger.info("Saving test data to " + tg.path)
+    tg.save(xdf_tg)
+    tg.get_substore('WIZ', '00', 'HHZ').save(xdf_tg)
+    tg.save_labels(get_labels(xdf_tg.rsam, float(xdf_tg.rsam.quantile(0.85))))
+
 
 if __name__ == '__main__':
     main()
