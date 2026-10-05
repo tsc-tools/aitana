@@ -85,6 +85,10 @@ FROM base AS operational
 # Workspace package to install, together with its dependencies.
 ARG PACKAGE=aitana-storage
 
+# ~/.cache is root-owned (created by conda in base), and a uv cache would
+# only bloat the image layers anyway.
+ENV UV_NO_CACHE=1
+
 # Install dependencies before copying the source so this layer stays cached
 # until uv.lock changes; with --frozen, uv needs only these two files here.
 COPY --chown=bayes:bayes uv.lock pyproject.toml /home/bayes/aitana/
