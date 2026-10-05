@@ -29,33 +29,14 @@ RUN groupadd -g $D_GID bayes && \
     fix-permissions $HOME/data && \
     fix-permissions $HOME/.venv && \
     fix-permissions $HOME/.claude && \
-    fix-permissions /opt/conda && \
-    echo "bayes:100000:65536" >> /etc/subuid && \
-    echo "bayes:100000:65536" >> /etc/subgid
+    fix-permissions /opt/conda
 
-# Install Apptainer
 RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
         curl \
-        squashfs-tools \
-        fuse3 \
-        fakeroot \
         tzdata \
-        fonts-crosextra-carlito \
-        uidmap && \
-    curl -fsSL "https://github.com/apptainer/apptainer/releases/download/v1.4.5/apptainer_1.4.5_amd64.deb" \
-        -o /tmp/apptainer.deb && \
-    apt-get install --yes /tmp/apptainer.deb && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    rm /tmp/apptainer.deb
-
-# Quarto: renders .qmd reports to HTML, including executed Python code
-# blocks (via the Jupyter engine below). The .deb bundles its own Pandoc
-# and Deno, so no extra system deps are required.
-RUN curl -fsSL -o /tmp/quarto.deb \
-      https://github.com/quarto-dev/quarto-cli/releases/download/v1.9.38/quarto-1.9.38-linux-amd64.deb && \
-    apt-get update && apt-get install -y --no-install-recommends /tmp/quarto.deb && \
-    rm -f /tmp/quarto.deb && rm -rf /var/lib/apt/lists/*
+        fonts-crosextra-carlito && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js (for npx) via conda-forge
 RUN conda install -y -n base -c conda-forge nodejs=24.18.0 && \
@@ -77,9 +58,48 @@ RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
 
 EXPOSE 8003
 
-# Operational image: the devcontainer bind-mounts the workspace and runs
-# `uv sync` via postCreateCommand instead, so this stage is skipped there
-# (devcontainer.json builds with --target base).
+# aitana-bench workflows run some rules in Apptainer containers
+# (scripts/run_egu2026.sh builds with --target bench).
+FROM base AS bench
+
+USER root
+
+# Install Apptainer
+RUN apt-get update --yes && \
+    apt-get install --yes --no-install-recommends \
+        squashfs-tools \
+        fuse3 \
+        fakeroot \
+        uidmap && \
+    curl -fsSL "https://github.com/apptainer/apptainer/releases/download/v1.4.5/apptainer_1.4.5_amd64.deb" \
+        -o /tmp/apptainer.deb && \
+    apt-get install --yes /tmp/apptainer.deb && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    rm /tmp/apptainer.deb && \
+    echo "bayes:100000:65536" >> /etc/subuid && \
+    echo "bayes:100000:65536" >> /etc/subgid
+
+USER bayes
+
+# Devcontainer image: the devcontainer bind-mounts the workspace and runs
+# `uv sync` via postCreateCommand (devcontainer.json builds with --target dev).
+FROM bench AS dev
+
+USER root
+
+# Quarto: renders .qmd reports to HTML, including executed Python code
+# blocks (via the Jupyter engine). The .deb bundles its own Pandoc
+# and Deno, so no extra system deps are required.
+RUN curl -fsSL -o /tmp/quarto.deb \
+      https://github.com/quarto-dev/quarto-cli/releases/download/v1.9.38/quarto-1.9.38-linux-amd64.deb && \
+    apt-get update && apt-get install -y --no-install-recommends /tmp/quarto.deb && \
+    rm -f /tmp/quarto.deb && rm -rf /var/lib/apt/lists/*
+
+USER bayes
+
+# Operational image, and the default target (kept last so a plain
+# `docker build`, as in .gitlab-ci.yml, produces it). Built from base, so
+# BuildKit skips the bench and dev stages.
 FROM base AS operational
 
 # Workspace package to install, together with its dependencies.

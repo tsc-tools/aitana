@@ -10,9 +10,9 @@
 #               (default: all logical CPUs on the host)
 #   -h          Show this help message and exit
 #
-# The Docker image is built from docker/Dockerfile on first run and cached by
-# Docker. Conda environments for individual workflow rules are cached in a named
-# Docker volume (aitana-conda-envs) and reused across runs.
+# The Docker image is built from the bench stage of docker/Dockerfile on first
+# run and cached by Docker. Conda environments for individual workflow rules are
+# cached in a named Docker volume (aitana-conda-envs) and reused across runs.
 #
 # The poster generation step uses Apptainer inside Docker to run an Inkscape
 # container.  Apptainer requires elevated capabilities; the flags below mirror
@@ -48,6 +48,7 @@ echo "==> Building Docker image '${IMAGE_NAME}' ..."
 docker build \
     --build-arg D_UID="$(id -u)" \
     --build-arg D_GID="$(id -g)" \
+    --target bench \
     -t "$IMAGE_NAME" \
     -f "$PROJECT_ROOT/docker/Dockerfile" \
     "$PROJECT_ROOT"

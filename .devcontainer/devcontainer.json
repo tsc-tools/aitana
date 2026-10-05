@@ -5,7 +5,7 @@
 	"build": {
 		"dockerfile": "../docker/Dockerfile",
 		"context": "..",
-		"target": "base",
+		"target": "dev",
 		"args": {
 			"D_UID": "${localEnv:D_UID}",
 			"D_GID": "${localEnv:D_GID}"
