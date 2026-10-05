@@ -82,11 +82,17 @@ EXPOSE 8003
 # (devcontainer.json builds with --target base).
 FROM base AS operational
 
-USER root
-COPY --chown=bayes:bayes . /home/bayes/aitana
-USER bayes
+# Workspace package to install, together with its dependencies.
+ARG PACKAGE=aitana-storage
+
+# Install dependencies before copying the source so this layer stays cached
+# until uv.lock changes; with --frozen, uv needs only these two files here.
+COPY --chown=bayes:bayes uv.lock pyproject.toml /home/bayes/aitana/
 WORKDIR /home/bayes/aitana
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --package ${PACKAGE} --no-install-workspace
+
+COPY --chown=bayes:bayes . /home/bayes/aitana
+RUN uv sync --frozen --no-dev --package ${PACKAGE}
 
 ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
 

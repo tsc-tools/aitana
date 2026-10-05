@@ -1,5 +1,6 @@
 variables:
-  IMAGE: "${AWS_SHARED_SERVICES_ECR}/volcanology/aitana:$CI_COMMIT_BRANCH"
+  PACKAGE: "aitana-storage"
+  IMAGE: "${AWS_SHARED_SERVICES_ECR}/volcanology/aitana:${PACKAGE}-$CI_COMMIT_BRANCH"
   APP_NAME: "tonik-$CI_COMMIT_BRANCH"
   APP_SERVER: "Vulkan"
   TEAM: "Volcano"
@@ -18,7 +19,7 @@ build:
       when: never
     - when: always 
   script:
-    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t "$IMAGE" .
+    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PACKAGE="$PACKAGE" -t "$IMAGE" .
     - docker image push "$IMAGE"
 
 deploy-api:
