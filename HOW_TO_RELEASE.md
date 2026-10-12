@@ -1,5 +1,36 @@
 # How to issue a new tonik release
 
+## Running tests
+Run the tests before every release.
+
+### All packages
+From the repository root, run the tests for every package (`aitana-*/tests`) plus the cross-package integration tests in `tests/`:
+```
+uv run pytest
+```
+This uses the workspace environment, so all packages are installed from your local checkout.
+
+### Hatch test matrix (per package)
+`aitana-access` and `aitana-storage` define a hatch `test` matrix that runs the package's tests in isolated environments for Python 3.11, 3.12 and 3.13. Run it from inside the package directory:
+```
+cd aitana-storage
+uvx hatch run test:run-pytest
+```
+To run a single Python version from the matrix:
+```
+uvx hatch run +py=3.12 test:run-pytest
+```
+Arguments after the script name are passed to pytest, e.g. `uvx hatch run test:run-pytest -x -k zarr`.
+
+Hatch does not use the uv workspace, so sibling packages (e.g. `aitana-storage` as a dependency of `aitana-access`) are installed from PyPI. If you have changed `aitana-storage`, release it before running the `aitana-access` matrix.
+
+### Optional tests
+Slow tests and tests that request data from webservices are skipped by default. Enable them with:
+```
+uv run pytest --runslow --runwebservice
+```
+The same flags also work with the hatch commands above.
+
 ## Pypi
 Install the build system
 ```
