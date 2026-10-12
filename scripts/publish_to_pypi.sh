@@ -29,7 +29,7 @@ build_and_upload() {
     uv run python -m build "$dist_dir"
 
     echo "==> Uploading $dist"
-    uv run python -m twine upload "$dist_dir/dist/*"
+    uvx twine upload "$dist_dir/dist/*"
 }
 
 check_clean_tree
