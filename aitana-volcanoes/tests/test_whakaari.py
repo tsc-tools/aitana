@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-
 from aitana.volcanoes.whakaari import Gas, Seismicity, eruptions, load_all
 
 
