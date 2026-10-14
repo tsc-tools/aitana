@@ -522,14 +522,7 @@ class S3Waveforms(WaveformBaseclass):
         PATH_FORMAT += "{network}/{year}.{julday:03d}.{station}."
         PATH_FORMAT += "{location}-{channel}.{network}.D"
         t_start = start
-        t_end = UTCDateTime(
-            year=t_start.year,
-            julday=t_start.julday + 1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
+        t_end = UTCDateTime(year=t_start.year, julday=t_start.julday) + timedelta(days=1)
         t_end = min(t_end, end)
         st = Stream()
         while t_start < end:

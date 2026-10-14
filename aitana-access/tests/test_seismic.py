@@ -249,6 +249,43 @@ def test_aws_backend(setup_temporary_sds):
     assert len(tr3) == 0
 
 
+@mock_aws
+def test_aws_backend_year_end(setup_temporary_sds):
+    """
+    Test that a request starting on the last day of the year reads
+    the day files on either side of the year boundary.
+    """
+    bucket_name = "virtual-geonet-open-data"
+    client = boto3.client(
+        "s3",
+        region_name="us-east-1",
+        aws_access_key_id="fake_access_key",
+        aws_secret_access_key="fake_secret_key",
+    )
+    client.create_bucket(Bucket=bucket_name)
+    keys = [
+        (UTCDateTime(2019, 12, 31), "2019/2019.365/MAVZ.NZ/2019.365.MAVZ.10-HHZ.NZ.D"),
+        (UTCDateTime(2020, 1, 1), "2020/2020.001/MAVZ.NZ/2020.001.MAVZ.10-HHZ.NZ.D"),
+    ]
+    for day, key in keys:
+        tr = synthetic_trace(starttime=day, nsec=86400, station="MAVZ", location="10")
+        fd = tempfile.NamedTemporaryFile(delete=False)
+        tr.write(fd, format="MSEED")
+        fd.close()
+        client.upload_file(
+            Filename=fd.name, Bucket=bucket_name, Key="waveforms/miniseed/" + key
+        )
+    awsc = S3Waveforms(fill_value=np.nan)
+    awsc.bucket = bucket_name
+
+    starttime = UTCDateTime(2019, 12, 31, 12)
+    endtime = UTCDateTime(2020, 1, 1, 3)
+    tr = awsc.get_waveforms("NZ", "MAVZ", "10", "HHZ", starttime, endtime)
+    assert tr.stats.starttime == starttime
+    assert tr.stats.endtime == endtime
+    assert not np.any(np.isnan(tr.data))
+
+
 def test_mock_client():
     """
     Test that the mock client is working.
