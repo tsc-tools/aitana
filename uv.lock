@@ -13,6 +13,7 @@ members = [
     "aitana-access",
     "aitana-anomaly",
     "aitana-bench",
+    "aitana-bot",
     "aitana-features",
     "aitana-storage",
     "aitana-testing",
@@ -192,6 +193,7 @@ dependencies = [
     { name = "scikit-fuzzy" },
     { name = "scikit-learn" },
     { name = "snakemake" },
+    { name = "stumpy" },
     { name = "torch" },
     { name = "tqdm" },
     { name = "typer" },
@@ -210,6 +212,7 @@ requires-dist = [
     { name = "scikit-fuzzy" },
     { name = "scikit-learn" },
     { name = "snakemake", specifier = ">=9.16.3,<10" },
+    { name = "stumpy" },
     { name = "torch" },
     { name = "tqdm" },
     { name = "typer", specifier = ">=0.25,<1" },
@@ -233,6 +236,21 @@ requires-dist = [
     { name = "aitana-volcanoes", editable = "aitana-volcanoes" },
     { name = "matplotlib", specifier = ">=3.10.8,<4" },
     { name = "snakemake", specifier = ">=9.16.3,<10" },
+    { name = "typer", specifier = ">=0.25,<1" },
+]
+
+[[package]]
+name = "aitana-bot"
+version = "0.1.0"
+source = { editable = "aitana-bot" }
+dependencies = [
+    { name = "slack-sdk" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "slack-sdk", specifier = ">=3,<4" },
     { name = "typer", specifier = ">=0.25,<1" },
 ]
 
@@ -3666,6 +3684,15 @@ wheels = [
 ]
 
 [[package]]
+name = "slack-sdk"
+version = "3.45.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/74/a4b30685bc76846b70baa9edaa45ba577ce5a28fc9e474b51524bb2aa932/slack_sdk-3.45.0.tar.gz", hash = "sha256:1ab794452f238b59db0d8a4d346263d65190288add53ec67a05751d8e7402486", size = 259739, upload-time = "2026-10-01T22:24:56.998Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/58/d54e4564946a9a3276f3de2905d18b66977977d4ba0fd7d11164df3c73cb/slack_sdk-3.45.0-py2.py3-none-any.whl", hash = "sha256:6356d4486d1a3ad156462c5544ab1b9c076ff426a250495c08f51b7ad71eb8fb", size = 322681, upload-time = "2026-10-01T22:24:55.133Z" },
+]
+
+[[package]]
 name = "smart-open"
 version = "7.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3919,6 +3946,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/81/68/dddd76117df2ef14c943c6bbb6618be5c9401280046f4ddfc9fb4596a1b8/statsmodels-0.14.6-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:19b58cf7474aa9e7e3b0771a66537148b2df9b5884fbf156096c0e6c1ff0469d", size = 10339446, upload-time = "2025-12-05T23:10:28.503Z" },
     { url = "https://files.pythonhosted.org/packages/56/4a/dce451c74c4050535fac1ec0c14b80706d8fc134c9da22db3c8a0ec62c33/statsmodels-0.14.6-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:81e7dcc5e9587f2567e52deaff5220b175bf2f648951549eae5fc9383b62bc37", size = 10368705, upload-time = "2025-12-05T23:10:44.339Z" },
     { url = "https://files.pythonhosted.org/packages/60/15/3daba2df40be8b8a9a027d7f54c8dedf24f0d81b96e54b52293f5f7e3418/statsmodels-0.14.6-cp312-cp312-win_amd64.whl", hash = "sha256:b5eb07acd115aa6208b4058211138393a7e6c2cf12b6f213ede10f658f6a714f", size = 9543991, upload-time = "2025-12-05T23:10:58.536Z" },
+]
+
+[[package]]
+name = "stumpy"
+version = "1.14.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c9/78/bd8662a45669dfecda152af36f45b00f186cb2b368b3289b9fd556587ef4/stumpy-1.14.1.tar.gz", hash = "sha256:1cb13696724ddab4b512b16843d37ccf4047aee19e072d1ad83024e1fa6fde96", size = 597700, upload-time = "2026-02-08T01:54:10.08Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/3d/0701e08335954b5d25ae98e5c2e9f20580587c833de85e486ebdda80cb20/stumpy-1.14.1-py3-none-any.whl", hash = "sha256:1150c95905fdee5f6cb8c77d7136035c2ef4f4aed8d41af73a550a4cf55c7fc5", size = 183983, upload-time = "2026-02-08T01:54:08.255Z" },
 ]
 
 [[package]]
