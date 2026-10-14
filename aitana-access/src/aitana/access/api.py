@@ -21,7 +21,7 @@ class AitanaAPI(TonikAPI):
                  fdsn_urls: Iterable[str] = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")):
         super(AitanaAPI, self).__init__(rootdir, backend)
         datasources = []
-        datasources.append(S3Waveforms(staxml_dir=rootdir))
+        datasources.append(S3Waveforms())
         for url in fdsn_urls:
             datasources.append(FDSNWaveforms(url=url))
         self.datasource = DataSource(datasources)

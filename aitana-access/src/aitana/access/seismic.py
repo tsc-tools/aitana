@@ -699,16 +699,16 @@ class SeismicData:
                         tr = client.get_waveforms(
                             net, site, loc, single_comp, t_start, t_end
                         )
-                    except Exception:
+                    except Exception as e:
                         logger.warning(
                             "{} failed to get waveforms for {} between {} "
-                            "and {}, trying next client.".format(
+                            "and {} ({!r}), trying next client.".format(
                                 client.__class__.__name__,
                                 ".".join((net, site, loc, single_comp)),
                                 t_start,
                                 t_end,
-                            ),
-                            exc_info=True,
+                                e,
+                            )
                         )
                         continue
                     else:

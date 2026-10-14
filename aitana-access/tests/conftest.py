@@ -72,7 +72,7 @@ def setup_temporary_sds(tmp_path_factory):
 def setup_api(tmp_path_factory, monkeypatch):
     from aitana.access.api import AitanaAPI
 
-    savedir = tmp_path_factory.mktemp("zizou_api_test_tmp", numbered=True)
+    savedir = tmp_path_factory.mktemp("aitana_api_test_tmp", numbered=True)
     api = AitanaAPI(rootdir=savedir)
 
     def mockreturn(net, sta, loc, chan, start, end):
