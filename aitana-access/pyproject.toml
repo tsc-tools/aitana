@@ -23,6 +23,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "aitana-storage>=0.1.0",
+    "aitana-testing>=0.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -42,6 +43,7 @@ run-pytest = "pytest tests {args}"
 
 [tool.uv.sources]
 aitana-storage = { workspace = true }
+aitana-testing = { workspace = true }
 
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

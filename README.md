@@ -59,6 +59,8 @@ contracts in [pyproject.toml](pyproject.toml):
 
 (Arrows are `depends on`. `aitana-bench` also depends on `aitana-storage` directly)
 
+`aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
+
 The `aitana-volcanoes` package is a convenience package that combines various datasets for a particular volcano.
 
 The full reasoning — including namespace packaging (PEP 420), the many-distributions/one-repo
@@ -74,6 +76,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
 | [`aitana-volcanoes`](aitana-volcanoes/) | `aitana.volcanoes` | Ruapehu & Whakaari domain aggregates, eruption catalogues, Kalman fusion | Working (0.1.0) |
 | [`aitana-bench`](aitana-bench/) | `aitana.bench` | `volcanobench` CLI, scoring, plotting, Snakemake workflows | Working (0.1.0) |
 | [`aitana-anomaly`](aitana-anomaly/) | `aitana.anomaly` | State & anomaly detection expert panel | Partial — see below |
+| [`aitana-testing`](aitana-testing/) | `aitana.testing` | Synthetic waveforms with known spectral content for tests | Working (0.1.0) |
 | [`aitana-bot`](aitana-bot/) | — | Duty-officer companion (VAB drafting, eruption confirmation) | Planned only ([PLAN.md](aitana-bot/PLAN.md)) |
 
 ## What is implemented

@@ -80,13 +80,14 @@ def plot_ssam_mpl(xdf, axes=None, cmap=cm.viridis, figsize=(12, 6), **kwargs):
     :type figsize: [float, float]
     
     >>> import numpy as np
-    >>> from aitana.features.ssam import SSAM, test_signal
+    >>> from aitana.features.ssam import SSAM
+    >>> from aitana.testing import synthetic_trace
     >>> from aitana.features.visualise import plot_ssam_mpl
     >>> ft = SSAM(interval=60, per_lap=.9, smooth=10, \
                   frequencies=np.arange(0., 25.1, .1), \
                   timestamp='start')
-    >>> _ = ft.compute(test_signal())
-    >>> fig = plot_ssam_mpl(ft.feature)
+    >>> _ = ft.compute(synthetic_trace())
+    >>> fig = plot_ssam_mpl(ft.feature["ssam"])
 
     """
 
@@ -212,13 +213,14 @@ def plot_ssam_plotly(xdf, cmap="Ice_r", new_fig=True, **kwargs):
     :type max_tpoints: int
 
     >>> import numpy as np
-    >>> from aitana.features.ssam import SSAM, test_signal
+    >>> from aitana.features.ssam import SSAM
+    >>> from aitana.testing import synthetic_trace
     >>> from aitana.features.visualise import plot_ssam_plotly
     >>> ft = SSAM(interval=60, per_lap=.9, smooth=10, \
                   frequencies=np.arange(0., 25.1, .1), \
                   timestamp='start')
-    >>> _ = ft.compute(test_signal())
-    >>> fig = plot_ssam_plotly(ft.feature)
+    >>> _ = ft.compute(synthetic_trace())
+    >>> fig = plot_ssam_plotly(ft.feature["ssam"])
     """
     dates, freq, spec = spectrogram_preprocessing(xdf, **kwargs)
     if not new_fig:

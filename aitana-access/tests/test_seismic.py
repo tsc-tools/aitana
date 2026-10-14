@@ -41,7 +41,7 @@ from aitana.access.seismic import (
 from aitana.access.seismic import (
     SeismicData as DataSource,
 )
-from aitana.access.util import test_signal
+from aitana.testing import synthetic_trace
 from moto import mock_aws
 from obspy import UTCDateTime, read_inventory
 
@@ -211,10 +211,10 @@ def test_aws_backend(setup_temporary_sds):
     endtime2 = UTCDateTime(2019, 4, 18, 3, 4, 5)
     key1 = "waveforms/miniseed/2019/2019.107/MAVZ.NZ/2019.107.MAVZ.10-HHZ.NZ.D"
     key2 = "waveforms/miniseed/2019/2019.108/MAVZ.NZ/2019.108.MAVZ.10-HHZ.NZ.D"
-    test_data1 = test_signal(
+    test_data1 = synthetic_trace(
         starttime=starttime1, nsec=endtime1 - starttime1, station="MAVZ", location="10"
     )
-    test_data2 = test_signal(
+    test_data2 = synthetic_trace(
         starttime=starttime2, nsec=endtime2 - starttime2, station="MAVZ", location="10"
     )
     fd = tempfile.NamedTemporaryFile(delete=False)
@@ -266,7 +266,7 @@ def test_mock_client():
 
 
 def test_caching():
-    tr_orig = test_signal(
+    tr_orig = synthetic_trace(
         nsec=4320 * 600.0,
         sampling_rate=1 / 600.0,
         starttime=UTCDateTime(2020, 7, 18, 8, 22),

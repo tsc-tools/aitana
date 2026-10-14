@@ -3,7 +3,7 @@ from obspy import UTCDateTime
 import pytest
 
 from aitana.features.dsar import DSAR
-from aitana.access.util import test_signal
+from aitana.testing import synthetic_trace
 
 @pytest.fixture(scope="session")
 def decreasing_hf_signal():
@@ -13,7 +13,7 @@ def decreasing_hf_signal():
     hf_deltas = [hf_levels[0]] + list(np.diff(hf_levels))
     n_hf = len(hf_levels)
 
-    return test_signal(
+    return synthetic_trace(
         nsec=interval * n_hf,
         frequencies=[lf_freq] + [hf_freq] * n_hf,
         amplitudes=[1.0] + hf_deltas,

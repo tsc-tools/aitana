@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import fsspec
 import numpy as np
-from aitana.access.util import test_signal
+from aitana.testing import synthetic_trace
 from obspy import Inventory, Stream, Trace, UTCDateTime, read, read_inventory
 from obspy.clients.fdsn import Client as FDSN_Client
 from obspy.clients.filesystem.sds import Client as SDS_Client
@@ -404,7 +404,7 @@ class MockSDSWaveforms(WaveformBaseclass):
         # Always generate whole day files
         _tstart = UTCDateTime(year=tstart.year, julday=tstart.julday)
         tend = UTCDateTime(end)
-        tr = test_signal(
+        tr = synthetic_trace(
             starttime=_tstart,
             sampling_rate=10,
             nsec=86400,

@@ -6,6 +6,7 @@ members = [
   "aitana-bench",
   "aitana-anomaly",
   "aitana-storage",
+  "aitana-testing",
 ]
 
 [dependency-groups]

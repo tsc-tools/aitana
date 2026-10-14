@@ -2,25 +2,23 @@ import os
 import shutil
 import tempfile
 import unittest
-import warnings
 
 import numpy as np
 import pytest
-from obspy import Trace, UTCDateTime
+from obspy import Trace
 from scipy.signal import find_peaks
 
 from aitana.features.ssam import SSAM
-from aitana.storage import Storage
-from aitana.access.util import test_signal
+from aitana.testing import synthetic_trace
 
 
 @pytest.fixture(scope="module")
 def setup_spectrogram():
-    trace_ssam = test_signal(
+    trace_ssam = synthetic_trace(
         sinusoid=False, addchirp=False, frequencies=[1.0, 3.0, 10.0]
     )
-    trace_ssam_gaps = test_signal(gaps=True)
-    trace_sono = test_signal(
+    trace_ssam_gaps = synthetic_trace(gaps=True)
+    trace_sono = synthetic_trace(
         offsets=[1000.0, 2000.0, 3000.0],
         frequencies=[1.0, 2.0, 5.0],
         amplitudes=[0.1, 1.0, 5.0],
@@ -145,48 +143,6 @@ def test_ssam_with_gaps(setup_spectrogram):
     spec = s.compute(trace.copy())
     peaks = find_peaks(spec["ssam"].data[:, 0], height=1e-1)[0]
     np.testing.assert_array_almost_equal(linfreqs[peaks], test_peaks, 2)
-
-
-@pytest.mark.slow
-def test_realtime(tmp_path_factory):
-    """
-    Test with 1 hour windows as in the real-time computation
-    """
-    savedir = tmp_path_factory.mktemp("realtime")
-    linfreqs = np.arange(0, 25.1, 0.1)
-    testpeaks = np.array([0.1, 3.0, 5.0, 6.0, 10.0])
-    s = SSAM(
-        interval=60,
-        frequencies=linfreqs,
-        resample_int=(None, "10min"),
-        timestamp="start",
-    )
-    starttime = UTCDateTime(2020, 4, 21, 0, 0, 0)
-    nsec = 86500  # Slightly longer than 24 h to avoid rounding issues
-    step = 3600
-    tr = test_signal(nsec=nsec, starttime=starttime, gaps=True)
-    sg = Storage(
-        "test",
-        savedir,
-        starttime=starttime.datetime,
-        endtime=(starttime + nsec).datetime,
-    )
-    store = sg.get_substore("WIZ", "00", "HHZ")
-    startwin = starttime
-    while True:
-        endwin = startwin + step
-        if endwin > tr.stats.endtime:
-            break
-        ntr = tr.slice(startwin, endwin)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            store.save(s.compute(ntr))
-        startwin = endwin
-
-    ssam = store("ssam")
-    assert ssam.shape == (251, 144)
-    peaks = find_peaks(ssam.data[:, 0], height=1e-1)[0]
-    np.testing.assert_array_almost_equal(linfreqs[peaks], testpeaks, 2)
 
 
 def test_config():

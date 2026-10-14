@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 import pytest
-from aitana.access.util import test_signal
+from aitana.testing import synthetic_trace
 from aitana.features.rsam import RSAM
 from obspy import UTCDateTime
 
@@ -50,7 +50,7 @@ def rsam_setup():
     frequencies = [0.1, 3.0]
     phases = [0.0, np.pi * 0.25]
     starttime = UTCDateTime(1978, 7, 18, 8, 8, 24)
-    tr1 = test_signal(
+    tr1 = synthetic_trace(
         sinusoid=False,
         addchirp=False,
         starttime=starttime,
@@ -60,7 +60,7 @@ def rsam_setup():
         frequencies=frequencies,
     )
     tr1.data *= 1e-9
-    tr2 = test_signal(
+    tr2 = synthetic_trace(
         sinusoid=False,
         addchirp=False,
         starttime=starttime,
@@ -79,7 +79,7 @@ def rsam_setup():
     return tr1, tr2, data_dir
 
 
-def test_with_gaps(rsam_setup, setup_sds):
+def test_with_gaps(rsam_setup):
     tr1, tr2, data_dir = rsam_setup
     r = RSAM()
     xdf = r.compute(tr1)
@@ -110,7 +110,7 @@ def decreasing_outofband_signal():
     outofband_deltas = [outofband_levels[0]] + list(np.diff(outofband_levels))
     n_windows = len(outofband_levels)
 
-    return test_signal(
+    return synthetic_trace(
         nsec=interval * n_windows,
         frequencies=[inband_freq] + [outofband_freq] * n_windows,
         amplitudes=[1.0] + outofband_deltas,

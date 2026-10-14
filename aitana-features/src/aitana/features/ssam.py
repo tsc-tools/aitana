@@ -50,11 +50,12 @@ class SSAM(FeatureBaseClass):
     :param configfile: Configuration as a .yml file or a dictionary.
     :type configfile: str or dict
 
-    >>> from aitana.features.ssam import SSAM, test_signal
+    >>> from aitana.features.ssam import SSAM
+    >>> from aitana.testing import synthetic_trace
     >>> import numpy as np
-    >>> tr = test_signal(gaps=True)
+    >>> tr = synthetic_trace(gaps=True)
     >>> s = SSAM(interval=60, per_lap=.9, smooth=10,
-                 frequencies=np.arange(0, 25.1, .1))
+    ...          frequencies=np.arange(0, 25.1, .1))
 
     """
 
@@ -116,9 +117,9 @@ class SSAM(FeatureBaseClass):
         """
         Find power of two nearest to x
 
-        >>> _nearest_pow_2(3)
+        >>> SSAM._nearest_pow_2(3)
         2.0
-        >>> _nearest_pow_2(15)
+        >>> SSAM._nearest_pow_2(15)
         16.0
 
         :param x: Number
