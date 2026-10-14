@@ -32,7 +32,8 @@
 	"mounts": [
 		"source=${localWorkspaceFolderBasename}-venv,target=/home/bayes/.venv,type=volume",
 		"source=${localEnv:HOME}/.pypirc,target=/home/bayes/.pypirc,type=bind,consistency=cached",
-		"source=${localEnv:HOME}/.claude,target=/home/bayes/.claude,type=bind"
+		"source=${localEnv:HOME}/.claude,target=/home/bayes/.claude,type=bind",
+		"source=${localEnv:HOME}/.ssh,target=/home/bayes/.ssh,type=bind,readonly"
 	],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "uv sync",
