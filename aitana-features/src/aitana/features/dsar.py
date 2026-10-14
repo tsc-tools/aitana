@@ -40,7 +40,7 @@ class DSAR(FeatureBaseClass):
         configfile=None,
         reindex=True,
     ):
-        super(DSAR, self).__init__()
+        super().__init__()
         self.interval = float(interval)
         self.filtertype = filtertype
         self.lowerfreqband = lowerfreqband
@@ -171,7 +171,7 @@ class DSAR(FeatureBaseClass):
             endtime = UTCDateTime(str(xda.datetime.data[-1]))
             endtime = round_time(endtime, self.interval)
             new_index = pd.date_range(
-                starttime.datetime, endtime.datetime, freq="%dS" % int(self.interval)
+                starttime.datetime, endtime.datetime, freq="%ds" % int(self.interval)
             )
             xdf = xdf.reindex(dict(datetime=new_index), method="nearest")
         self.feature = xdf
