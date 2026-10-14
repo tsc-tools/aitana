@@ -238,24 +238,36 @@ name = "aitana-features"
 version = "0.1.0"
 source = { editable = "aitana-features" }
 dependencies = [
+    { name = "cftime" },
+    { name = "datashader" },
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "obspy" },
     { name = "pandas" },
+    { name = "plotly" },
+    { name = "pyyaml" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "xarray" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "cftime" },
+    { name = "datashader", specifier = ">=0.18.2,<0.19" },
+    { name = "matplotlib", specifier = ">=3.10.8,<4" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "obspy", specifier = ">=1.4.2,<2" },
-    { name = "pandas", specifier = ">=2.3.3,<3" },
+    { name = "pandas", specifier = ">=2.3.3,<4" },
+    { name = "plotly", specifier = ">=6.5.0,<7" },
+    { name = "pyyaml" },
     { name = "scipy", specifier = ">=1.15.0" },
+    { name = "xarray", specifier = ">=2025.6.1,<2026" },
 ]
 
 [[package]]
 name = "aitana-storage"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "aitana-storage" }
 dependencies = [
     { name = "datashader" },
@@ -264,6 +276,7 @@ dependencies = [
     { name = "h5py" },
     { name = "matplotlib" },
     { name = "pandas" },
+    { name = "requests" },
     { name = "s3fs" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "xarray", extra = ["accel", "io", "parallel"] },
@@ -284,6 +297,7 @@ requires-dist = [
     { name = "h5py", specifier = ">=3.15.1,<4" },
     { name = "matplotlib", specifier = ">=3.10.8,<4" },
     { name = "pandas", specifier = ">=2.3.3,<4" },
+    { name = "requests", specifier = ">=2.32.5,<3" },
     { name = "s3fs", specifier = ">=2025.12.0,<2026" },
     { name = "torch", marker = "extra == 'pytorch'", specifier = ">=2.10.0,<3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<0.41" },
@@ -310,7 +324,7 @@ requires-dist = [
     { name = "aitana-access", editable = "aitana-access" },
     { name = "aitana-features", editable = "aitana-features" },
     { name = "numpy", specifier = ">=1.26.0" },
-    { name = "pandas", specifier = ">=2.3.3,<3" },
+    { name = "pandas", specifier = ">=2.3.3,<4" },
     { name = "requests", specifier = ">=2.32.5,<3" },
     { name = "statsmodels", specifier = ">=0.14.6,<0.15" },
 ]

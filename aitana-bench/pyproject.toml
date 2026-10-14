@@ -21,9 +21,6 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
 
-[tool.hatch.build]
-include = ["src/aitana/bench/data/**"]
-
 [project.scripts]
 volcanobench = "aitana.bench.volcanobench:app"
 

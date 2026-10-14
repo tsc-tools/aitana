@@ -11,7 +11,6 @@ src/aitana/data/workflows/egu_2026/.snakemake/
 *.png
 *.pdf
 aitana-volcanoes/src/aitana/volcanoes/data/RSAM_NZ.WIZ.10.HHZ.csv
-aitana-volcanoes/src/aitana/volcanoes/data/ruapehu_rsam.csv
 .vscode/settings.json
 .vscode/launch.json
 .devcontainer/devcontainer-lock.json

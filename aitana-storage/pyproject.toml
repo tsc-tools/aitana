@@ -24,6 +24,7 @@ dependencies = [
   "matplotlib>=3.10.8,<4",
   "zarr>=3.1.5,<4",
   "s3fs>=2025.12.0,<2026",
+  "requests>=2.32.5,<3",
 ]
 
 [project.optional-dependencies]
@@ -31,9 +32,6 @@ pytorch = ["torch>=2.10.0,<3"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
-
-[tool.hatch.build]
-include = ["src/aitana/storage/package_data/**"]
 
 [project.scripts]
 tonik_api = "aitana.storage.api:main"

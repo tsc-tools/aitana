@@ -9,11 +9,11 @@ authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
 description = "Per-volcano domain aggregates for Ruapehu, Whakaari, and Taupo."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "aitana-access>=0.1.0",
     "aitana-features>=0.1.0",
-    "pandas>=2.3.3,<3",
+    "pandas>=2.3.3,<4",
     "numpy>=1.26.0",
     "statsmodels>=0.14.6,<0.15",
     "requests>=2.32.5,<3",
@@ -23,7 +23,7 @@ dependencies = [
 packages = ["src/aitana"]
 
 [tool.hatch.build]
-include = ["src/aitana/volcanoes/data/**"]
+artifacts = ["src/aitana/volcanoes/data/ruapehu_rsam.csv"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -33,6 +33,19 @@ exclude = [
 [tool.uv.sources]
 aitana-access = { workspace = true }
 aitana-features = { workspace = true }
+
+[tool.hatch.envs.test]
+dependencies = [
+  "coverage[toml]",
+  "pytest",
+  "httpx"
+]
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.11", "3.12", "3.13"]
+
+[tool.hatch.envs.test.scripts]
+run-pytest = "pytest tests {args}"
 
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"

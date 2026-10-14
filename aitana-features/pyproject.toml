@@ -9,12 +9,18 @@ authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
 description = "Algorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM)."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "numpy>=1.26.0",
     "scipy>=1.15.0",
-    "pandas>=2.3.3,<3",
+    "pandas>=2.3.3,<4",
     "obspy>=1.4.2,<2",
+    "xarray>=2025.6.1,<2026",
+    "pyyaml",
+    "matplotlib>=3.10.8,<4",
+    "datashader>=0.18.2,<0.19",
+    "plotly>=6.5.0,<7",
+    "cftime",
 ]
 
 [tool.hatch.build.targets.wheel]
