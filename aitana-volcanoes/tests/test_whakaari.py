@@ -44,7 +44,7 @@ def test_load_all():
     assert df.SO2[~pd.isnull(df.SO2)].index[-1] == pd.Timestamp(
         "2025-11-04 00:00:00+0000", tz="UTC"
     )
-    assert df.SO2[~pd.isnull(df.SO2)][-1] - 839.81 < 0.01
+    assert df.SO2[~pd.isnull(df.SO2)].iloc[-1] - 839.81 < 0.01
     # Check that caching works with function default arguments
     df = load_all()
     assert len(df) > 0
