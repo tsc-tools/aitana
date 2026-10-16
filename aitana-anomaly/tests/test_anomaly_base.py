@@ -7,10 +7,9 @@ from torch.utils.data import DataLoader, random_split
 
 from aitana.anomaly.anomaly_base import (
     AnomalyDetectionBaseClass,
-    SliceBatchSampler,
-    ZizouDataset,
     min_max_scale_netcdf,
 )
+from aitana.anomaly.dataset import SliceBatchSampler, ZizouDataset
 
 
 def test_dataset(setup_dataset):

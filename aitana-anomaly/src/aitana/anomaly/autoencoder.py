@@ -20,11 +20,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, random_split
 
-from aitana.anomaly.anomaly_base import (
-    AnomalyDetectionBaseClass,
-    SliceBatchSampler,
-    ZizouDataset,
-)
+from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
+from aitana.anomaly.dataset import SliceBatchSampler, ZizouDataset
 from aitana.storage import Storage
 
 logger = logging.getLogger(__name__)
