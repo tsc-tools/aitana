@@ -23,7 +23,7 @@ and insufficient uncertainty quantification. Aitana is a prototype addressing th
   computation with pre-eruption windows (`scoring`).
 - **State-space models** — Kalman-filter models for multi-sensor SO₂ fusion and
   trend estimation (`assimilate`).
-- **Benchmarking CLI** — `volcanobench` drives Snakemake workflows for end-to-end
+- **Workflow CLI** — `aitana-pipelines` drives Snakemake workflows for end-to-end
   benchmarking (download → feature extraction → model training → forecast scoring).
   One workflow is bundled: a Bayesian network vs decision tree benchmark for Whakaari/White Island.
 
@@ -49,18 +49,18 @@ and insufficient uncertainty quantification. Aitana is a prototype addressing th
 pip install -U aitana
 ```
 
-## `volcanobench` CLI
+## `aitana-pipelines` CLI
 
-The `volcanobench` command drives Snakemake benchmarking workflows bundled with Aitana
-or registered by third-party packages via the `volcanobench.workflows` entry-point group.
+The `aitana-pipelines` command drives Snakemake workflows bundled with Aitana or
+registered by third-party packages via the `aitana.pipelines.workflows` entry-point group.
 
 | Command | Description |
 |---|---|
-| `volcanobench list` | List all registered workflows (name, volcano, description). |
-| `volcanobench run <volcano> <outdir>` | Run every registered workflow for a volcano. |
-| `volcanobench clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
+| `aitana-pipelines list` | List all registered workflows (name, volcano, description). |
+| `aitana-pipelines run <volcano> <outdir>` | Run every registered workflow for a volcano. |
+| `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
 
-`volcanobench run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
+`aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
 
 ## Get in touch
 

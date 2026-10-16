@@ -21,7 +21,7 @@ other aitana package. The longer-term plan (bulletin drafting, eruption confirma
 ## Usage
 
 ```bash
-volcanobench run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
+aitana-pipelines run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
 ```
 
 `aitana-bot notify OUTDIR` picks the most recently written `results/*/alert.json` in

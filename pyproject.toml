@@ -3,7 +3,7 @@ members = [
   "aitana-access",
   "aitana-features",
   "aitana-volcanoes",
-  "aitana-bench",
+  "aitana-pipelines",
   "aitana-anomaly",
   "aitana-storage",
   "aitana-testing",
@@ -42,16 +42,16 @@ root_packages = ["aitana"]
 name = "access is pure I/O"
 type = "forbidden"
 source_modules = ["aitana.access"]
-forbidden_modules = ["aitana.volcanoes", "aitana.features", "aitana.bench"]
+forbidden_modules = ["aitana.volcanoes", "aitana.features", "aitana.pipelines"]
 
 [[tool.importlinter.contracts]]
 name = "features never fetches"
 type = "forbidden"
 source_modules = ["aitana.features"]
-forbidden_modules = ["aitana.access", "aitana.volcanoes", "aitana.bench"]
+forbidden_modules = ["aitana.access", "aitana.volcanoes", "aitana.pipelines"]
 
 [[tool.importlinter.contracts]]
-name = "volcanoes does not import bench"
+name = "volcanoes does not import pipelines"
 type = "forbidden"
 source_modules = ["aitana.volcanoes"]
-forbidden_modules = ["aitana.bench"]
+forbidden_modules = ["aitana.pipelines"]

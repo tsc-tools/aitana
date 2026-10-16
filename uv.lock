@@ -12,9 +12,9 @@ resolution-markers = [
 members = [
     "aitana-access",
     "aitana-anomaly",
-    "aitana-bench",
     "aitana-bot",
     "aitana-features",
+    "aitana-pipelines",
     "aitana-storage",
     "aitana-testing",
     "aitana-volcanoes",
@@ -219,27 +219,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "aitana-bench"
-version = "0.1.0"
-source = { editable = "aitana-bench" }
-dependencies = [
-    { name = "aitana-storage" },
-    { name = "aitana-volcanoes" },
-    { name = "matplotlib" },
-    { name = "snakemake" },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aitana-storage", editable = "aitana-storage" },
-    { name = "aitana-volcanoes", editable = "aitana-volcanoes" },
-    { name = "matplotlib", specifier = ">=3.10.8,<4" },
-    { name = "snakemake", specifier = ">=9.16.3,<10" },
-    { name = "typer", specifier = ">=0.25,<1" },
-]
-
-[[package]]
 name = "aitana-bot"
 version = "0.1.0"
 source = { editable = "aitana-bot" }
@@ -284,6 +263,27 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "scipy", specifier = ">=1.15.0" },
     { name = "xarray", specifier = ">=2025.6.1,<2026" },
+]
+
+[[package]]
+name = "aitana-pipelines"
+version = "0.1.0"
+source = { editable = "aitana-pipelines" }
+dependencies = [
+    { name = "aitana-storage" },
+    { name = "aitana-volcanoes" },
+    { name = "matplotlib" },
+    { name = "snakemake" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aitana-storage", editable = "aitana-storage" },
+    { name = "aitana-volcanoes", editable = "aitana-volcanoes" },
+    { name = "matplotlib", specifier = ">=3.10.8,<4" },
+    { name = "snakemake", specifier = ">=9.16.3,<10" },
+    { name = "typer", specifier = ">=0.25,<1" },
 ]
 
 [[package]]

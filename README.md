@@ -27,8 +27,9 @@ The target system is a closed loop, with `aitana-storage` as the hub:
 4. **Detect** — `aitana-anomaly` runs a *panel* of state- and anomaly-detection algorithms
    over the stored features, each producing a comparable `[0,1]` anomaly index rather than
    one method being anointed as "the" detector.
-5. **Benchmark** — `aitana-bench` scores those methods against real eruption catalogues and
-   synthetic fault injection, through reproducible Snakemake workflows.
+5. **Run & evaluate** — `aitana-pipelines` combines the layers below into reproducible Snakemake
+   workflows: operational runs that feed alerts, and evaluation runs that score methods against
+   real eruption catalogues and synthetic fault injection.
 6. **Communicate** — `aitana-bot` provides a slack bot that sends notifications when anomalies are detected, and allows further investigation. It can also draft a daily "volcano weather report" and assists duty officers with on-demand eruption confirmation.
 7. **Close the loop** — a human expert reviews what the system flagged. Their annotations flow back into `aitana-storage` as confirmed or revised labels, becoming ground truth for the next round of training and evaluation. Grafana provides the visual front end for that review.
 
@@ -45,8 +46,8 @@ contracts in [pyproject.toml](pyproject.toml):
    not import `access`. They are siblings that never import each other.
 
 ```
-   aitana-bot ◀┄┄ reads outputs ┄┄ aitana-bench    pipelines (Snakemake workflows)
-                                        ┆ runs
+   aitana-bot ◀┄┄ reads outputs ┄┄ aitana-pipelines runs Snakemake workflows
+                                        ┆
                                         ▼
                                  aitana-anomaly     detection
                                      │    │
@@ -57,9 +58,9 @@ contracts in [pyproject.toml](pyproject.toml):
                                  aitana-storage     persistence
 ```
 
-(Solid arrows are `depends on`. `aitana-bench` is where components are combined into
+(Solid arrows are `depends on`. `aitana-pipelines` is where components are combined into
 reproducible pipelines: its Snakemake workflows *run* the lower layers in the active
-environment but `aitana.bench` never imports them (it depends on `aitana-volcanoes` and
+environment but `aitana.pipelines` never imports them (it depends on `aitana-volcanoes` and
 `aitana-storage` only). `aitana-bot` imports no aitana package; it reads workflow outputs.)
 
 `aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
@@ -77,7 +78,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
 | [`aitana-access`](aitana-access/) | `aitana.access` | Pure I/O: Tilde, WFS, FDSN/S3/SDS waveforms | Working (0.1.2) |
 | [`aitana-features`](aitana-features/) | `aitana.features` | RSAM, SSAM, DSAR, spectral & complex-trace features | Working (0.1.0) |
 | [`aitana-volcanoes`](aitana-volcanoes/) | `aitana.volcanoes` | Ruapehu & Whakaari domain aggregates, eruption catalogues, Kalman fusion | Working (0.1.0) |
-| [`aitana-bench`](aitana-bench/) | `aitana.bench` | `volcanobench` CLI, scoring, plotting, Snakemake workflows | Working (0.1.0) |
+| [`aitana-pipelines`](aitana-pipelines/) | `aitana.pipelines` | `aitana-pipelines` CLI, scoring, plotting, Snakemake workflows | Working (0.1.0) |
 | [`aitana-anomaly`](aitana-anomaly/) | `aitana.anomaly` | State & anomaly detection expert panel | Partial — see below |
 | [`aitana-testing`](aitana-testing/) | `aitana.testing` | Synthetic waveforms with known spectral content for tests | Working (0.1.0) |
 | [`aitana-bot`](aitana-bot/) | `aitana.bot` | Slack alerts from workflow outputs; planned: VAB drafting, eruption confirmation ([PLAN.md](aitana-bot/PLAN.md)) | Partial (0.1.0) |
@@ -117,9 +118,9 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `assimilate` — state-space Kalman models: `SO2FusionModel` (multi-sensor SO₂ fusion),
   `LocalLinearTrend`, `SemiLinearTrend`.
 
-### `aitana-bench`
-- `volcanobench` CLI (`list` / `run` / `clean`) driving Snakemake workflows discovered via
-  the `volcanobench.workflows` entry-point group — third-party packages can register their own.
+### `aitana-pipelines`
+- `aitana-pipelines` CLI (`list` / `run` / `clean`) driving Snakemake workflows discovered via
+  the `aitana.pipelines.workflows` entry-point group — third-party packages can register their own.
 - `scoring` — pre-eruption-window evaluation, TP/FP/TN/FN thresholding, ROC curves,
   forecasted-rate computation.
 - `visualise` — `trellis_plot` (multi-panel time series with ensemble/uncertainty overlays)
@@ -230,7 +231,7 @@ pip install aitana-storage     # feature archives + HTTP API only
 pip install aitana-features    # feature computation only
 pip install aitana-access      # I/O only (pulls storage)
 pip install aitana-volcanoes   # per-volcano aggregates (pulls access + features)
-pip install aitana-bench       # benchmarking CLI
+pip install aitana-pipelines   # workflow CLI
 ```
 
 `aitana-anomaly` is not published yet — install it from the workspace (see below).
@@ -254,20 +255,20 @@ uv run lint-imports        # check the layering contracts
 A [devcontainer](.devcontainer/devcontainer.json) is provided with the full toolchain
 (uv, Apptainer, Quarto, Node) preinstalled.
 
-## `volcanobench` CLI
+## `aitana-pipelines` CLI
 
-The `volcanobench` command drives Snakemake benchmarking workflows bundled with Aitana
-or registered by third-party packages via the `volcanobench.workflows` entry-point group.
+The `aitana-pipelines` command drives Snakemake workflows bundled with Aitana or
+registered by third-party packages via the `aitana.pipelines.workflows` entry-point group.
 
 ### Commands
 
 | Command | Description |
 |---|---|
-| `volcanobench list` | List all registered workflows (name, volcano, description). |
-| `volcanobench run <volcano> <outdir>` | Run every registered workflow for a volcano. |
-| `volcanobench clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
+| `aitana-pipelines list` | List all registered workflows (name, volcano, description). |
+| `aitana-pipelines run <volcano> <outdir>` | Run every registered workflow for a volcano. |
+| `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
 
-`volcanobench run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
+`aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
 Any further arguments are passed to Snakemake, e.g. `--config end=2022-03-20T00:00` or `-n`
 for a dry run.
 
@@ -275,16 +276,16 @@ for a dry run.
 
 ```bash
 # See what workflows are available
-volcanobench list
+aitana-pipelines list
 
 # Run the Whakaari Bayesian-network benchmark, writing results to ./results
-volcanobench run whakaari ./results
+aitana-pipelines run whakaari ./results
 
 # Run with 4 parallel cores
-volcanobench run whakaari ./results --cores 4
+aitana-pipelines run whakaari ./results --cores 4
 
 # Remove all outputs
-volcanobench clean whakaari ./results
+aitana-pipelines clean whakaari ./results
 ```
 
 ### Bundled workflows
@@ -305,11 +306,11 @@ Its rules run in the active environment, so run it from the uv workspace (`uv sy
 
 ```bash
 # Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
-volcanobench run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
+aitana-pipelines run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
 aitana-bot notify ~/rsam_mp --dry-run
 
 # Score the last 24 h and post to Slack if it alarms
-volcanobench run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
+aitana-pipelines run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
 ```
 
 The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
@@ -354,18 +355,18 @@ automatically by the script.
 ### Registering your own workflow
 
 Any Python package can register a workflow by exposing a `WorkflowDescriptor` instance
-under the `volcanobench.workflows` entry-point group:
+under the `aitana.pipelines.workflows` entry-point group:
 
 ```toml
 # pyproject.toml
-[project.entry-points."volcanobench.workflows"]
+[project.entry-points."aitana.pipelines.workflows"]
 my_workflow = "my_package.workflows:my_workflow"
 ```
 
 ```python
 # my_package/workflows.py
 from pathlib import Path
-from aitana.bench.volcanobench import WorkflowDescriptor
+from aitana.pipelines.cli import WorkflowDescriptor
 
 my_workflow = WorkflowDescriptor(
     name="my_workflow",

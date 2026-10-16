@@ -10,7 +10,7 @@
 #               (default: all logical CPUs on the host)
 #   -h          Show this help message and exit
 #
-# The Docker image is built from the bench stage of docker/Dockerfile on first
+# The Docker image is built from the pipelines stage of docker/Dockerfile on first
 # run and cached by Docker. Conda environments for individual workflow rules are
 # cached in a named Docker volume (aitana-conda-envs) and reused across runs.
 #
@@ -48,7 +48,7 @@ echo "==> Building Docker image '${IMAGE_NAME}' ..."
 docker build \
     --build-arg D_UID="$(id -u)" \
     --build-arg D_GID="$(id -g)" \
-    --target bench \
+    --target pipelines \
     -t "$IMAGE_NAME" \
     -f "$PROJECT_ROOT/docker/Dockerfile" \
     "$PROJECT_ROOT"
@@ -67,8 +67,8 @@ docker run --rm \
         set -euo pipefail
         echo '--> Installing aitana from source ...'
         pip install /project --quiet
-        echo '--> Launching volcanobench ...'
-        volcanobench run whakaari /results --cores ${CORES}
+        echo '--> Launching aitana-pipelines ...'
+        aitana-pipelines run whakaari /results --cores ${CORES}
     "
 
 echo "==> Done. Results written to: ${OUTDIR}"

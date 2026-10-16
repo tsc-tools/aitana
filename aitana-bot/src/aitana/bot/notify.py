@@ -16,7 +16,7 @@ def latest_alert(outdir):
     Parameters
     ----------
     outdir : str or Path
-        Output directory of ``volcanobench run``.
+        Output directory of ``aitana-pipelines run``.
 
     Returns
     -------

@@ -36,7 +36,7 @@ class PipelineError(RuntimeError):
 
 def discover_workflows() -> dict[str, WorkflowDescriptor]:
     result = {}
-    for ep in entry_points(group="volcanobench.workflows"):
+    for ep in entry_points(group="aitana.pipelines.workflows"):
         try:
             result[ep.name] = ep.load()
         except Exception as e:
@@ -110,7 +110,7 @@ def _resolve(volcano: str) -> list[WorkflowDescriptor]:
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 def run(ctx: typer.Context, volcano: str, outdir: str, cores: int = 1):
-    """Run all registered benchmark workflows for a volcano.
+    """Run all registered workflows for a volcano.
 
     Extra arguments are passed to Snakemake, e.g. ``--config end=2022-03-20T00:00``.
     """

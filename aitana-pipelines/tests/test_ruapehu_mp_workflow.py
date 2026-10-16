@@ -4,8 +4,8 @@ import re
 
 import pytest
 
-from aitana.bench.volcanobench import SnakemakeBackend
-from aitana.bench.workflows.ruapehu_mp import workflow
+from aitana.pipelines.cli import SnakemakeBackend
+from aitana.pipelines.workflows.ruapehu_mp import workflow
 
 
 def planned_jobs(output):

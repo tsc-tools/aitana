@@ -51,7 +51,7 @@ RUN curl -fsSL https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin U
 # bayes ownership from the image, instead of the root ownership Docker gives
 # a volume mounted inside the bind-mounted workspace.
 ENV UV_PROJECT_ENVIRONMENT=$HOME/.venv
-# Put the workspace's console scripts (volcanobench, aitana-bot, ...) on PATH
+# Put the workspace's console scripts (aitana-pipelines, aitana-bot, ...) on PATH
 # in every stage, not only in shells VS Code happens to activate.
 ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
 
@@ -61,9 +61,9 @@ RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
 
 EXPOSE 8003
 
-# aitana-bench workflows run some rules in Apptainer containers
-# (scripts/run_egu2026.sh builds with --target bench).
-FROM base AS bench
+# aitana-pipelines workflows run some rules in Apptainer containers
+# (scripts/run_egu2026.sh builds with --target pipelines).
+FROM base AS pipelines
 
 USER root
 
@@ -86,7 +86,7 @@ USER bayes
 
 # Devcontainer image: the devcontainer bind-mounts the workspace and runs
 # `uv sync` via postCreateCommand (devcontainer.json builds with --target dev).
-FROM bench AS dev
+FROM pipelines AS dev
 
 USER root
 

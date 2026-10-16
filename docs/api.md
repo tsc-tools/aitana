@@ -25,5 +25,5 @@
 
 ### CLI and workflows
 
-::: aitana.volcanobench
+::: aitana.pipelines.cli
 ::: aitana.logging_config

@@ -8,7 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Dependency-ordered list
-ALL_DISTS=(aitana-access aitana-features aitana-volcanoes aitana-bench)
+ALL_DISTS=(aitana-access aitana-features aitana-volcanoes aitana-pipelines)
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
