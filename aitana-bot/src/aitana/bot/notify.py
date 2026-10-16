@@ -32,6 +32,30 @@ def latest_alert(outdir):
     return json.loads(path.read_text()), path
 
 
+def finished_alert(outdir):
+    """
+    Load the newest alert summary of a workflow output directory once its run is done.
+
+    Parameters
+    ----------
+    outdir : str or Path
+        Output directory of ``aitana-pipelines run``.
+
+    Returns
+    -------
+    tuple of (dict, Path) or None
+        Like `latest_alert`, or None while there is no alert yet or the newest
+        run has not written its plot.
+    """
+    try:
+        alert, path = latest_alert(outdir)
+    except FileNotFoundError:
+        return None
+    if not (path.parent / alert["plot"]).exists():
+        return None
+    return alert, path
+
+
 def format_message(alert):
     """
     Turn an alert summary into a Slack mrkdwn message.

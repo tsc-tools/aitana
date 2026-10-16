@@ -145,3 +145,57 @@ def test_notify_needs_credentials(tmp_path, slack, monkeypatch):
     result = CliRunner().invoke(cli.app, ["notify", str(tmp_path)])
     assert result.exit_code == 1
     assert slack.instances == []
+
+
+class StopWatching(Exception):
+    pass
+
+
+def test_watch_posts_each_raised_alarm_once(tmp_path, slack, monkeypatch):
+    # Already raised before the watcher starts: not posted.
+    write_alert(tmp_path, "20220319T0000", alarm=True, mtime=1_000)
+    unfinished = tmp_path / "results" / "20220319T0100" / "rsam_mp.png"
+    runs = iter(
+        [
+            lambda: write_alert(tmp_path, "20220319T0010", alarm=True, mtime=2_000),
+            lambda: write_alert(tmp_path, "20220319T0020", alarm=False, mtime=3_000),
+            lambda: write_alert(tmp_path, "20220319T0030", alarm=True, mtime=4_000),
+            lambda: write_alert(tmp_path, "20220319T0040", alarm=True, mtime=5_000),
+            lambda: write_alert(tmp_path, "20220319T0050", alarm=False, mtime=6_000),
+            # Raised again, but the run has not written its plot yet...
+            lambda: write_alert(tmp_path, "20220319T0100", alarm=True, mtime=7_000)
+            .with_name("rsam_mp.png")
+            .unlink(),
+            # ...until the next check.
+            lambda: unfinished.write_bytes(b"png"),
+        ]
+    )
+
+    def sleep(seconds):
+        """Let the next workflow run finish instead of waiting."""
+        try:
+            next(runs)()
+        except StopIteration:
+            raise StopWatching
+
+    posted = []
+    monkeypatch.setattr(cli.time, "sleep", sleep)
+    monkeypatch.setattr(
+        cli,
+        "post_to_slack",
+        lambda client, channel, text, image: posted.append((image, image.exists())),
+    )
+    result = CliRunner().invoke(cli.app, ["watch", str(tmp_path)])
+
+    assert isinstance(result.exception, StopWatching), result.output
+    assert posted == [
+        (tmp_path / "results" / tag / "rsam_mp.png", True)
+        for tag in ["20220319T0030", "20220319T0100"]
+    ]
+
+
+def test_watch_needs_credentials(tmp_path, slack, monkeypatch):
+    monkeypatch.delenv("SLACK_CHANNEL_ID")
+    result = CliRunner().invoke(cli.app, ["watch", str(tmp_path)])
+    assert result.exit_code == 1
+    assert slack.instances == []

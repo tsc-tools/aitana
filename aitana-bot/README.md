@@ -28,3 +28,13 @@ aitana-pipelines run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
 `OUTDIR`. It always prints a one-line summary; if the alert raised an alarm it posts the
 message with the plot (`rsam_mp.png`) to the channel. `--dry-run` prints the message instead
 of posting it. Every message is marked as an automated draft for duty-officer review.
+
+For a workflow that runs on a schedule (`aitana-pipelines run ... --cron`), run
+
+```bash
+aitana-bot watch ~/rsam_mp
+```
+
+instead. It checks `OUTDIR` every minute and posts a run once its plot is written, if it
+raised the alarm and the run before it did not. An alarm that stays raised across runs is
+posted once; one raised while the watcher was down is not posted when it restarts.
