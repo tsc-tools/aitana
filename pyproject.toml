@@ -26,6 +26,7 @@ dev = [
   "nbclient",
   "nbformat",
   "pip-audit",
+  "torch>=2.13.0",
 ]
 
 [tool.pytest.ini_options]
