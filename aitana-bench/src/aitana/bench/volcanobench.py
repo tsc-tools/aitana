@@ -1,12 +1,12 @@
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Protocol
 
 import typer
-
 from aitana.access.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -106,11 +106,18 @@ def _resolve(volcano: str) -> list[WorkflowDescriptor]:
     return matches
 
 
-@app.command()
-def run(volcano: str, outdir: str, cores: int = 1):
-    """Run all registered benchmark workflows for a volcano."""
+@app.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+def run(ctx: typer.Context, volcano: str, outdir: str, cores: int = 1):
+    """Run all registered benchmark workflows for a volcano.
+
+    Extra arguments are passed to Snakemake, e.g. ``--config end=2022-03-20T00:00``.
+    """
     for w in _resolve(volcano):
-        SnakemakeBackend(w.workflowdir, Path(outdir)).execute(cores=cores)
+        SnakemakeBackend(w.workflowdir, Path(outdir)).execute(
+            cores=cores, extra=ctx.args
+        )
 
 
 @app.command()
