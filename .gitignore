@@ -8,7 +8,6 @@ site/
 src/aitana/data/workflows/egu_2026/.conda/
 src/aitana/data/workflows/egu_2026/.cache/
 src/aitana/data/workflows/egu_2026/.snakemake/
-*.png
 *.pdf
 aitana-volcanoes/src/aitana/volcanoes/data/RSAM_NZ.WIZ.10.HHZ.csv
 .vscode/settings.json

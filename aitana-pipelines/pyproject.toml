@@ -16,6 +16,7 @@ dependencies = [
     "typer>=0.25,<1",
     "matplotlib>=3.10.8,<4",
     "aitana-storage>=0.1.0",
+    "apscheduler>=3.11,<4",
 ]
 
 [tool.hatch.build.targets.wheel]

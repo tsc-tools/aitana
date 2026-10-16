@@ -8,6 +8,8 @@ from typing import Protocol
 
 import typer
 from aitana.access.logging_config import get_logger
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 logger = get_logger(__name__)
 
@@ -109,22 +111,41 @@ def _resolve(volcano: str) -> list[WorkflowDescriptor]:
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
-def run(ctx: typer.Context, volcano: str, outdir: str, cores: int = 1):
+def run(
+    ctx: typer.Context,
+    volcano: str,
+    outdir: str,
+    cores: int = 1,
+    cron: str | None = None,
+):
     """Run all registered workflows for a volcano.
 
     Extra arguments are passed to Snakemake, e.g. ``--config end=2022-03-20T00:00``.
+    With ``--cron``, keep running and repeat on a crontab schedule in UTC, e.g.
+    ``--cron "*/10 * * * *"``; a run that is due while the previous one is still
+    going is skipped.
     """
-    for w in _resolve(volcano):
-        SnakemakeBackend(w.workflowdir, Path(outdir)).execute(
-            cores=cores, extra=ctx.args
-        )
+    workflows = _resolve(volcano)
+
+    def run_all():
+        for w in workflows:
+            SnakemakeBackend(w.workflowdir, Path(outdir)).execute(
+                cores=cores, extra=ctx.args
+            )
+
+    if cron is None:
+        run_all()
+        return
+    scheduler = BlockingScheduler(timezone="UTC")
+    scheduler.add_job(run_all, CronTrigger.from_crontab(cron, timezone="UTC"))
+    scheduler.start()
 
 
 @app.command()
 def clean(volcano: str, outdir: str):
     """Delete all workflow outputs for a volcano."""
     for w in _resolve(volcano):
-        SnakemakeBackend(w.workflowfile, Path(outdir)).clean()
+        SnakemakeBackend(w.workflowdir, Path(outdir)).clean()
 
 
 @app.command(name="list")
