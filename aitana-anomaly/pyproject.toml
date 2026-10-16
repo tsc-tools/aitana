@@ -25,6 +25,7 @@ dependencies = [
     "pyyaml",
     "scatseisnet",
     "tqdm",
+    "stumpy",
 ]
 
 [tool.hatch.build.targets.wheel]

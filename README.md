@@ -45,19 +45,22 @@ contracts in [pyproject.toml](pyproject.toml):
    not import `access`. They are siblings that never import each other.
 
 ```
-              aitana-bot                     duty-officer companion (planned)
-                   │
-                   ▼
-            aitana-anomaly ──▶ aitana-bench  detection / benchmarking
-                   │    │
-                   ▼    ▼
-        aitana-access aitana-features         siblings: I/O ── computation
-                   │    |
-                   ▼    ▼
-             aitana-storage                   persistence
+   aitana-bot ◀┄┄ reads outputs ┄┄ aitana-bench    pipelines (Snakemake workflows)
+                                        ┆ runs
+                                        ▼
+                                 aitana-anomaly     detection
+                                     │    │
+                                     ▼    ▼
+                       aitana-access   aitana-features   siblings: I/O ── computation
+                                     │    |
+                                     ▼    ▼
+                                 aitana-storage     persistence
 ```
 
-(Arrows are `depends on`. `aitana-bench` also depends on `aitana-storage` directly)
+(Solid arrows are `depends on`. `aitana-bench` is where components are combined into
+reproducible pipelines: its Snakemake workflows *run* the lower layers in the active
+environment but `aitana.bench` never imports them (it depends on `aitana-volcanoes` and
+`aitana-storage` only). `aitana-bot` imports no aitana package; it reads workflow outputs.)
 
 `aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
 
@@ -77,7 +80,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
 | [`aitana-bench`](aitana-bench/) | `aitana.bench` | `volcanobench` CLI, scoring, plotting, Snakemake workflows | Working (0.1.0) |
 | [`aitana-anomaly`](aitana-anomaly/) | `aitana.anomaly` | State & anomaly detection expert panel | Partial — see below |
 | [`aitana-testing`](aitana-testing/) | `aitana.testing` | Synthetic waveforms with known spectral content for tests | Working (0.1.0) |
-| [`aitana-bot`](aitana-bot/) | — | Duty-officer companion (VAB drafting, eruption confirmation) | Planned only ([PLAN.md](aitana-bot/PLAN.md)) |
+| [`aitana-bot`](aitana-bot/) | `aitana.bot` | Slack alerts from workflow outputs; planned: VAB drafting, eruption confirmation ([PLAN.md](aitana-bot/PLAN.md)) | Partial (0.1.0) |
 
 ## What is implemented
 
@@ -121,7 +124,9 @@ stacking utilities and Matplotlib/Plotly visualisation.
   forecasted-rate computation.
 - `visualise` — `trellis_plot` (multi-panel time series with ensemble/uncertainty overlays)
   and `scoring_plot`.
-- One bundled workflow: `egu2026`, a Bayesian network vs decision tree benchmark for Whakaari.
+- Two bundled workflows: `egu2026`, a Bayesian network vs decision tree benchmark for
+  Whakaari, and `ruapehu_mp`, the Ruapehu RSAM matrix-profile alert (see
+  [below](#the-ruapehu-rsam-alert-end-to-end)).
 
 ### `aitana-anomaly`
 - `AnomalyDetectionBaseClass` — the shared contract every detector implements, including
@@ -131,15 +136,23 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `AutoEncoder` / `TiedAutoEncoder` — working per-timestep autoencoder with training,
   checkpointing and inference; `FuzzyCluster` for cluster assignment.
 - `SNet` — scattering-network feature extraction (via `scatseisnet`).
+- `MatrixProfile` — z-normalized left matrix profile (`stumpy`) of a single series, scored
+  against its own trailing history and mapped to `[0, 1]` with `normalize_score()`. Sensitive
+  to changes in *shape*, deliberately blind to amplitude.
 - `evaluation` — the synthetic validation harness: `inject_faults()` (independent per-stream
   Bernoulli faults and coupled multi-stream faults), `inject_change_points()` (persistent
   regime shifts), `simulate_regime_series()` (synthetic data with known states) and
   `score_detector()` (ROC/AUC against the injected ground-truth mask). Documented with
   worked examples in [docs/evaluation_methods.qmd](aitana-anomaly/docs/evaluation_methods.qmd).
 
-**Not yet working in `aitana-anomaly`:** no detector implements `compute_anomaly_index()` yet,
-so the package does not currently produce a usable anomaly signal end to end. `pca.py` needs a
-rewrite (its test suite is entirely skipped), and `SNet` has no downstream scoring layer.
+**Not yet working in `aitana-anomaly`:** `MatrixProfile` is the only detector that implements
+`compute_anomaly_index()`. `pca.py` needs a rewrite (its test suite is entirely skipped), and
+`SNet` has no downstream scoring layer.
+
+### `aitana-bot`
+- `aitana-bot notify OUTDIR` reads the most recently written `results/*/alert.json` of a
+  workflow output directory and, if it raised an alarm, posts the message and plot to Slack
+  (`--dry-run` prints instead). Setup in [aitana-bot/README.md](aitana-bot/README.md).
 
 ## What is planned
 
@@ -182,8 +195,8 @@ Two capabilities, deliberately different architectures, both Ruapehu-first:
   an audit trail.
 
 Details, milestones and open questions for the volcano team are in
-[aitana-bot/PLAN.md](aitana-bot/PLAN.md). Note the directory is `aitana-bot` while the plan
-proposes distribution name `aitana-virtual-volcanologist` — the naming is not yet settled.
+[aitana-bot/PLAN.md](aitana-bot/PLAN.md). The plan's proposed distribution name
+`aitana-virtual-volcanologist` was not adopted; the package is `aitana-bot` (`aitana.bot`).
 
 ### Cross-cutting
 
@@ -255,6 +268,8 @@ or registered by third-party packages via the `volcanobench.workflows` entry-poi
 | `volcanobench clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
 
 `volcanobench run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
+Any further arguments are passed to Snakemake, e.g. `--config end=2022-03-20T00:00` or `-n`
+for a dry run.
 
 ### Examples
 
@@ -277,6 +292,31 @@ volcanobench clean whakaari ./results
 | Name | Volcano | Description |
 |---|---|---|
 | `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
+| `ruapehu_mp` | ruapehu | Matrix-profile anomaly index of Ruapehu RSAM with an alert summary for `aitana-bot` |
+
+### The Ruapehu RSAM alert, end to end
+
+`ruapehu_mp` fetches `NZ.FWVZ.10.HHZ` waveforms (GeoNet's S3 archive, falling back to the
+near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day, stores
+RSAM and the anomaly index in `aitana-storage` under `<outdir>/storage`, scores the last 24 h
+against the preceding 28 days with `MatrixProfile` and writes
+`results/<end>/{alert.json,index.csv,rsam_mp.png}`. Completed days are reused across runs.
+Its rules run in the active environment, so run it from the uv workspace (`uv sync`).
+
+```bash
+# Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
+volcanobench run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
+aitana-bot notify ~/rsam_mp --dry-run
+
+# Score the last 24 h and post to Slack if it alarms
+volcanobench run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
+```
+
+The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
+threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet
+months and on about 20 % of days during the March–May 2022 unrest. It did not flag the abrupt
+2022-03-13 onset itself (a step looks like any other step once z-normalized); the first alarm
+after it was 2022-03-19 17:30 UTC, on an unusually steady stretch of tremor.
 
 ### Running the EGU 2026 workflow with Docker
 

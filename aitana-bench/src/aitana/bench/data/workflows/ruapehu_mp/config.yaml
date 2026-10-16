@@ -1,0 +1,13 @@
+# End of the scored period (UTC): "now" or an ISO timestamp, e.g. 2022-03-20T00:00
+end: now
+seed_id: NZ.FWVZ.10.HHZ
+# Days of history every scored subsequence is compared against
+history_days: 28
+# Hours scored per run
+lookback_hours: 24
+# Matrix-profile window in 10-min samples (36 = 6 h)
+window: 36
+# Alarm when the anomaly index reaches this value
+threshold: 0.999
+# aitana-storage root for RSAM and the anomaly index, relative to the output directory
+storage_dir: storage

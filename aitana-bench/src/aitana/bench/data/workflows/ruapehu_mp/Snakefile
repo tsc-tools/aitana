@@ -1,0 +1,101 @@
+"""
+Matrix-profile anomaly index of Ruapehu RSAM.
+
+Computes 10-min RSAM for ``seed_id`` from GeoNet waveforms, one job per UTC
+day so that completed days are reused across runs, scores the last
+``lookback_hours`` against the preceding ``history_days`` with
+``aitana.anomaly.matrix_profile.MatrixProfile`` and writes an alert summary
+that ``aitana-bot notify`` posts to Slack.
+
+Rules run in the active Python environment, which must provide aitana-access,
+aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
+workspace). Override config values on the command line, e.g.
+``volcanobench run ruapehu OUT --config end=2022-03-20T00:00``.
+"""
+
+import pandas as pd
+
+
+configfile: "config.yaml"
+
+
+RESOLUTION = pd.Timedelta("10min")
+
+
+def utc(value):
+    ts = pd.Timestamp(value)
+    return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+
+
+def naive(ts):
+    """ISO string in UTC without an offset, matching the RSAM timestamps."""
+    return ts.tz_convert(None).isoformat()
+
+
+END = utc("now" if str(config["end"]) == "now" else str(config["end"])).floor(RESOLUTION)
+SCORE_START = END - pd.Timedelta(hours=config["lookback_hours"])
+HISTORY_START = (
+    SCORE_START - pd.Timedelta(days=config["history_days"]) - config["window"] * RESOLUTION
+)
+TAG = END.strftime("%Y%m%dT%H%M")
+DAYS = pd.date_range(
+    HISTORY_START.floor("D"), END.floor("D"), freq="D", inclusive="left"
+).strftime("%Y-%m-%d")
+PARTIAL = [f"rsam/partial_{TAG}.csv"] if END > END.floor("D") else []
+
+
+wildcard_constraints:
+    day=r"\d{4}-\d{2}-\d{2}",
+
+
+rule all:
+    input:
+        f"results/{TAG}/alert.json",
+        f"results/{TAG}/rsam_mp.png",
+
+
+# RSAM for one complete UTC day, cached in rsam/<day>.csv: later runs reuse the
+# file. Delete it to fetch and recompute that day, e.g. after a data gap is filled.
+rule rsam_day:
+    output:
+        "rsam/{day}.csv",
+    params:
+        start=lambda wc: pd.Timestamp(wc.day).isoformat(),
+        end=lambda wc: (pd.Timestamp(wc.day) + pd.Timedelta(days=1)).isoformat(),
+    script:
+        "scripts/rsam.py"
+
+
+# The incomplete current day, recomputed for every new end time.
+rule rsam_partial:
+    output:
+        f"rsam/partial_{TAG}.csv",
+    params:
+        start=naive(END.floor("D")),
+        end=naive(END),
+    script:
+        "scripts/rsam.py"
+
+
+rule matrix_profile:
+    input:
+        expand("rsam/{day}.csv", day=DAYS) + PARTIAL,
+    output:
+        index=f"results/{TAG}/index.csv",
+        alert=f"results/{TAG}/alert.json",
+    params:
+        end=naive(END),
+        score_start=naive(SCORE_START),
+        history_start=naive(HISTORY_START),
+    script:
+        "scripts/matrix_profile.py"
+
+
+rule plot:
+    input:
+        index=f"results/{TAG}/index.csv",
+        alert=f"results/{TAG}/alert.json",
+    output:
+        f"results/{TAG}/rsam_mp.png",
+    script:
+        "scripts/plot.py"

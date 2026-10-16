@@ -51,6 +51,9 @@ RUN curl -fsSL https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin U
 # bayes ownership from the image, instead of the root ownership Docker gives
 # a volume mounted inside the bind-mounted workspace.
 ENV UV_PROJECT_ENVIRONMENT=$HOME/.venv
+# Put the workspace's console scripts (volcanobench, aitana-bot, ...) on PATH
+# in every stage, not only in shells VS Code happens to activate.
+ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
 
 USER bayes
 RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ${HOME}/.bashrc
@@ -117,7 +120,5 @@ RUN uv sync --frozen --no-dev --package ${PACKAGE} --no-install-workspace
 
 COPY --chown=bayes:bayes . /home/bayes/aitana
 RUN uv sync --frozen --no-dev --package ${PACKAGE}
-
-ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
 
 CMD ["tonik_api"]

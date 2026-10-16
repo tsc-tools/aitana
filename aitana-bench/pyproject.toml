@@ -26,6 +26,7 @@ volcanobench = "aitana.bench.volcanobench:app"
 
 [project.entry-points."volcanobench.workflows"]
 whakaari_bn_2026 = "aitana.bench.workflows.whakaari_bn_2026:workflow"
+ruapehu_mp = "aitana.bench.workflows.ruapehu_mp:workflow"
 
 [tool.uv.sources]
 aitana-volcanoes = { workspace = true }

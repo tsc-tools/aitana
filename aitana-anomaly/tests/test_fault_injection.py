@@ -6,6 +6,10 @@ Verify:
   entries are unchanged, faulted entries differ.
 - Coupled mode: faults land on the same timestamps across all columns in
   a group; columns outside any group are untouched.
+- inject_change_points: mask marks only the onset timestep, but the shift
+  itself persists after onset; coupled onsets are shared across a group.
+- simulate_regime_series: segment shapes and change-point locations match
+  the requested state sequence, and repeated regime labels share a mean.
 - score_detector: a trivial threshold-on-raw-value detector achieves high
   AUC against easy faults, confirming the harness end-to-end.
 - normalize_score: ECDF percentile ranks are in [0, 1] and monotone.
@@ -16,7 +20,12 @@ import pandas as pd
 import pytest
 
 from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
-from aitana.anomaly.evaluation import inject_faults, score_detector
+from aitana.anomaly.evaluation import (
+    inject_change_points,
+    inject_faults,
+    score_detector,
+    simulate_regime_series,
+)
 
 
 @pytest.fixture
@@ -129,6 +138,18 @@ def test_coupled_multiple_groups(toy_df):
     )
 
 
+def test_coupled_overlapping_groups_keep_all_faults(toy_df):
+    # "a" is in both groups, so it must carry both groups' faults, not just
+    # the last group's.
+    groups = [["a", "b"], ["a", "c"]]
+    corrupted, mask = inject_faults(
+        toy_df, mode="coupled", coupled_groups=groups, rate=0.1, rng=12
+    )
+    pd.testing.assert_series_equal(
+        corrupted["a"] != toy_df["a"], mask["a"], check_names=False
+    )
+
+
 def test_coupled_requires_coupled_groups(toy_df):
     with pytest.raises(ValueError, match="coupled_groups"):
         inject_faults(toy_df, mode="coupled", coupled_groups=None, rng=10)
@@ -137,6 +158,122 @@ def test_coupled_requires_coupled_groups(toy_df):
 def test_unknown_mode_raises(toy_df):
     with pytest.raises(ValueError, match="Unknown mode"):
         inject_faults(toy_df, mode="bogus", rng=11)
+
+
+# ---------------------------------------------------------------------------
+# inject_change_points
+# ---------------------------------------------------------------------------
+
+
+def test_change_points_mask_is_sparse(toy_df):
+    # Unlike inject_faults, the mask should mark only onsets, not the whole
+    # shifted segment that follows.
+    corrupted, change_points = inject_change_points(
+        toy_df, n_changes=3, mode="independent", rng=1
+    )
+    assert change_points.shape == toy_df.shape
+    for col in toy_df.columns:
+        assert change_points[col].sum() == 3
+
+
+def test_change_points_shift_persists_after_onset(toy_df):
+    corrupted, change_points = inject_change_points(
+        toy_df, columns=["a"], n_changes=1, offset_range="easy", mode="independent", rng=2
+    )
+    onset = change_points.index[change_points["a"]][0]
+    onset_pos = toy_df.index.get_loc(onset)
+    # The shift should still be present several steps after the onset, not
+    # just at the onset timestep itself.
+    later_pos = min(onset_pos + 5, len(toy_df) - 1)
+    later = toy_df.index[later_pos]
+    assert corrupted.loc[later, "a"] != toy_df.loc[later, "a"]
+
+
+def test_change_points_before_onset_unchanged(toy_df):
+    corrupted, change_points = inject_change_points(
+        toy_df, columns=["a"], n_changes=1, mode="independent", rng=3
+    )
+    onset = change_points.index[change_points["a"]][0]
+    onset_pos = toy_df.index.get_loc(onset)
+    if onset_pos > 0:
+        before = toy_df.index[onset_pos - 1]
+        assert corrupted.loc[before, "a"] == toy_df.loc[before, "a"]
+
+
+def test_change_points_coupled_same_onsets(toy_df):
+    groups = [["a", "b"]]
+    corrupted, change_points = inject_change_points(
+        toy_df, mode="coupled", coupled_groups=groups, n_changes=2, rng=4
+    )
+    pd.testing.assert_series_equal(
+        change_points["a"].reset_index(drop=True),
+        change_points["b"].reset_index(drop=True),
+        check_names=False,
+    )
+    assert not change_points["c"].any()
+
+
+def test_change_points_coupled_overlapping_groups_keep_all_shifts(toy_df):
+    # "a" is in both groups, so its level must step at every onset the mask
+    # records, not just the last group's.
+    groups = [["a", "b"], ["a", "c"]]
+    corrupted, change_points = inject_change_points(
+        toy_df, mode="coupled", coupled_groups=groups, n_changes=2, rng=7
+    )
+    level = (corrupted["a"] - toy_df["a"]).to_numpy()
+    steps = np.flatnonzero(np.abs(np.diff(level)) > 1e-9) + 1
+    np.testing.assert_array_equal(steps, np.flatnonzero(change_points["a"]))
+
+
+def test_change_points_coupled_requires_coupled_groups(toy_df):
+    with pytest.raises(ValueError, match="coupled_groups"):
+        inject_change_points(toy_df, mode="coupled", coupled_groups=None, rng=5)
+
+
+def test_change_points_unknown_mode_raises(toy_df):
+    with pytest.raises(ValueError, match="Unknown mode"):
+        inject_change_points(toy_df, mode="bogus", rng=6)
+
+
+# ---------------------------------------------------------------------------
+# simulate_regime_series
+# ---------------------------------------------------------------------------
+
+
+def test_simulate_regime_series_shape():
+    series, change_points, labels = simulate_regime_series(
+        ["A", "B", "A", "C"], segment_length=50, n_features=2, rng=0
+    )
+    assert series.shape == (200, 2)
+    assert len(labels) == 200
+    assert len(change_points) == 3
+
+
+def test_simulate_regime_series_change_point_locations():
+    series, change_points, labels = simulate_regime_series(
+        ["A", "B", "A", "C"], segment_length=[10, 20, 30, 40], rng=1
+    )
+    np.testing.assert_array_equal(change_points, [10, 30, 60])
+
+
+def test_simulate_regime_series_repeated_state_same_mean():
+    # Both "A" segments must be drawn from the same mean so a state
+    # detector could recover a shared label for them.
+    series, change_points, labels = simulate_regime_series(
+        ["A", "B", "A"],
+        segment_length=500,
+        n_features=1,
+        state_noise_std={"A": 0.1, "B": 0.1},
+        rng=2,
+    )
+    mean_a1 = series.loc[labels == "A"].iloc[:500].mean().item()
+    mean_a2 = series.loc[labels == "A"].iloc[500:].mean().item()
+    assert abs(mean_a1 - mean_a2) < 0.1
+
+
+def test_simulate_regime_series_segment_length_mismatch_raises():
+    with pytest.raises(ValueError):
+        simulate_regime_series(["A", "B"], segment_length=[10], rng=3)
 
 
 # ---------------------------------------------------------------------------
