@@ -105,8 +105,8 @@ USER bayes
 # BuildKit skips the bench and dev stages.
 FROM base AS operational
 
-# Workspace package to install, together with its dependencies.
-ARG PACKAGE=aitana-storage
+# One image for every deployed service (storage API, pipelines, bot): all
+# workspace packages, without the dev group or extras (so without torch).
 
 # ~/.cache is root-owned (created by conda in base), and a uv cache would
 # only bloat the image layers anyway.
@@ -116,9 +116,9 @@ ENV UV_NO_CACHE=1
 # until uv.lock changes; with --frozen, uv needs only these two files here.
 COPY --chown=bayes:bayes uv.lock pyproject.toml /home/bayes/aitana/
 WORKDIR /home/bayes/aitana
-RUN uv sync --frozen --no-dev --package ${PACKAGE} --no-install-workspace
+RUN uv sync --frozen --no-dev --all-packages --no-install-workspace
 
 COPY --chown=bayes:bayes . /home/bayes/aitana
-RUN uv sync --frozen --no-dev --package ${PACKAGE}
+RUN uv sync --frozen --no-dev --all-packages
 
 CMD ["tonik_api"]
