@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib>=3.10.8,<4",
     "aitana-storage>=0.1.0",
     "apscheduler>=3.11,<4",
+    "aitana-anomaly>=0.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -32,6 +33,7 @@ ruapehu_mp = "aitana.pipelines.workflows.ruapehu_mp:workflow"
 [tool.uv.sources]
 aitana-volcanoes = { workspace = true }
 aitana-storage = { workspace = true }
+aitana-anomaly = { workspace = true }
 
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"
