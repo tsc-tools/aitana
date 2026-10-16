@@ -17,3 +17,11 @@ aitana-volcanoes/src/aitana/volcanoes/data/RSAM_NZ.WIZ.10.HHZ.csv
 sandbox.ipynb
 file.tar
 .cache/mkdocs-jupyter/420337ba48befbcb635ec031a7d75be7d7746c272cd29ffdd968828c2bf81fc6.json
+.env
+aitana-anomaly/blended-regime-state-space-model.md
+aitana-anomaly/DBN.md
+aitana-anomaly/carniel-1996-methodology-summary.md
+aitana-bench/PLAN.md
+*ipynb*
+aitana-bench/src/aitana/bench/data/workflows/egu_2026/poster/poster.svg
+reviews/20260714-dp-standards-review.md
