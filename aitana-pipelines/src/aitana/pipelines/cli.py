@@ -57,7 +57,7 @@ class SnakemakeBackend:
         self.snakefile = self._prepare_workflow_directory()
 
     def _prepare_workflow_directory(self) -> str:
-        """Copy the snakefile, rules/, and notebooks/ into *directory* if it differs
+        """Copy the Snakefile, and all other necessary files into *directory* if it differs
         from the bundled workflow directory.  Returns the path to the snakefile that
         should be passed to snakemake (the copy when applicable, original otherwise).
         """

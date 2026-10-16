@@ -135,7 +135,8 @@ stacking utilities and Matplotlib/Plotly visualisation.
   raw statistics comparable against a quiet reference period.
 - `ZizouDataset` — feature loading and scaling for model input.
 - `AutoEncoder` / `TiedAutoEncoder` — working per-timestep autoencoder with training,
-  checkpointing and inference; `FuzzyCluster` for cluster assignment.
+  checkpointing and inference; `FuzzyCluster` for cluster assignment. This and
+  `ZizouDataset` need the `pytorch` extra (`aitana-anomaly[pytorch]`).
 - `SNet` — scattering-network feature extraction (via `scatseisnet`).
 - `MatrixProfile` — z-normalized left matrix profile (`stumpy`) of a single series, scored
   against its own trailing history and mapped to `[0, 1]` with `normalize_score()`. Sensitive
@@ -154,6 +155,8 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `aitana-bot notify OUTDIR` reads the most recently written `results/*/alert.json` of a
   workflow output directory and, if it raised an alarm, posts the message and plot to Slack
   (`--dry-run` prints instead). Setup in [aitana-bot/README.md](aitana-bot/README.md).
+- `aitana-bot watch OUTDIR` keeps checking the directory and posts each newly raised alarm
+  once, for workflows run on a schedule.
 
 ## What is planned
 
@@ -269,6 +272,8 @@ registered by third-party packages via the `aitana.pipelines.workflows` entry-po
 | `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
 
 `aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
+With `--cron "<crontab expression>"` it keeps running and repeats on that schedule (UTC),
+skipping a run that is due while the previous one is still going.
 Any further arguments are passed to Snakemake, e.g. `--config end=2022-03-20T00:00` or `-n`
 for a dry run.
 
@@ -311,7 +316,14 @@ aitana-bot notify ~/rsam_mp --dry-run
 
 # Score the last 24 h and post to Slack if it alarms
 aitana-pipelines run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
+
+# Or keep scoring every 10 min and post each newly raised alarm once
+aitana-pipelines run ruapehu ~/rsam_mp --cron "2-59/10 * * * *" &
+aitana-bot watch ~/rsam_mp
 ```
+
+On the default branch, [.gitlab-ci.yml](.gitlab-ci.yml) deploys these two commands as the
+`aitana-ruapehu-mp` and `aitana-bot` containers, sharing the Docker volume `aitana-ruapehu-mp`.
 
 The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
 threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet
