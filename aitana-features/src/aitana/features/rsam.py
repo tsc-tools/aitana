@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["RSAM"]
 
+# As in the reference RSAM, keep a trailing window that the trace only partly
+# covers if data fill at least 500 of its 600 s, and drop it otherwise.
+_MIN_LAST_WINDOW_FRACTION = 5 / 6
+
 
 def rsam_wideband_energy_ratio(arr_rsam, arr_wideband, axis=-1):
     energy_rsam_band = scipy.integrate.simpson(arr_rsam**2, axis=axis)
@@ -47,6 +51,11 @@ class RSAM(FeatureBaseClass):
     :type filterfreq: tuple, optional
     :param configfile: Configuration as a .yml file or a dictionary.
     :type configfile: str or dict
+    :param max_gap_fraction: If given, windows in which a larger fraction of
+                             samples is missing (NaN, or padding past the end
+                             of the trace) are set to NaN instead of being
+                             computed across the interpolated gap.
+    :type max_gap_fraction: float, optional
     """
 
     features = ["rsam", "rsam_energy_prop"]
@@ -58,12 +67,14 @@ class RSAM(FeatureBaseClass):
         timestamp="start",
         filterfreq=(2, 5),
         configfile=None,
+        max_gap_fraction=None,
     ):
         super(RSAM, self).__init__()
         self.interval = interval
         self.per_lap = per_lap
         self.timestamp = timestamp
         self.filterfreq = filterfreq
+        self.max_gap_fraction = max_gap_fraction
         self.feature = None
 
         if configfile is not None:
@@ -132,9 +143,21 @@ class RSAM(FeatureBaseClass):
         rsam = np.absolute(rsam).mean(axis=-1)
         rsam /= 1e-9
 
+        if self.max_gap_fraction is not None:
+            # Fraction of each window that is missing; padding counts as missing.
+            gaps = window_array(nans, int(interval), noverlap, remove_mean=False,
+                                taper=False, padval=1.0).mean(axis=0)
+            rsam[gaps > self.max_gap_fraction] = np.nan
+            energy_ratio[gaps > self.max_gap_fraction] = np.nan
+
         # Calculate time stamps
         steplength = interval - noverlap
         steps = np.arange(rsam.shape[0]) * steplength
+
+        # Drop a trailing window that is mostly zero padding.
+        covered = np.minimum(npts - steps, interval)
+        keep = covered >= _MIN_LAST_WINDOW_FRACTION * interval
+        rsam, energy_ratio, steps = rsam[keep], energy_ratio[keep], steps[keep]
         if self.timestamp == "center":
             t = (steps + interval / 2) / Fs
         elif self.timestamp == "start":
