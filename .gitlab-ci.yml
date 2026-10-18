@@ -2,6 +2,8 @@ variables:
   IMAGE: "${AWS_SHARED_SERVICES_ECR}/volcanology/aitana:$CI_COMMIT_BRANCH"
   APP_SERVER: "Ruamoko"
   TEAM: "Volcano"
+  D_UID: "2737"
+  D_GID: "2737"
 
 stages:
   - build
@@ -16,7 +18,7 @@ build:
       when: never
     - when: always
   script:
-    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t "$IMAGE" .
+    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg D_UID=$D_UID --build-arg D_GID=$D_GID -t "$IMAGE" .
     - docker image push "$IMAGE"
 
 deploy-api:
@@ -82,7 +84,6 @@ deploy-ruapehu-mp:
               "--cron", "2-59/10 * * * *"],
       "HostConfig": {
         "Binds": ["${DATA_VOLUME}:/home/bayes/data"],
-        "Init": true,
         "RestartPolicy": { "Name": "always" }
       }
     }
@@ -105,7 +106,6 @@ deploy-bot:
       ],
       "HostConfig": {
         "Binds": ["${DATA_VOLUME}:/home/bayes/data:ro"],
-        "Init": true,
         "RestartPolicy": { "Name": "always" }
       }
     }

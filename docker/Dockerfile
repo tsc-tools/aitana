@@ -19,16 +19,20 @@ ENV SHELL=/bin/bash \
     LANGUAGE=C.UTF-8 \
     HOME=/home/bayes
 
+# Create ~/.cache before the root-run installs below, which would otherwise
+# create it root-owned and break Snakemake's source cache at runtime.
 RUN groupadd -g $D_GID bayes && \
     useradd -m -s /bin/bash -N -u $D_UID -G bayes bayes && \
     chmod a+rx /usr/local/bin/fix-permissions && \
     mkdir $HOME/data && \
     mkdir $HOME/.venv && \
     mkdir $HOME/.claude && \
+    mkdir $HOME/.cache && \
     fix-permissions $HOME && \
     fix-permissions $HOME/data && \
     fix-permissions $HOME/.venv && \
     fix-permissions $HOME/.claude && \
+    fix-permissions $HOME/.cache && \
     fix-permissions /opt/conda
 
 RUN apt-get update --yes && \
@@ -108,8 +112,7 @@ FROM base AS operational
 # One image for every deployed service (storage API, pipelines, bot): all
 # workspace packages, without the dev group or extras (so without torch).
 
-# ~/.cache is root-owned (created by conda in base), and a uv cache would
-# only bloat the image layers anyway.
+# A uv cache would only bloat the image layers.
 ENV UV_NO_CACHE=1
 
 # Install dependencies before copying the source so this layer stays cached
