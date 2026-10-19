@@ -122,8 +122,9 @@ def _create_root_group(defaultGroupName, featureName, h5f, xArray, starttime, ti
     # Note: xArray.dims returns a dictionary of dimensions that are not necesarily
     # in the right order; xArray[featureName].dims returns a tuple with dimension
     # names in the correct order
+    # NaN, not 0, marks unwritten slots, so that zeros read back as data
     rootGrp.create_variable(featureName, tuple(
-        xArray[featureName].dims), dtype=float, fillvalue=0.)
+        xArray[featureName].dims), dtype=float, fillvalue=np.nan)
     _set_attributes(featureName, rootGrp, xArray)
     return rootGrp
 

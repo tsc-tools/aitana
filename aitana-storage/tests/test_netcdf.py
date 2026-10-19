@@ -152,6 +152,26 @@ def test_xarray2netcdf_with_gaps(tmp_path_factory):
     assert xdf_test.isnull().sum() == 24
 
 
+def test_xarray2netcdf_zeros(tmp_path_factory):
+    """
+    Zeros are data, not missing values: a 0/1 alarm series reads back as
+    written, and only the slots that were never written are NaN.
+    """
+    temp_dir = tmp_path_factory.mktemp('test_xarray2netcdf')
+    dates = pd.date_range('2022-03-19T16:00', periods=6, freq='10min')
+    alarm = xr.DataArray([0., 1., 0., np.nan, 1., 0.], coords={'datetime': dates},
+                         dims='datetime', name='alarm')
+    g = Storage('test_experiment', rootdir=temp_dir, starttime=dates[0],
+                endtime=dates[-1], backend='netcdf',
+                archive_starttime=datetime(2022, 3, 19))
+    c = g.get_substore('MDR', '00', 'HHZ')
+    c.save(alarm.to_dataset())
+
+    np.testing.assert_array_equal(c('alarm').values, alarm.values)
+    g.starttime = datetime(2022, 3, 19)
+    assert c('alarm').loc[:'2022-03-19T15:50'].isnull().all()
+
+
 @pytest.mark.xfail(raises=OSError)
 def test_xarray2netcdf_multi_access(tmp_path_factory):
     """
