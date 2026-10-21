@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from aitana.storage import Storage, generate_test_data, get_labels
+from aitana.storage import Storage, generate_test_data
 from fastapi.testclient import TestClient
 
 tstart = datetime(2023, 1, 1, 0, 0, 0)
@@ -38,8 +38,6 @@ def storage_setup(tmp_path_factory):
         feat = generate_test_data(tstart=tstart, feature_names=[_f], ndays=ndays)
         for _c in g.stores:
             _c.save(feat)
-            if _f == "dsar":
-                _c.save_labels(get_labels(feat.dsar, float(feat.dsar.quantile(0.85))))
     for _n, _f in features2D:
         feat = generate_test_data(
             tstart=tstart,

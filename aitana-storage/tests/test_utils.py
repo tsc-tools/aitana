@@ -2,18 +2,9 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from aitana.storage.utils import (extract_consecutive_integers,
-                         generate_test_data,
+from aitana.storage.utils import (generate_test_data,
                          round_datetime,
                          floor_datetime)
-
-
-def test_extract_consecutive_integers():
-    nums = [1, 2, 3, 5, 6, 7, 8, 10]
-    assert extract_consecutive_integers(
-        nums) == [[1, 2, 3], [5, 6, 7, 8], [10]]
-    assert extract_consecutive_integers([1]) == [[1]]
-    assert extract_consecutive_integers(np.array([1, 2, 4])) == [[1, 2], [4]]
 
 
 def test_generate_test_data():

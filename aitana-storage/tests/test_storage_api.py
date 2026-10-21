@@ -36,7 +36,6 @@ def test_unknown_group(setup_storage_api):
     for endpoint, params in [
         ("/inventory", {"path": "doesnt_exist"}),
         ("/feature", {"path": "doesnt_exist", "name": "rsam", **times}),
-        ("/labels", {"path": "doesnt_exist", **times}),
     ]:
         r = client.get(endpoint, params=params)
         assert r.status_code == 404, endpoint
@@ -295,22 +294,3 @@ def test_inventory(setup_storage_api):
         txt = r.text
     result_test = json.loads(txt)
     assert sorted(result_test) == ["volcanoes"]
-
-
-def test_labels(setup_storage_api):
-    client, fq = setup_storage_api
-    params = {
-        "path": "volcanoes,MDR,00,BHZ",
-        "starttime": str(fq.starttime),
-        "endtime": str(fq.endtime),
-    }
-    with client.stream("GET", "/labels", params=params) as r:
-        r.read()
-        txt = r.text
-    result = json.loads(txt)
-    assert "time" in result["dsar"][0]
-    assert "timeEnd" in result["dsar"][0]
-    assert "title" in result["dsar"][0]
-    assert "description" in result["dsar"][0]
-    assert "tags" in result["dsar"][0]
-    assert "id" in result["dsar"][0]

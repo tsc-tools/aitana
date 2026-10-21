@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Union
 from datetime import datetime, timezone, timedelta
 
 import numpy as np
@@ -278,58 +278,6 @@ def merge_arrays(xds_old: xr.DataArray, xds_new: xr.DataArray,
     return xda_new
 
 
-def extract_consecutive_integers(nums: List[int]) -> List[List[int]]:
-    """
-    Extract consecutive integers from a list of integers.
-    """
-    if not len(nums) > 0:
-        return []
-
-    nums.sort()  # Sort the array
-    result = []
-    temp = [nums[0]]  # Initialize the first group with the first number
-
-    for i in range(1, len(nums)):
-        if nums[i] == nums[i - 1] + 1:  # Check if consecutive
-            temp.append(nums[i])
-        else:
-            result.append(temp)  # Add the current group to the result
-            temp = [nums[i]]  # Start a new group
-
-    result.append(temp)  # Add the last group
-    return result
-
-
-def get_labels(xda: xr.DataArray, threshold: float) -> dict:
-    """
-    Generate labels for time windows where the values are exceeding the threshold.
-    """
-    # add labels to time windows where the values are exceeding the 85th percentile
-    labels = {xda.name: []}
-    idx = np.where(xda > threshold)[0]
-    window_list = extract_consecutive_integers(idx)
-    ids = 0
-    for _w in window_list:
-        timeEnd = None
-        # Convert to unix time milliseconds
-        timeStart = xda.datetime.isel(dict(datetime=_w[0])).values.astype(
-            'datetime64[ms]').astype(int)
-        timeStart = int(timeStart)
-        if len(_w) > 1:
-            timeEnd = xda.datetime.isel(
-                dict(datetime=_w[-1])).values.astype('datetime64[ms]').astype(int)
-            timeEnd = int(timeEnd)
-        label = dict(time=timeStart,
-                     timeEnd=timeEnd,
-                     title='Greater 85th percentile',
-                     description='Values exceed 85th percentile',
-                     tags=['anomaly'],
-                     id=ids)
-        ids += 1
-        labels[xda.name].append(label)
-    return labels
-
-
 def main():
     from .storage import Storage
     import logging
@@ -364,12 +312,6 @@ def main():
     st2.save(xdf_1D_1)
     st2.save(xdf_2D_1)
 
-    # add labels to RSAM time windows where the values are exceeding the 85th percentile
-    logger.info("Adding labels to DSAR data")
-    labels = get_labels(xdf_1D.dsar, float(xdf_1D.dsar.quantile(0.85)))
-    logger.info("Saving labels to " + st1.path + '/labels.json')
-    st1.save_labels(labels)
-
     # Generate the data used by the examples in package_data/index.html
     tg_start = datetime(2023, 1, 1)
     tg = Storage('testgroup', rootdir=rootdir, archive_starttime=tg_start)
@@ -378,7 +320,6 @@ def main():
     logger.info("Saving test data to " + tg.path)
     tg.save(xdf_tg)
     tg.get_substore('WIZ', '00', 'HHZ').save(xdf_tg)
-    tg.save_labels(get_labels(xdf_tg.rsam, float(xdf_tg.rsam.quantile(0.85))))
 
 
 if __name__ == '__main__':

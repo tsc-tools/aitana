@@ -1,151 +1,188 @@
 """
-Post labels as Grafana annotations and retrieve them via the Grafana API.
-Labels are assumed to be in the following format:
+Sync the labels people draw on Grafana dashboards with a label file.
 
-[
-    {"time": "2023-01-01T00:00:00Z",
-     "title": "Label 1",
-     "description": "Some description",
-     "tags": ["tag1", "tag2"],
-     "id": 12345
-     },
-    {"time": "2023-02-01T00:00:00Z",
-     "timeEnd": "2023-02-01T01:00:00Z",
-     "title": "Label 2", description:
-     "description": "Another description",
-     "tags": ["tag1", "tag2"],
-     "id": 12346
-     },
-     ...
-]
-
-Note: The `timeEnd` field is optional. If it is provided, the grafana annotation will 
-be a range annotation, otherwise it will be a point annotation. The label id is used to
-check if an annotation was already added to Grafana. If the label id is not present in the
-annotations, a new annotation will be created. If the label id is present, the annotation
-will be skipped to avoid duplicates.
+Every annotation tagged `label:<class>` is a label, whichever dashboard it was drawn on,
+and all of them are kept in one JSON file. What a label refers to is in its tags only:
+`volcano:<name>`, and `series:<site>.<loc>.<cha>.<feature>` for a label that concerns
+particular series rather than the whole volcano. Each label carries a stable id in an
+"Id: <id>" line at the end of its text. The sync is a union: edits made in Grafana win,
+and stored labels missing from Grafana (deleted there, or a freshly deployed Grafana) are
+posted back as organization annotations, which any dashboard shows through an annotation
+query on the volcano tag. To withdraw a label, retag it, e.g. `label:retracted`.
 """
 
-import numpy as np
-import requests
+import json
+import os
+import re
 import uuid
-from typing import List, Dict, Any, Optional
+from collections import Counter
+from datetime import UTC, datetime
+from typing import Any
+
+import requests
+
+ID_LINE = re.compile(r"(?:^|\n)Id: (\S+)\s*$")
 
 
-def get_annotations(baseurl: str, tags: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+def is_label(tags: list[str]) -> bool:
+    """Whether tags mark an annotation as a `label:` label."""
+    return any(tag.startswith("label:") for tag in tags)
+
+
+def _split_id(text: str):
+    """Split annotation text into the text before its "Id: <id>" line and the id."""
+    match = ID_LINE.search(text)
+    if match is None:
+        return text, None
+    return text[: match.start()], match.group(1)
+
+
+def _check(rval, action: str):
+    if rval.status_code != 200:
+        raise RuntimeError(f"Failed to {action}: {rval.status_code} {rval.text}")
+
+
+def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
     """
-    Get existing annotations from the Grafana API.
+    Bring the label annotations in Grafana and the stored labels in step.
+
+    The result is the union of both. A label in both takes its text, tags and
+    times from Grafana; labels drawn in Grafana, on any dashboard, are added;
+    stored labels missing from Grafana are posted as organization annotations,
+    so nothing is lost when an annotation is deleted or Grafana is redeployed.
+    Annotations without an "Id: <id>" line get a new id appended to their text.
 
     Parameters
     ----------
     baseurl : str
-        The base URL of the Grafana API. This is typically in the format
+        The base URL of the Grafana API, e.g.
         "http://<grafana-user>:<user-pwd>@<grafana-host>:<port>".
-    tags : list of str, optional
-        A list of tags to filter the annotations. If None, all annotations are retrieved.
+    stored : list of dict
+        Labels from the previous sync, as returned by this function.
+
     Returns
     -------
-    annotations : dict
-        A dictionary containing the annotations, where the keys are the label IDs
-        and the values are dictionaries with the following keys:
-            - 'text': The text of the annotation.
-            - 'time': The start time of the annotation in milliseconds since epoch.
-            - 'timeEnd': (optional) The end time of the annotation in milliseconds since epoch.
-            - 'tags': A list of tags associated with the annotation.
-            - 'id': The ID of the annotation.
-    """
-    url = baseurl + "/api/annotations"
-    params = {}
-    if tags is not None:
-        params = {"tags": tags}
-    rval = requests.get(url, params=params)
-    if rval.status_code != 200:
-        raise RuntimeError(
-            f"Failed to retrieve annotations: {rval.status_code} {rval.text}")
-    annotations = {}
-    for atn in rval.json():
-        # Extract label ID from text using regex
-        try:
-            label_id = atn["text"].split("Id: ")[-1].strip()
-        except IndexError:
-            label_id = str(uuid.uuid4())
-        annotations[label_id] = {"text": atn["text"],
-                                 "time": atn["time"],
-                                 "timeEnd": atn.get("timeEnd", None),
-                                 "tags": atn.get("tags", []),
-                                 "id": atn["id"]}
-    return annotations
-
-
-def post_annotations(baseurl: str, labels: List[Dict[str, Any]]) -> None:
-    """
-    Post annotations from a list of labels if they do not already exist.
-
-    Parameters
-    ----------
-    baseurl : str
-        The base URL of the Grafana API. This is typically in the format
-        "http://<grafana-user>:<user-pwd>@<grafana-host>:<port>".
     labels : list of dict
-        A list of dictionaries containing label information. Each dictionary
-        should have the following keys:
-            - 'time': The start time of the annotation in ISO format.
-            - 'timeEnd': (optional) The end time of the annotation in ISO format.
-            - 'title': The title of the annotation.
-            - 'description': The description of the annotation.
-            - 'tags': A list of tags associated with the annotation.
-            - 'id': A unique identifier for the label, used to check for duplicates.
+        All labels, ordered by time. Each has 'time' and 'timeEnd' (ms since
+        epoch; 'timeEnd' is None for a point), 'title' (first line of the
+        text), 'description' (the text without its "Id:" line), 'tags', 'id'
+        (the stable label id), and where they were made: 'user' (login),
+        'dashboardUID' and 'panelId' (None for an annotation made through the
+        API).
+    report : dict
+        Number of labels 'restored' to Grafana and 'added' from Grafana, and
+        'untagged': the labels without a `volcano:` tag, which no volcano
+        dashboard shows.
     """
     url = baseurl + "/api/annotations"
-    header = {"Content-type": "application/json"}
-    for label in labels:
-        existing_labels = get_annotations(baseurl, tags=label['tags'])
-        if str(label['id']) in existing_labels:
-            print(
-                f"Label with ID {label['id']} already exists. Skipping post.")
+    rval = requests.get(url, params={"type": "annotation", "limit": 100000})
+    _check(rval, "retrieve annotations")
+    known = {label["id"]: label for label in stored}
+
+    in_grafana = {}
+    for atn in rval.json():
+        tags = atn.get("tags", [])
+        if not is_label(tags):
             continue
-        starttime = np.datetime64(label['time']).astype(
-            'datetime64[ms]').astype(int)
-        try:
-            endtime = np.datetime64(label['timeEnd']).astype(
-                'datetime64[ms]').astype(int)
-            endtime = int(endtime)
-        except KeyError:
-            endtime = None
-        text = f"{label['title']}\n{label['description']}\nId: {label['id']}"
-        new_annotation = {
-            "time": int(starttime),
-            "timeEnd": endtime,
-            "text": text,
-            "tags": label['tags']
+        description, label_id = _split_id(atn.get("text", ""))
+        if label_id is None:
+            label_id = uuid.uuid4().hex
+            _check(
+                requests.patch(
+                    f"{url}/{atn['id']}",
+                    json={"text": f"{description}\nId: {label_id}"},
+                ),
+                "add an id to an annotation",
+            )
+        # where a label was made survives its restore as an organization annotation
+        origin = known.get(label_id, {})
+        time_end = atn.get("timeEnd")
+        in_grafana[label_id] = {
+            "time": atn["time"],
+            "timeEnd": time_end if time_end and time_end != atn["time"] else None,
+            "title": description.split("\n")[0],
+            "description": description,
+            "tags": tags,
+            "id": label_id,
+            "user": origin.get("user") or atn.get("login"),
+            "dashboardUID": origin.get("dashboardUID")
+            or atn.get("dashboardUID")
+            or None,
+            "panelId": origin.get("panelId") or atn.get("panelId") or None,
         }
-        rval = requests.post(url, headers=header, json=new_annotation)
-        if rval.status_code != 200:
-            raise RuntimeError(
-                f"Failed to post annotation: {rval.status_code} {rval.text}")
-        else:
-            print("Annotation posted successfully.")
+
+    missing = known.keys() - in_grafana.keys()
+    for label_id in missing:
+        label = known[label_id]
+        _check(
+            requests.post(
+                url,
+                json={
+                    "time": label["time"],
+                    "timeEnd": label["timeEnd"] or label["time"],
+                    "text": f"{label['description']}\nId: {label_id}",
+                    "tags": label["tags"],
+                },
+            ),
+            "restore an annotation",
+        )
+        in_grafana[label_id] = label
+
+    labels = sorted(in_grafana.values(), key=lambda label: (label["time"], label["id"]))
+    report = {
+        "restored": len(missing),
+        "added": len(in_grafana.keys() - known.keys()),
+        "untagged": [
+            label
+            for label in labels
+            if not any(tag.startswith("volcano:") for tag in label["tags"])
+        ],
+    }
+    return labels, report
 
 
 def main(argv=None):
     import argparse
-    import json
-    parser = argparse.ArgumentParser(
-        description=__doc__)
-    parser.add_argument('url', type=str,
-                        help='Grafana API URL for annotations.')
-    parser.add_argument('--labels', type=str, default=None,
-                        help='Path to JSON file containing labels to post.')
-    parser.add_argument('--get-annotations', action='store_true',
-                        help='Get existing annotations from Grafana API.')
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("url", type=str, help="Grafana API URL for annotations.")
+    parser.add_argument(
+        "--file",
+        type=str,
+        required=True,
+        help="Label file, e.g. /data/labels.json. Created by the first sync.",
+    )
     args = parser.parse_args(argv)
-    if args.labels is not None:
-        with open(args.labels, 'r') as f:
-            labels = json.load(f)
-        post_annotations(args.url, labels)
-    elif args.get_annotations:
-        annotations = get_annotations(args.url)
-        print(json.dumps(annotations, indent=2))
+    try:
+        with open(args.file) as fh:
+            stored = json.load(fh)
+    except FileNotFoundError:
+        stored = []
+    labels, report = sync_labels(args.url, stored)
+    # write and rename, so an interrupted sync can't leave a truncated file
+    tmp = args.file + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(labels, fh, indent=1)
+    os.replace(tmp, args.file)
+
+    counts = Counter(tag for label in labels for tag in label["tags"])
+    print(
+        f"{len(labels)} labels in {args.file} ({report['restored']} restored to "
+        f"Grafana, {report['added']} added). Tags:"
+    )
+    for tag, n in sorted(counts.items()):
+        print(f"  {tag}: {n}")
+    if report["untagged"]:
+        print(
+            f"{len(report['untagged'])} labels have no volcano: tag, so no volcano "
+            "dashboard shows them:"
+        )
+        for label in report["untagged"]:
+            start = datetime.fromtimestamp(label["time"] / 1000, tz=UTC)
+            print(
+                f"  {start:%Y-%m-%d %H:%M} UTC on dashboard "
+                f"{label['dashboardUID'] or '-'}: {label['title']}"
+            )
 
 
 if __name__ == "__main__":

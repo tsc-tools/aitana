@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from aitana.storage import Storage, generate_test_data, get_labels
+from aitana.storage import Storage, generate_test_data
 from aitana.storage.ingest import IngestWorker
 
 
@@ -172,19 +172,40 @@ def test_shape(tmp_path_factory):
     assert rsam_shape['frequency'] == 10
 
 
-def test_labels(tmp_path_factory):
+@pytest.mark.parametrize("backend", ["netcdf", "zarr"])
+def test_feature_info_counts_records(tmp_path_factory, backend):
+    """
+    Pre-allocated slots and gaps are not records, and a rewrite shows at once.
+    """
     rootdir = tmp_path_factory.mktemp('data')
-    g = Storage('volcanoes', rootdir=rootdir)
-    tstart = datetime(2016, 1, 1)
-    xdf = generate_test_data(dim=1, intervals=100, tstart=tstart)
-    g.save_labels(get_labels(xdf.rsam, float(xdf.rsam.quantile(0.85))))
-    labels = g.get_labels()
-    assert 'time' in labels['rsam'][0]
-    assert 'timeEnd' in labels['rsam'][0]
-    assert 'title' in labels['rsam'][0]
-    assert 'description' in labels['rsam'][0]
-    assert 'tags' in labels['rsam'][0]
-    assert 'id' in labels['rsam'][0]
+    g = Storage('volcanoes', rootdir=rootdir, backend=backend,
+                archive_starttime=datetime(2022, 1, 1))
+    dates = pd.date_range('2022-03-19T16:00', periods=6, freq='10min')
+    alarm = xr.DataArray([0., 1., np.nan, 1., 0., 0.], coords={'datetime': dates},
+                         dims='datetime', name='alarm')
+    g.save(alarm.to_dataset())
+    assert g.get_feature_info('alarm') == {
+        'name': 'alarm', 'recordCount': 5,
+        'earliestRecord': '2022-03-19T16:00:00',
+        'latestRecord': '2022-03-19T16:50:00'}
+
+    # fill the gap and add one sample; file times are only as fine as the
+    # kernel's clock tick, so let one pass before rewriting
+    time.sleep(0.02)
+    later = pd.date_range('2022-03-19T16:20', periods=5, freq='10min')
+    g.save(xr.DataArray([1., 1., 0., 0., 1.], coords={'datetime': later},
+                        dims='datetime', name='alarm').to_dataset())
+    info = g.get_feature_info('alarm')
+    assert (info['recordCount'], info['latestRecord']) == (7, '2022-03-19T17:00:00')
+
+    # a 2D timestamp is a record if any frequency holds data
+    spec = xr.DataArray([[1., np.nan, np.nan], [np.nan, np.nan, 2.]],
+                        coords={'frequency': [1., 2.], 'datetime': dates[:3]},
+                        dims=('frequency', 'datetime'), name='spec')
+    g.save(spec.to_dataset())
+    info = g.get_feature_info('spec')
+    assert (info['recordCount'], info['earliestRecord'], info['latestRecord']) == (
+        2, '2022-03-19T16:00:00', '2022-03-19T16:20:00')
 
 
 def test_attributes_only(tmp_path_factory):

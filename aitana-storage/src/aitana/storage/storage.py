@@ -1,5 +1,5 @@
 from datetime import datetime
-import json
+from functools import lru_cache
 import logging
 import os
 import threading
@@ -19,6 +19,45 @@ from .xarray2zarr import xarray2zarr
 
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=4096)
+def _record_info(feature_path, mtime_ns, feature, engine):
+    """
+    Count the timestamps of a stored feature that hold data.
+
+    The writers pre-allocate the time axis from `archive_starttime`, so that
+    data can be written out of order, and unwritten slots read as NaN. A
+    timestamp of a 2D feature holds data if any of its values is not NaN.
+
+    Parameters
+    ----------
+    feature_path : str
+        NetCDF file or Zarr store of the feature.
+    mtime_ns : int
+        Modification time of `feature_path`. Only part of the cache key, so
+        that a feature is read again after every write.
+    feature : str
+        Feature name.
+    engine : str
+        xarray engine to open it with.
+
+    Returns
+    -------
+    tuple of (int, str or None, str or None)
+        Number of records, and the times of the first and last (ISO 8601,
+        seconds); the times are None when there are no records.
+    """
+    with xr.open_dataset(feature_path, group='original', engine=engine) as ds:
+        has_data = ds[feature].notnull()
+        other_dims = [dim for dim in has_data.dims if dim != 'datetime']
+        if other_dims:
+            has_data = has_data.any(dim=other_dims)
+        times = has_data['datetime'].values[has_data.values]
+    if times.size == 0:
+        return 0, None, None
+    return (int(times.size), np.datetime_as_string(times[0], unit='s'),
+            np.datetime_as_string(times[-1], unit='s'))
 
 
 class Path(object):
@@ -142,48 +181,19 @@ class Path(object):
 
         :param feature: Feature name
         :type feature: str
-        :return: dict with keys name, recordCount, earliestRecord, latestRecord
+        :return: dict with keys name, recordCount (timestamps that hold data),
+            earliestRecord and latestRecord (None without records)
         :rtype: dict
         """
         filename = self.feature_path(feature)
-        # NOTE: the writers pre-allocate the datetime axis from
-        # `archive_starttime`, so count/earliest describe the allocated axis
-        # rather than the records actually stored.
-        with xr.open_dataset(filename, group='original', engine=self.engine) as ds:
-            dt = ds[feature].coords['datetime']
-            count = int(dt.sizes['datetime'])
-            earliest = np.datetime_as_string(dt.values[0], unit='s')
-            latest = np.datetime_as_string(dt.values[-1], unit='s')
+        count, earliest, latest = _record_info(
+            filename, os.stat(filename).st_mtime_ns, feature, self.engine)
         return {
             'name': feature,
             'recordCount': count,
             'earliestRecord': earliest,
             'latestRecord': latest,
         }
-
-    def save_labels(self, labels):
-        """
-        Save all labels. Labels are stored in a list of dictionaries with the following keys:
-        {
-            'time': 'time, or the beginning of the time window',
-            'timeEnd': 'end of the time window [optional]',
-            'title': 'title of the label',
-            'text': 'A more detailed description of the label',
-            'tags': 'tags to sort labels',
-            'id': 'unique id of the label'
-        }
-        """
-        filename = os.path.join(self.path, 'labels.json')
-        with open(filename, 'w') as f:
-            json.dump(labels, f)
-
-    def get_labels(self):
-        """
-        Load all labels.
-        """
-        filename = os.path.join(self.path, 'labels.json')
-        with open(filename) as f:
-            return json.load(f)
 
 
 class Storage(Path):
@@ -274,8 +284,6 @@ class Storage(Path):
             return {feature_name: feature_name}
         elif os.path.isdir(path):
             dir_contents = os.listdir(path)
-            if 'labels.json' in dir_contents:
-                dir_contents.remove('labels.json')
             children = {}
             for child in sorted(dir_contents):
                 result = Storage.directory_tree_to_dict(
@@ -292,13 +300,8 @@ class Storage(Path):
 
     def _build_feature_dict_with_url(self, feature_path, feature_name, base_url=None):
         """Build a feature info dict with metadata and an optional pre-built request URL."""
-        # NOTE: same caveat as `get_feature_info`: count/earliest reflect the
-        # axis pre-allocated from `archive_starttime`, not the stored records.
-        with xr.open_dataset(feature_path, group='original', engine=self.engine) as ds:
-            dt = ds[feature_name].coords['datetime']
-            count = int(dt.sizes['datetime'])
-            earliest = np.datetime_as_string(dt.values[0], unit='s')
-            latest = np.datetime_as_string(dt.values[-1], unit='s')
+        count, earliest, latest = _record_info(
+            feature_path, os.stat(feature_path).st_mtime_ns, feature_name, self.engine)
         info = {
             'name': feature_name,
             'recordCount': count,
@@ -310,7 +313,7 @@ class Storage(Path):
             rel = os.path.relpath(feature_dir, self.path)
             subdirs = rel.split(os.sep) if rel != '.' else []
             path_str = ','.join([self.name] + subdirs)
-            info['url'] = (
+            info['url'] = None if count == 0 else (
                 f"{base_url}feature?path={path_str}&name={feature_name}"
                 f"&starttime={earliest}&endtime={latest}"
             )
@@ -324,8 +327,6 @@ class Storage(Path):
             return {feature_name: self._build_feature_dict_with_url(path, feature_name, base_url)}
         elif os.path.isdir(path):
             dir_contents = os.listdir(path)
-            if 'labels.json' in dir_contents:
-                dir_contents.remove('labels.json')
             children = {}
             for child in sorted(dir_contents):
                 result = self._enrich_tree(os.path.join(path, child), base_url)

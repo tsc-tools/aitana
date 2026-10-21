@@ -8,10 +8,9 @@ version = "0.1.0"
 authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
-description = "Slack notifications for Aitana workflow alerts"
+description = "Interactive duty-officer companion for Aitana (planned)"
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "slack_sdk>=3,<4",
     "typer>=0.25,<1",
 ]
 

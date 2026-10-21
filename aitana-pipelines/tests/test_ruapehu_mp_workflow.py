@@ -38,4 +38,3 @@ def test_job_graph(tmp_path, capfd, end, partial):
     assert jobs["rsam_day"] == 30
     assert jobs.get("rsam_partial", 0) == int(partial)
     assert jobs["matrix_profile"] == 1
-    assert jobs["plot"] == 1

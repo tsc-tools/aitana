@@ -4,8 +4,8 @@ Matrix-profile anomaly index of Ruapehu RSAM.
 Computes 10-min RSAM for ``seed_id`` from GeoNet waveforms, one job per UTC
 day so that completed days are reused across runs, scores the last
 ``lookback_hours`` against the preceding ``history_days`` with
-``aitana.anomaly.matrix_profile.MatrixProfile`` and writes an alert summary
-that ``aitana-bot notify`` posts to Slack.
+``aitana.anomaly.matrix_profile.MatrixProfile`` and stores RSAM, the anomaly
+index and its alarm series in aitana-storage for Grafana to plot and alert on.
 
 Rules run in the active Python environment, which must provide aitana-access,
 aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
@@ -50,8 +50,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        f"results/{TAG}/alert.json",
-        f"results/{TAG}/rsam_mp.png",
+        f"results/{TAG}/index.csv",
 
 
 # RSAM for one complete UTC day, cached in rsam/<day>.csv: later runs reuse the
@@ -82,20 +81,9 @@ rule matrix_profile:
         expand("rsam/{day}.csv", day=DAYS) + PARTIAL,
     output:
         index=f"results/{TAG}/index.csv",
-        alert=f"results/{TAG}/alert.json",
     params:
         end=naive(END),
         score_start=naive(SCORE_START),
         history_start=naive(HISTORY_START),
     script:
         "scripts/matrix_profile.py"
-
-
-rule plot:
-    input:
-        index=f"results/{TAG}/index.csv",
-        alert=f"results/{TAG}/alert.json",
-    output:
-        f"results/{TAG}/rsam_mp.png",
-    script:
-        "scripts/plot.py"

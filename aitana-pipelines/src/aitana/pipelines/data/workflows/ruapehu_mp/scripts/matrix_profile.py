@@ -1,8 +1,7 @@
 """
-Matrix-profile anomaly index of log10 RSAM and the alert summary for aitana-bot.
+Matrix-profile anomaly index of log10 RSAM, its alarm series (1 where the index
+reaches the threshold) and the threshold, stored for Grafana.
 """
-
-import json
 
 import numpy as np
 import pandas as pd
@@ -27,30 +26,19 @@ gap_length = gap.groupby((~gap).cumsum()).transform("sum")
 x = x.interpolate(limit_area="inside").where(~gap | (gap_length <= MAX_GAP))
 
 index = MatrixProfile(window=cfg["window"]).compute_anomaly_index(x, score_start)
+alarm = (index >= cfg["threshold"]).astype(float).where(index.notna())
 scored = index[score_start:]
-peak_time = scored.idxmax() if scored.notna().any() else None
+scored_alarm = alarm[score_start:]
+# the threshold in force when each sample was scored, so retunes stay traceable
+threshold = pd.Series(float(cfg["threshold"]), index=scored.index)
 
-pd.DataFrame({"rsam": rsam, "anomaly_index": index}).rename_axis("datetime").to_csv(
-    snakemake.output.index
-)
-
-alert = {
-    "volcano": "Ruapehu",
-    "seed_id": cfg["seed_id"],
-    "end": end.isoformat(),
-    "score_start": score_start.isoformat(),
-    "history_start": history_start.isoformat(),
-    "window_hours": cfg["window"] * 10 / 60,
-    "threshold": cfg["threshold"],
-    "peak_index": None if peak_time is None else float(scored.max()),
-    "peak_time": None if peak_time is None else peak_time.isoformat(),
-    "alarm": peak_time is not None and bool(scored.max() >= cfg["threshold"]),
-    "plot": "rsam_mp.png",
-}
-with open(snakemake.output.alert, "w") as fh:
-    json.dump(alert, fh, indent=2)
+pd.DataFrame({"rsam": rsam, "anomaly_index": index, "alarm": alarm}).rename_axis(
+    "datetime"
+).to_csv(snakemake.output.index)
 
 net, sta, loc, cha = cfg["seed_id"].split(".")
 store = Storage("ruapehu", cfg["storage_dir"]).get_substore(sta, loc, cha)
 store.save(rsam.rename_axis("datetime").to_xarray().to_dataset(name="rsam"))
 store.save(scored.rename_axis("datetime").to_xarray().to_dataset(name="rsam_mp_index"))
+store.save(scored_alarm.rename_axis("datetime").to_xarray().to_dataset(name="rsam_mp_alarm"))
+store.save(threshold.rename_axis("datetime").to_xarray().to_dataset(name="rsam_mp_threshold"))

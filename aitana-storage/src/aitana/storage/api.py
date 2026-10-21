@@ -44,7 +44,6 @@ class TonikAPI:
         self.app.get("/", response_class=HTMLResponse)(self.root)
         self.app.get("/feature")(self.feature)
         self.app.get("/inventory")(self.inventory)
-        self.app.get("/labels")(self.labels)
 
     def root(self):
         with open(get_data("package_data/index.html"), "r", encoding="utf-8") as file:
@@ -181,8 +180,6 @@ class TonikAPI:
             return sg.to_dict_with_info(base_url)
         else:
             dir_contents = os.listdir(c.path)
-            if 'labels.json' in dir_contents:
-                dir_contents.remove('labels.json')
             result = []
             for fn in sorted(dir_contents):
                 full_path = os.path.join(c.path, fn)
@@ -192,7 +189,7 @@ class TonikAPI:
                     rel = os.path.relpath(c.path, os.path.join(self.rootdir, group))
                     subdirs_list = rel.split(os.sep) if rel != '.' else []
                     path_str = ','.join([group] + subdirs_list)
-                    info['url'] = (
+                    info['url'] = None if info['recordCount'] == 0 else (
                         f"{base_url}feature?path={path_str}&name={feature_name}"
                         f"&starttime={info['earliestRecord']}&endtime={info['latestRecord']}"
                     )
@@ -200,26 +197,6 @@ class TonikAPI:
                 else:
                     result.append(fn)
             return result
-
-    async def labels(self, path: str, starttime: Optional[str] = None, endtime: Optional[str] = None):
-        group, subdir = parse_path(path)
-        _st = self.preprocess_datetime(starttime)
-        _et = self.preprocess_datetime(endtime)
-        try:
-            sg = Storage(group, rootdir=self.rootdir,
-                         starttime=_st, endtime=_et, create=False,
-                         backend=self.backend)
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Group {group} not found.")
-        try:
-            c = sg.get_substore(*subdir) if subdir else sg
-        except TypeError:
-            c = sg
-        except FileNotFoundError:
-            msg = "Directory {} not found.".format(
-                '/'.join([sg.path] + list(subdir)))
-            raise HTTPException(status_code=404, detail=msg)
-        return c.get_labels()
 
 
 def main(argv=None):

@@ -30,7 +30,7 @@ The target system is a closed loop, with `aitana-storage` as the hub:
 5. **Run & evaluate** — `aitana-pipelines` combines the layers below into reproducible Snakemake
    workflows: operational runs that feed alerts, and evaluation runs that score methods against
    real eruption catalogues and synthetic fault injection.
-6. **Communicate** — `aitana-bot` provides a slack bot that sends notifications when anomalies are detected, and allows further investigation. It can also draft a daily "volcano weather report" and assists duty officers with on-demand eruption confirmation.
+6. **Communicate** — workflows store an alarm series next to each anomaly index, and Grafana alerting posts to Slack when it is raised. `aitana-bot` (planned) is a Slack bot for investigating further. It can also draft a daily "volcano weather report" and assists duty officers with on-demand eruption confirmation.
 7. **Close the loop** — a human expert reviews what the system flagged. Their annotations flow back into `aitana-storage` as confirmed or revised labels, becoming ground truth for the next round of training and evaluation. Grafana provides the visual front end for that review.
 
 
@@ -46,7 +46,7 @@ contracts in [pyproject.toml](pyproject.toml):
    not import `access`. They are siblings that never import each other.
 
 ```
-   aitana-bot ◀┄┄ reads outputs ┄┄ aitana-pipelines runs Snakemake workflows
+                                 aitana-pipelines runs Snakemake workflows
                                         ┆
                                         ▼
                                  aitana-anomaly     detection
@@ -61,7 +61,8 @@ contracts in [pyproject.toml](pyproject.toml):
 (Solid arrows are `depends on`. `aitana-pipelines` is where components are combined into
 reproducible pipelines: its Snakemake workflows *run* the lower layers in the active
 environment but `aitana.pipelines` never imports them (it depends on `aitana-volcanoes` and
-`aitana-storage` only). `aitana-bot` imports no aitana package; it reads workflow outputs.)
+`aitana-storage` only). Grafana reads workflow results from `aitana-storage` through
+`tonik_api`. `aitana-bot` is a stub so far and imports no aitana package.)
 
 `aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
 
@@ -81,7 +82,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
 | [`aitana-pipelines`](aitana-pipelines/) | `aitana.pipelines` | `aitana-pipelines` CLI, scoring, plotting, Snakemake workflows | Working (0.1.0) |
 | [`aitana-anomaly`](aitana-anomaly/) | `aitana.anomaly` | State & anomaly detection expert panel | Partial — see below |
 | [`aitana-testing`](aitana-testing/) | `aitana.testing` | Synthetic waveforms with known spectral content for tests | Working (0.1.0) |
-| [`aitana-bot`](aitana-bot/) | `aitana.bot` | Slack alerts from workflow outputs; planned: VAB drafting, eruption confirmation ([PLAN.md](aitana-bot/PLAN.md)) | Partial (0.1.0) |
+| [`aitana-bot`](aitana-bot/) | `aitana.bot` | Planned: interactive Slack companion, VAB drafting, eruption confirmation ([PLAN.md](aitana-bot/PLAN.md)) | Stub (0.1.0) |
 
 ## What is implemented
 
@@ -90,8 +91,9 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
   with gap filling, incremental merging and time-range queries.
 - `AitanaDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
   configurable stride.
-- `tonik_api` — FastAPI service exposing `/feature`, `/inventory` and `/labels`.
-- `grafana_annotations` — post stored labels to Grafana, or read annotations back.
+- `tonik_api` — FastAPI service exposing `/feature` and `/inventory`.
+- `grafana_annotations` — sync the labels drawn on any Grafana dashboard with one label
+  file; restores them to a freshly deployed Grafana.
 - Background `IngestWorker` for queued dataset writes.
 
 ### `aitana-access`
@@ -150,13 +152,6 @@ stacking utilities and Matplotlib/Plotly visualisation.
 **Not yet working in `aitana-anomaly`:** `MatrixProfile` is the only detector that implements
 `compute_anomaly_index()`. `pca.py` needs a rewrite (its test suite is entirely skipped), and
 `SNet` has no downstream scoring layer.
-
-### `aitana-bot`
-- `aitana-bot notify OUTDIR` reads the most recently written `results/*/alert.json` of a
-  workflow output directory and, if it raised an alarm, posts the message and plot to Slack
-  (`--dry-run` prints instead). Setup in [aitana-bot/README.md](aitana-bot/README.md).
-- `aitana-bot watch OUTDIR` keeps checking the directory and posts each newly raised alarm
-  once, for workflows run on a schedule.
 
 ## What is planned
 
@@ -298,32 +293,39 @@ aitana-pipelines clean whakaari ./results
 | Name | Volcano | Description |
 |---|---|---|
 | `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
-| `ruapehu_mp` | ruapehu | Matrix-profile anomaly index of Ruapehu RSAM with an alert summary for `aitana-bot` |
+| `ruapehu_mp` | ruapehu | Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana |
 
 ### The Ruapehu RSAM alert, end to end
 
 `ruapehu_mp` fetches `NZ.FWVZ.10.HHZ` waveforms (GeoNet's S3 archive, falling back to the
-near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day, stores
-RSAM and the anomaly index in `aitana-storage` under `<outdir>/storage`, scores the last 24 h
-against the preceding 28 days with `MatrixProfile` and writes
-`results/<end>/{alert.json,index.csv,rsam_mp.png}`. Completed days are reused across runs.
-Its rules run in the active environment, so run it from the uv workspace (`uv sync`).
+near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day,
+scores the last 24 h against the preceding 28 days with `MatrixProfile`, and stores RSAM
+(`rsam`), the anomaly index (`rsam_mp_index`), its alarm series (`rsam_mp_alarm`: 1 where
+the index reaches `threshold`, 0 below, NaN where there is no index) and the threshold in force
+when each sample was scored (`rsam_mp_threshold`, so retunes stay traceable and Grafana can draw
+it on the index panel) in `aitana-storage` under `<outdir>/storage`. Each run also writes
+`results/<end>/index.csv` with RSAM, index and alarm.
+Completed days are reused across runs. Its rules run in the active environment, so run it from
+the uv workspace (`uv sync`).
 
 ```bash
 # Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
 aitana-pipelines run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
-aitana-bot notify ~/rsam_mp --dry-run
 
-# Score the last 24 h and post to Slack if it alarms
-aitana-pipelines run ruapehu ~/rsam_mp && aitana-bot notify ~/rsam_mp
-
-# Or keep scoring every 10 min and post each newly raised alarm once
+# Keep scoring every 10 min and serve the stored series for Grafana
 aitana-pipelines run ruapehu ~/rsam_mp --cron "2-59/10 * * * *" &
-aitana-bot watch ~/rsam_mp
+tonik_api --rootdir ~/rsam_mp/storage --port 8003
 ```
 
+Grafana reads the series from `tonik_api` with the Infinity data source (CSV, **Backend**
+parser, which alerting requires), e.g.
+`/feature?path=ruapehu,FWVZ,10,HHZ&name=rsam_mp_alarm&starttime=${__from:date:iso}&endtime=${__to:date:iso}`.
+An alert rule on the maximum of `rsam_mp_alarm` posts to Slack, and a No Data rule on
+`rsam_mp_index` catches a stalled pipeline (or a station data gap).
+
 On the default branch, [.gitlab-ci.yml](.gitlab-ci.yml) deploys these two commands as the
-`aitana-ruapehu-mp` and `aitana-bot` containers, sharing the Docker volume `aitana-ruapehu-mp`.
+`aitana-ruapehu-mp` and `aitana-ruapehu-api` containers, sharing the Docker volume
+`aitana-ruapehu-mp`.
 
 The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
 threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet

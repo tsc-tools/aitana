@@ -6,7 +6,7 @@ from aitana.pipelines import get_data
 workflow = WorkflowDescriptor(
     name="ruapehu_mp",
     volcano="ruapehu",
-    description="Matrix-profile anomaly index of Ruapehu RSAM with an alert summary for aitana-bot",
+    description="Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana",
     workflowdir=Path(get_data("data/workflows/ruapehu_mp/")),
     outputs={
         "rsam": "rsam/",
