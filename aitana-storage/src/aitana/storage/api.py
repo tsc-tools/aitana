@@ -30,7 +30,7 @@ def parse_path(path: str):
     return parts[0], parts[1:]
 
 
-class TonikAPI:
+class StorageAPI:
 
     def __init__(self, rootdir, backend='netcdf') -> None:
         self.rootdir = rootdir
@@ -135,7 +135,7 @@ class TonikAPI:
         return StreamingResponse(iter([output]),
                                  media_type='text/csv',
                                  headers={"Content-Disposition":
-                                          "attachment;filename=<tonik_feature>.csv",
+                                          "attachment;filename=<aitana_feature>.csv",
                                           'Content-Length': str(len(output))})
 
     def aggregate_feature(self, resolution, verticalres, feat, nfreqs, dates):
@@ -206,8 +206,8 @@ def main(argv=None):
     parser.add_argument("-p", "--port", default=8003, type=int)
     parser.add_argument("--host", default='0.0.0.0')
     args = parser.parse_args(argv)
-    ta = TonikAPI(args.rootdir, backend=args.backend)
-    uvicorn.run(ta.app, host=args.host, port=args.port)
+    sa = StorageAPI(args.rootdir, backend=args.backend)
+    uvicorn.run(sa.app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

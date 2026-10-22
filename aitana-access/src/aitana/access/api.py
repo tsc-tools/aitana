@@ -10,13 +10,13 @@ import pandas as pd
 from scipy.signal import ShortTimeFFT
 from scipy.signal.windows import tukey
 import uvicorn
-from aitana.storage.api import TonikAPI
+from aitana.storage.api import StorageAPI
 import xarray as xr
 
 from .seismic import SeismicData as DataSource, S3Waveforms, FDSNWaveforms
 
 
-class AitanaAPI(TonikAPI):
+class AitanaAPI(StorageAPI):
     def __init__(self, rootdir: str, backend: str = "netcdf",
                  fdsn_urls: Iterable[str] = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")):
         super(AitanaAPI, self).__init__(rootdir, backend)

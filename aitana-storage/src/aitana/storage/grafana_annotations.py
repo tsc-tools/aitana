@@ -11,6 +11,7 @@ posted back as organization annotations, which any dashboard shows through an an
 query on the volcano tag. To withdraw a label, retag it, e.g. `label:retracted`.
 """
 
+import base64
 import json
 import os
 import re
@@ -42,6 +43,16 @@ def _check(rval, action: str):
         raise RuntimeError(f"Failed to {action}: {rval.status_code} {rval.text}")
 
 
+def _auth_headers():
+    """Basic authorization from GRAFANA_USER and GRAFANA_PASSWORD, if both are set."""
+    user = os.environ.get("GRAFANA_USER")
+    password = os.environ.get("GRAFANA_PASSWORD")
+    if not (user and password):
+        return {}
+    credentials = base64.b64encode(f"{user}:{password}".encode()).decode()
+    return {"Authorization": "Basic " + credentials}
+
+
 def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
     """
     Bring the label annotations in Grafana and the stored labels in step.
@@ -55,8 +66,9 @@ def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
     Parameters
     ----------
     baseurl : str
-        The base URL of the Grafana API, e.g.
-        "http://<grafana-user>:<user-pwd>@<grafana-host>:<port>".
+        The base URL of the Grafana API, e.g. "http://<grafana-host>:<port>".
+        Authenticate with the environment variables GRAFANA_USER and
+        GRAFANA_PASSWORD, or with "http://<user>:<password>@<grafana-host>:<port>".
     stored : list of dict
         Labels from the previous sync, as returned by this function.
 
@@ -75,7 +87,10 @@ def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
         dashboard shows.
     """
     url = baseurl + "/api/annotations"
-    rval = requests.get(url, params={"type": "annotation", "limit": 100000})
+    headers = _auth_headers()
+    rval = requests.get(
+        url, params={"type": "annotation", "limit": 100000}, headers=headers
+    )
     _check(rval, "retrieve annotations")
     known = {label["id"]: label for label in stored}
 
@@ -91,6 +106,7 @@ def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
                 requests.patch(
                     f"{url}/{atn['id']}",
                     json={"text": f"{description}\nId: {label_id}"},
+                    headers=headers,
                 ),
                 "add an id to an annotation",
             )
@@ -123,6 +139,7 @@ def sync_labels(baseurl: str, stored: list[dict[str, Any]]):
                     "text": f"{label['description']}\nId: {label_id}",
                     "tags": label["tags"],
                 },
+                headers=headers,
             ),
             "restore an annotation",
         )

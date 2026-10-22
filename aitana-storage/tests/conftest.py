@@ -65,10 +65,10 @@ def storage_setup(tmp_path_factory):
 @pytest.fixture(scope="module")
 def setup_storage_api(storage_setup):
     savedir, g = storage_setup
-    from aitana.storage.api import TonikAPI
+    from aitana.storage.api import StorageAPI
 
-    ta = TonikAPI(str(savedir))
-    client = TestClient(ta.app)
+    sa = StorageAPI(str(savedir))
+    client = TestClient(sa.app)
     g.starttime = datetime(2023, 1, 1)
     g.endtime = datetime(2023, 1, 6)
     return client, g.get_substore("MDR", "00", "BHZ")
@@ -78,10 +78,10 @@ def setup_storage_api(storage_setup):
 def setup_api_zarr(tmp_path_factory):
     savedir = tmp_path_factory.mktemp("vumt_test_tmp_zarr", numbered=True)
     g = Storage("volcanoes", rootdir=savedir, backend="zarr", archive_starttime=tstart)
-    from aitana.storage.api import TonikAPI
+    from aitana.storage.api import StorageAPI
 
-    ta = TonikAPI(str(savedir), backend="zarr")
-    client = TestClient(ta.app)
+    sa = StorageAPI(str(savedir), backend="zarr")
+    client = TestClient(sa.app)
     g.starttime = datetime(2023, 1, 1)
     g.endtime = datetime(2023, 1, 6)
     feat = generate_test_data(

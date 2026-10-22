@@ -62,7 +62,7 @@ contracts in [pyproject.toml](pyproject.toml):
 reproducible pipelines: its Snakemake workflows *run* the lower layers in the active
 environment but `aitana.pipelines` never imports them (it depends on `aitana-volcanoes` and
 `aitana-storage` only). Grafana reads workflow results from `aitana-storage` through
-`tonik_api`. `aitana-bot` is a stub so far and imports no aitana package.)
+`aitana-api`. `aitana-bot` is a stub so far and imports no aitana package.)
 
 `aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
 
@@ -91,7 +91,7 @@ decision, and the PyPI publishing model — is in [Design.md](Design.md).
   with gap filling, incremental merging and time-range queries.
 - `AitanaDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
   configurable stride.
-- `tonik_api` — FastAPI service exposing `/feature` and `/inventory`.
+- `aitana-api` — FastAPI service exposing `/feature` and `/inventory`.
 - `grafana_annotations` — sync the labels drawn on any Grafana dashboard with one label
   file; restores them to a freshly deployed Grafana.
 - Background `IngestWorker` for queued dataset writes.
@@ -314,18 +314,20 @@ aitana-pipelines run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
 
 # Keep scoring every 10 min and serve the stored series for Grafana
 aitana-pipelines run ruapehu ~/rsam_mp --cron "2-59/10 * * * *" &
-tonik_api --rootdir ~/rsam_mp/storage --port 8003
+aitana-api --rootdir ~/rsam_mp/storage --port 8003
 ```
 
-Grafana reads the series from `tonik_api` with the Infinity data source (CSV, **Backend**
+Grafana reads the series from `aitana-api` with the Infinity data source (CSV, **Backend**
 parser, which alerting requires), e.g.
 `/feature?path=ruapehu,FWVZ,10,HHZ&name=rsam_mp_alarm&starttime=${__from:date:iso}&endtime=${__to:date:iso}`.
 An alert rule on the maximum of `rsam_mp_alarm` posts to Slack, and a No Data rule on
 `rsam_mp_index` catches a stalled pipeline (or a station data gap).
 
 On the default branch, [.gitlab-ci.yml](.gitlab-ci.yml) deploys these two commands as the
-`aitana-ruapehu-mp` and `aitana-ruapehu-api` containers, sharing the Docker volume
-`aitana-ruapehu-mp`.
+`aitana-ruapehu-mp` and `aitana-ruapehu-api` containers, plus `aitana-label-sync`, which syncs
+the labels drawn in Grafana with `labels.json` every 10 minutes (see
+[aitana-storage](aitana-storage/README.md)). All three share the data directory
+`DATA_VOLUME`.
 
 The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
 threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet

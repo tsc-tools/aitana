@@ -124,4 +124,4 @@ RUN uv sync --frozen --no-dev --all-packages --no-install-workspace
 COPY --chown=bayes:bayes . /home/bayes/aitana
 RUN uv sync --frozen --no-dev --all-packages
 
-CMD ["tonik_api"]
+CMD ["aitana-api"]

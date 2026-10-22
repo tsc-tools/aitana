@@ -176,7 +176,7 @@ rule combine_forecasts:
     run:
         import xarray as xr
         import pandas as pd
-        from tonik import Storage
+        from aitana.storage import Storage
         bn_xds = xr.open_dataset(input[0])
         rf_csv = pd.read_csv(input[1], parse_dates=True, index_col=0)
         st = Storage("whakaari_forecasts", rootdir="results")

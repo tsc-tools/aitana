@@ -24,19 +24,23 @@ class FakeGrafana:
         self.annotations = {atn["id"]: dict(atn) for atn in annotations}
         self.posted = []
         self.patched = []
+        self.headers = []
 
-    def get(self, url, params=None):
+    def get(self, url, params=None, headers=None):
         assert params == {"type": "annotation", "limit": 100000}
+        self.headers.append(headers)
         return FakeResponse([dict(atn) for atn in self.annotations.values()])
 
-    def patch(self, url, json=None):
+    def patch(self, url, json=None, headers=None):
         atn_id = int(url.rsplit("/", 1)[1])
         self.annotations[atn_id].update(json)
         self.patched.append(atn_id)
+        self.headers.append(headers)
         return FakeResponse()
 
-    def post(self, url, json=None):
+    def post(self, url, json=None, headers=None):
         # Grafana reports organization annotations with an empty dashboard and panel 0
+        self.headers.append(headers)
         atn_id = max(self.annotations, default=0) + 1
         self.annotations[atn_id] = {"id": atn_id, "login": "sync", "dashboardUID": "",
                                     "panelId": 0, **json}
@@ -53,6 +57,12 @@ def grafana(monkeypatch):
                                 getattr(fake, method))
         return fake
     return install
+
+
+@pytest.fixture(autouse=True)
+def no_credentials(monkeypatch):
+    monkeypatch.delenv("GRAFANA_USER", raising=False)
+    monkeypatch.delenv("GRAFANA_PASSWORD", raising=False)
 
 
 def annotation(atn_id, text, tags, time=1647158400000, time_end=None, dashboard="rsam",
@@ -112,6 +122,18 @@ def test_sync_union(grafana):
     assert station["timeEnd"] is None
     assert (station["user"], station["dashboardUID"], station["panelId"]) == (
         "other", "overview", 7)
+    # without GRAFANA_USER and GRAFANA_PASSWORD, credentials can only come from the URL
+    assert fake.headers == [{}] * 5
+
+
+def test_sync_sends_basic_auth(grafana, monkeypatch):
+    monkeypatch.setenv("GRAFANA_USER", "sync")
+    monkeypatch.setenv("GRAFANA_PASSWORD", "s3cret")
+    fake = grafana([annotation(1, "Station fault", ["label:instrument", RU])])
+    grafana_annotations.sync_labels("http://grafana",
+                                    [stored_label("a1", ["label:noise", RU])])
+    # GET, PATCH of the new label's id, POST restoring a1; base64 of "sync:s3cret"
+    assert fake.headers == [{"Authorization": "Basic c3luYzpzM2NyZXQ="}] * 3
 
 
 def test_sync_restores_fresh_grafana(grafana):

@@ -1,4 +1,4 @@
-# How to issue a new tonik release
+# How to issue a new aitana release
 
 ## Running tests
 Run the tests before every release.

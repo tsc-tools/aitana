@@ -46,11 +46,11 @@ dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 ### FastAPI service
 
-`aitana.storage.api.TonikAPI` exposes `/feature` and `/inventory` endpoints over
-HTTP.
+`aitana.storage.api.StorageAPI` exposes `/feature` and `/inventory` endpoints over
+HTTP. `aitana-api` runs it.
 
 ```bash
-tonik_api --rootdir /data --port 8003
+aitana-api --rootdir /data --port 8003
 ```
 
 ### Labelling in Grafana
@@ -77,8 +77,15 @@ Then sync all labels, from every dashboard and volcano, with one label file. Run
 schedule and after every Grafana deploy:
 
 ```bash
-grafana_annotations http://<user>:<pwd>@<grafana-host>:<port> --file /data/labels.json
+export GRAFANA_USER=… GRAFANA_PASSWORD=…   # a user allowed to read, create and edit annotations
+grafana_annotations http://<grafana-host>:<port> --file /data/labels.json
 ```
+
+The credentials are sent as HTTP Basic authentication. Without `GRAFANA_USER` and
+`GRAFANA_PASSWORD`, they can go in the URL instead
+(`http://<user>:<password>@<grafana-host>:<port>`). On the default branch,
+[.gitlab-ci.yml](../.gitlab-ci.yml) deploys the sync as the `aitana-label-sync` container,
+which runs it every 10 minutes.
 
 The file is a JSON list ordered by time. Each label has `time` and `timeEnd` (ms since
 epoch; `timeEnd` is null for a point), `title`, `description`, `tags`, a stable `id`, and

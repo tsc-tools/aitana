@@ -5,7 +5,7 @@ Slack, draft bulletins and work through eruption confirmation. The plan is in
 [PLAN.md](PLAN.md); the package is currently a stub.
 
 Alarms are not sent by the bot. Workflows such as `ruapehu_mp` store an alarm series in
-`aitana-storage`, TonikAPI serves it, and Grafana alerting posts to Slack when it is raised
+`aitana-storage`, `aitana-api` serves it, and Grafana alerting posts to Slack when it is raised
 (see the root [README](../README.md)).
 
 ## Slack setup (once)

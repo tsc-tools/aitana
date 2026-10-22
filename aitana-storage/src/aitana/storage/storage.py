@@ -425,7 +425,7 @@ class Storage(Path):
             target=worker.run_forever,
             kwargs={'stop_event': stop_event},
             daemon=True,
-            name=f"tonik-ingest-{self.name}",
+            name=f"aitana-ingest-{self.name}",
         )
         thread.start()
         self._ingest_thread = thread
@@ -473,7 +473,7 @@ class Storage(Path):
 
 class AitanaDataset:
     """
-    PyTorch Dataset wrapper for Tonik Storage.
+    PyTorch Dataset wrapper for Aitana Storage.
 
     This dataset loads time series data from Storage and returns it as PyTorch tensors.
     Each sample is a 2D tensor with shape [window_size, num_features] where features
