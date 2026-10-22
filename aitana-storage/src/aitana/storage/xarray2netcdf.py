@@ -76,18 +76,24 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
             new_time = date2num(xArray[timedim].values.astype('datetime64[us]').astype(datetime),
                                 units=rootGrp[timedim].attrs['units'],
                                 calendar=rootGrp[timedim].attrs['calendar'])
-            t0 = date2num(starttime,
-                          units=rootGrp[timedim].attrs['units'],
-                          calendar=rootGrp[timedim].attrs['calendar'])
+            times = rootGrp[timedim]
+            # an existing axis keeps its own origin, so that only its new tail
+            # needs writing
+            if times.shape[0] > 0:
+                t0 = times[0]
+            else:
+                t0 = date2num(starttime,
+                              units=rootGrp[timedim].attrs['units'],
+                              calendar=rootGrp[timedim].attrs['calendar'])
 
             indices = np.rint((new_time - t0)/resolution).astype(int)
             if not np.all(indices >= 0):
                 raise ValueError("Data starts before the archive start time")
-            times = rootGrp[timedim]
             newsize = indices[-1] + 1
-            if newsize > times.shape[0]:
+            oldsize = times.shape[0]
+            if newsize > oldsize:
                 rootGrp.resize_dimension(timedim, newsize)
-            times[:] = t0 + np.arange(times.shape[0]) * resolution
+                times[oldsize:] = t0 + np.arange(oldsize, newsize) * resolution
             data = rootGrp[featureName]
             if len(data.shape) > 1:
                 data[:, indices] = xArray[featureName].values
@@ -110,7 +116,11 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
 def _create_root_group(defaultGroupName, featureName, h5f, xArray, starttime, timedim):
     rootGrp = h5f.create_group(defaultGroupName)
     rootGrp.dimensions[timedim] = None
-    coordinates = rootGrp.create_variable(timedim, (timedim,), float)
+    # the axis is pre-allocated from the archive start and evenly spaced, so it
+    # compresses to almost nothing; large chunks compress best (1.17M 10-min
+    # slots: 32 kB with 65536 per chunk, 560 kB with the default 1024)
+    coordinates = rootGrp.create_variable(timedim, (timedim,), float, chunks=(65536,),
+                                          compression='gzip', shuffle=True)
     coordinates.attrs['units'] = 'hours since 1970-01-01 00:00:00.0'
     coordinates.attrs['calendar'] = 'gregorian'
     rootGrp.attrs['archive_starttime'] = str(starttime)

@@ -172,6 +172,43 @@ def test_xarray2netcdf_zeros(tmp_path_factory):
     assert c('alarm').loc[:'2022-03-19T15:50'].isnull().all()
 
 
+def test_xarray2netcdf_long_axis(tmp_path_factory):
+    """
+    An axis pre-allocated from 2000 stays small on disk, out-of-order writes
+    land in place, and the axis stays evenly spaced as it grows.
+    """
+    import h5py
+
+    temp_dir = tmp_path_factory.mktemp('test_xarray2netcdf')
+    g = Storage('test_experiment', rootdir=temp_dir, starttime=datetime(2000, 1, 1),
+                endtime=datetime(2022, 3, 22), backend='netcdf',
+                archive_starttime=datetime(2000, 1, 1))
+    c = g.get_substore('MDR', '00', 'HHZ')
+
+    def day(start, value):
+        dates = pd.date_range(start, periods=144, freq='10min')
+        return xr.DataArray(np.full(144, value), coords={'datetime': dates},
+                            dims='datetime', name='rsam').to_dataset()
+
+    c.save(day('2022-03-19', 1.))
+    c.save(day('2022-03-21', 3.))  # leaves a day's gap
+    c.save(day('2022-03-20', 2.))  # fills it out of order
+
+    rsam = c('rsam')
+    expected = pd.date_range('2000-01-01', '2022-03-21T23:50', freq='10min')
+    assert rsam.sizes['datetime'] == len(expected)
+    assert np.abs(rsam['datetime'].values - expected.values).max() < np.timedelta64(1, 's')
+    assert rsam.loc[:'2022-03-18T23:50'].isnull().all()
+    for date, value in [('2022-03-19', 1.), ('2022-03-20', 2.), ('2022-03-21', 3.)]:
+        assert (rsam.loc[date] == value).all()
+
+    path = c.feature_path('rsam')
+    with h5py.File(path, 'r') as h5f:
+        assert h5f['original/datetime'].compression == 'gzip'
+    # an uncompressed axis of 1.17 million slots alone took 9.4 MB
+    assert os.path.getsize(path) < 1e6
+
+
 @pytest.mark.xfail(raises=OSError)
 def test_xarray2netcdf_multi_access(tmp_path_factory):
     """
