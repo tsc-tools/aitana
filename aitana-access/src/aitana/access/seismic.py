@@ -477,12 +477,7 @@ class S3Waveforms(WaveformBaseclass):
         fill_value : int, float, 'interpolate', np.nan, or None
             Value to use for filling gaps in the data.
         """
-        self.fsclient = fsspec.filesystem(
-            "filecache",
-            target_protocol="s3",
-            target_options={"anon": True},
-            cache_storage="/tmp/s3filescache",
-        )
+        self.fsclient = fsspec.filesystem("s3", anon=True)
         self.fdsn_urls = [
             "https://service.geonet.org.nz",
             "https://service-nrt.geonet.org.nz",
