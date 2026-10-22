@@ -65,6 +65,11 @@ def test_contract(detector):
     gap = np.zeros(N, dtype=bool)
     gap[SCORE_START + 50 : SCORE_START + 55] = True
     assert aindex[windows_covering(gap)].isna().all()
+    # The raw profile is what the index ranks: same gaps, same order.
+    profile = detector.profile_
+    assert profile.index.equals(x.index)
+    assert profile.isna().equals(aindex.isna())
+    assert aindex[profile.dropna().sort_values().index].is_monotonic_increasing
 
 
 def test_change_point(detector):

@@ -300,11 +300,13 @@ aitana-pipelines clean whakaari ./results
 `ruapehu_mp` fetches `NZ.FWVZ.10.HHZ` waveforms (GeoNet's S3 archive, falling back to the
 near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day,
 scores the last 24 h against the preceding 28 days with `MatrixProfile`, and stores RSAM
-(`rsam`), the anomaly index (`rsam_mp_index`), its alarm series (`rsam_mp_alarm`: 1 where
+(`rsam`), the anomaly index (`rsam_mp_index`), the raw left matrix profile it is the percentile
+of (`rsam_mp_profile`: each 6-h window's z-normalized distance to its nearest earlier window,
+0 to 12), its alarm series (`rsam_mp_alarm`: 1 where
 the index reaches `threshold`, 0 below, NaN where there is no index) and the threshold in force
 when each sample was scored (`rsam_mp_threshold`, so retunes stay traceable and Grafana can draw
 it on the index panel) in `aitana-storage` under `<outdir>/storage`. Each run also writes
-`results/<end>/index.csv` with RSAM, index and alarm.
+`results/<end>/index.csv` with RSAM, index, matrix profile and alarm.
 Completed days are reused across runs. Its rules run in the active environment, so run it from
 the uv workspace (`uv sync`).
 

@@ -33,6 +33,15 @@ class MatrixProfile(AnomalyDetectionBaseClass):
     ----------
     window : int
         Subsequence length in samples.
+
+    Attributes
+    ----------
+    profile_ : pd.Series
+        Raw score from the last ``compute_anomaly_index`` call, on the same
+        index and NaN in the same places as the anomaly index: the left
+        matrix profile, i.e. the z-normalized Euclidean distance (0 to
+        ``2 * sqrt(window)``) of each scored subsequence to its nearest
+        earlier one.
     """
 
     def __init__(self, window=36):
@@ -73,4 +82,6 @@ class MatrixProfile(AnomalyDetectionBaseClass):
 
         out = pd.Series(np.nan, index=series.index, name="anomaly_index")
         out.iloc[end_pos[scored]] = aindex
+        self.profile_ = pd.Series(np.nan, index=series.index, name="matrix_profile")
+        self.profile_.iloc[end_pos[scored]] = np.where(np.isfinite(raw), raw, np.nan)
         return out
