@@ -7,11 +7,18 @@ day so that completed days are reused across runs, scores the last
 ``aitana.anomaly.matrix_profile.MatrixProfile`` and stores RSAM, the anomaly
 index and its alarm series in aitana-storage for Grafana to plot and alert on.
 
+With ``start`` set, e.g. ``--config start=2022-01-01``, the first run also builds
+the archive: it scores every complete UTC day since ``start`` against that day's
+own trailing history and writes ``results/archive_<start>.csv``. Later runs find
+that file and score only the last ``lookback_hours``; delete it to rebuild.
+
 Rules run in the active Python environment, which must provide aitana-access,
 aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
 workspace). Override config values on the command line, e.g.
 ``aitana-pipelines run ruapehu OUT --config end=2022-03-20T00:00``.
 """
+
+import os
 
 import pandas as pd
 
@@ -34,10 +41,21 @@ def naive(ts):
 
 END = utc("now" if str(config["end"]) == "now" else str(config["end"])).floor(RESOLUTION)
 SCORE_START = END - pd.Timedelta(hours=config["lookback_hours"])
-HISTORY_START = (
-    SCORE_START - pd.Timedelta(days=config["history_days"]) - config["window"] * RESOLUTION
-)
+HISTORY = pd.Timedelta(days=config["history_days"]) + config["window"] * RESOLUTION
 TAG = END.strftime("%Y%m%dT%H%M")
+OUTPUT = f"results/{TAG}/index.csv"
+# Scored (start, end) windows, each against the HISTORY before it. Building the
+# archive adds one per complete UTC day, scored as a run ending at the next
+# midnight would; the last lookback_hours come last so that they win overlaps.
+WINDOWS = [(SCORE_START, END)]
+if config["start"]:
+    START = utc(str(config["start"])).floor("D")
+    ARCHIVE = f"results/archive_{START:%Y%m%d}.csv"
+    BACKFILL = pd.date_range(START, END.floor("D"), freq="D", inclusive="left")
+    if len(BACKFILL) and not os.path.exists(ARCHIVE):
+        WINDOWS = [(day, day + pd.Timedelta(days=1)) for day in BACKFILL] + WINDOWS
+        OUTPUT = ARCHIVE
+HISTORY_START = min(start for start, _ in WINDOWS) - HISTORY
 DAYS = pd.date_range(
     HISTORY_START.floor("D"), END.floor("D"), freq="D", inclusive="left"
 ).strftime("%Y-%m-%d")
@@ -50,7 +68,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        f"results/{TAG}/index.csv",
+        OUTPUT,
 
 
 # RSAM for one complete UTC day, cached in rsam/<day>.csv: later runs reuse the
@@ -80,10 +98,9 @@ rule matrix_profile:
     input:
         expand("rsam/{day}.csv", day=DAYS) + PARTIAL,
     output:
-        index=f"results/{TAG}/index.csv",
+        index=OUTPUT,
     params:
-        end=naive(END),
-        score_start=naive(SCORE_START),
-        history_start=naive(HISTORY_START),
+        # (history_start, score_start, end) per scored window
+        windows=[(naive(s - HISTORY), naive(s), naive(e)) for s, e in WINDOWS],
     script:
         "scripts/matrix_profile.py"

@@ -1,5 +1,9 @@
 # End of the scored period (UTC): "now" or an ISO timestamp, e.g. 2022-03-20T00:00
 end: now
+# First day of the archive, e.g. 2022-01-01: while results/archive_<start>.csv is
+# missing, a run also scores every complete UTC day since then (delete the file to
+# rebuild it). null builds no archive.
+start: null
 seed_id: NZ.FWVZ.10.HHZ
 # Days of history every scored subsequence is compared against
 history_days: 28

@@ -309,10 +309,17 @@ it on the index panel) in `aitana-storage` under `<outdir>/storage`. Each run al
 `results/<end>/index.csv` with RSAM, index, matrix profile and alarm.
 Completed days are reused across runs. Its rules run in the active environment, so run it from
 the uv workspace (`uv sync`).
+With `--config start=2022-01-01`, the first run also builds the archive: it scores every
+complete UTC day since `start` exactly as a run ending at the next midnight would, and writes
+`results/archive_<start>.csv` instead. Later runs find that file and only score the last 24 h;
+delete it to rebuild the archive, e.g. after a retune or an outage of more than a day.
 
 ```bash
 # Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
 aitana-pipelines run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
+
+# Archive since 2022-01-01 (streams ~14 GB of waveforms; keeps ~10 MB of RSAM)
+aitana-pipelines run ruapehu ~/rsam_mp --cores 8 --config start=2022-01-01
 
 # Keep scoring every 10 min and serve the stored series for Grafana
 aitana-pipelines run ruapehu ~/rsam_mp --cron "2-59/10 * * * *" &

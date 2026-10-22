@@ -39,6 +39,8 @@ build:
 # Runs the ruapehu_mp workflow every 10 minutes, 2 minutes after each 10-min
 # boundary so GeoNet's near-real-time data has arrived. The volume is mounted
 # on ~/data, which exists in the image, so a new volume is owned by bayes.
+# The first run also builds the archive since 2022-01-01 (~1,800 days of RSAM,
+# hence 8 cores); later runs find results/archive_20220101.csv and only update.
 deploy-ruapehu-mp:
   extends: .deploy-default-branch
   script: |
@@ -46,7 +48,8 @@ deploy-ruapehu-mp:
     {
       "Image": "${IMAGE}",
       "Cmd": ["aitana-pipelines", "run", "ruapehu", "/home/bayes/data/ruapehu_mp",
-              "--cron", "2-59/10 * * * *"],
+              "--cron", "2-59/10 * * * *", "--cores", "8",
+              "--config", "start=2022-01-01"],
       "HostConfig": {
         "Binds": ["${DATA_VOLUME}:/home/bayes/data"],
         "RestartPolicy": { "Name": "always" }
