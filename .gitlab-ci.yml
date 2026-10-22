@@ -2,8 +2,8 @@ variables:
   IMAGE: "${AWS_SHARED_SERVICES_ECR}/volcanology/aitana:$CI_COMMIT_BRANCH"
   APP_SERVER: "Ruamoko"
   TEAM: "Volcano"
-  UID: "2737"
-  GID: "2737"
+  D_UID: "2737"
+  D_GID: "2737"
   DATA_VOLUME: "/scratch/behrya/aitana/data"
 
 stages:
@@ -19,7 +19,7 @@ build:
       when: never
     - when: always
   script:
-    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg D_UID="$UID" --build-arg D_GID="$GID" -t "$IMAGE" .
+    - DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg D_UID="$D_UID" --build-arg D_GID="$D_GID" -t "$IMAGE" .
     - docker image push "$IMAGE"
 
 .deploy-default-branch:
