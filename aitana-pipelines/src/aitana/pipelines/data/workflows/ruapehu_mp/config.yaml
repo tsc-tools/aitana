@@ -6,7 +6,7 @@ end: now
 start: null
 seed_id: NZ.FWVZ.10.HHZ
 # Days of history every scored subsequence is compared against
-history_days: 28
+history_days: 91 
 # Hours scored per run
 lookback_hours: 24
 # Matrix-profile window in 10-min samples (36 = 6 h)
