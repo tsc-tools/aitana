@@ -43,7 +43,7 @@ from aitana.access.seismic import (
 )
 from aitana.testing import synthetic_trace
 from moto import mock_aws
-from obspy import UTCDateTime, read_inventory
+from obspy import UTCDateTime, read, read_inventory
 
 
 def get_max(trace):
@@ -302,45 +302,135 @@ def test_mock_client():
     assert tr.stats.endtime == endtime
 
 
-def test_caching():
-    tr_orig = synthetic_trace(
-        nsec=4320 * 600.0,
-        sampling_rate=1 / 600.0,
-        starttime=UTCDateTime(2020, 7, 18, 8, 22),
-    )
+class FakeClient(WaveformBaseclass):
+    """
+    Serve raw int32 counts for NZ.MAVZ.10.HHZ and count the requests.
+    """
 
-    class FakeClient(WaveformBaseclass):
-        def __init__(self, trace):
-            self.trace = trace
-
-        def get_waveforms(self, net, site, loc, comp, starttime, endtime):
-            return self.trace.slice(starttime, endtime)
-
-    cache_dir = tempfile.mkdtemp()
-
-    ds = DataSource(clients=[FakeClient(tr_orig)], cache_dir=cache_dir)
-
-    starttime = UTCDateTime(2020, 7, 18, 8, 22)
-    endtime = UTCDateTime(2020, 8, 17, 8, 12)
-    tr = next(ds.get_waveforms("NZ", "BLUB", "", "HHZ", starttime, endtime, cache=True))
-
-    ds_cache = DataSource(clients=[FakeClient(tr_orig)], cache_dir=cache_dir)
-    tr_cache = next(
-        ds_cache.get_waveforms("NZ", "BLUB", "", "HHZ", starttime, endtime, cache=True)
-    )
-    assert tr_cache.stats.cached == True
-    assert np.all(tr_orig.data == tr_cache.data)
-
-    ds_chunked = DataSource(
-        clients=[FakeClient(tr_orig)], cache_dir=cache_dir, chunk_size=86400.0
-    )
-    tr_chunked = next(
-        ds_chunked.get_waveforms(
-            "NZ", "BLUB", "", "HHZ", starttime, endtime, cache=True
+    def __init__(self, starttime, nsec, gaps=False):
+        tr = synthetic_trace(
+            starttime=starttime,
+            nsec=nsec,
+            sampling_rate=1.0,
+            gaps=gaps,
+            station="MAVZ",
+            location="10",
         )
-    )
+        tr.data = np.ma.masked_invalid(tr.data * 1e5)
+        self.stream = tr.split()
+        for _tr in self.stream:
+            _tr.data = np.asarray(_tr.data, dtype=np.int32)
+        self.fdsn_urls = ()
+        self.fill_value = np.nan
+        self.calls = 0
+
+    def get_raw(self, net, site, loc, comp, start, end):
+        self.calls += 1
+        return self.stream.slice(start, end, nearest_sample=False)
+
+
+MAVZ = ("NZ", "MAVZ", "10", "HHZ")
+
+
+def test_caching(setup_temporary_sds):
+    """
+    Test that cached and uncached reads return the same processed trace.
+    """
+    starttime = UTCDateTime(2020, 7, 18, 8, 22)
+    endtime = UTCDateTime(2020, 7, 21, 8, 12)
+    client = FakeClient(UTCDateTime(2020, 7, 18), 4 * 86400)
+    cache_dir = tempfile.mkdtemp()
+    ds = DataSource(clients=[client], cache_dir=cache_dir)
+
+    tr_orig = next(ds.get_waveforms(*MAVZ, starttime, endtime))
+    tr = next(ds.get_waveforms(*MAVZ, starttime, endtime, cache=True))
+    assert tr.stats.cached == False
+    calls = client.calls
+    tr_cache = next(ds.get_waveforms(*MAVZ, starttime, endtime, cache=True))
+    assert tr_cache.stats.cached == True
+    assert client.calls == calls
+    assert tr_cache.stats.starttime == tr_orig.stats.starttime
+    np.testing.assert_array_equal(tr_orig.data, tr.data)
+    np.testing.assert_array_equal(tr_orig.data, tr_cache.data)
+
+    # Sensitivity removed once, not again on a cache read
+    assert tr_orig.data.dtype == np.float64
+    assert np.nanmax(np.abs(tr_orig.data)) < 1.0
+
+    ds_chunked = DataSource(clients=[client], cache_dir=cache_dir, chunk_size=86400.0)
+    tr_chunked = next(ds_chunked.get_waveforms(*MAVZ, starttime, endtime, cache=True))
     assert tr_chunked.stats.cached == True
-    assert np.all(tr_orig.slice(starttime, starttime + 86400.0).data == tr_chunked.data)
+    np.testing.assert_array_equal(
+        tr_orig.slice(starttime, starttime + 86400.0).data, tr_chunked.data
+    )
+
+
+def test_cache_stores_raw_counts(setup_temporary_sds):
+    """
+    Test that the cache holds Steim2-compressed int32 counts.
+    """
+    day = UTCDateTime(2020, 7, 18)
+    client = FakeClient(day, 86400)
+    cache_dir = tempfile.mkdtemp()
+    ds = DataSource(clients=[client], cache_dir=cache_dir)
+    next(ds.get_waveforms(*MAVZ, day, day + 86400, cache=True))
+    st = read(ds.to_sds(None, *MAVZ, day))
+    assert st[0].stats.mseed.encoding == "STEIM2"
+    assert st[0].data.dtype == np.int32
+    np.testing.assert_array_equal(st[0].data, client.stream[0].data)
+
+
+def test_cache_gappy_day(setup_temporary_sds):
+    """
+    Test that a day with gaps is read from the cache on the second request.
+    """
+    day = UTCDateTime(2020, 7, 18)
+    client = FakeClient(day, 86400, gaps=True)
+    ds = DataSource(clients=[client], cache_dir=tempfile.mkdtemp())
+    tr = next(ds.get_waveforms(*MAVZ, day, day + 86400, cache=True))
+    tr_cache = next(ds.get_waveforms(*MAVZ, day, day + 86400, cache=True))
+    assert client.calls == 1
+    assert tr_cache.stats.cached == True
+    assert np.any(np.isnan(tr_cache.data))
+    np.testing.assert_array_equal(tr.data, tr_cache.data)
+
+
+def test_cache_skips_recent_days(setup_temporary_sds):
+    """
+    Test that days which ended less than `cache_min_age` ago are not cached.
+    """
+    now = UTCDateTime(UTCDateTime().strftime("%Y-%m-%dT%H:%M:%S"))
+    starttime = UTCDateTime((now - 3 * 86400).date)
+    client = FakeClient(starttime, now - starttime)
+    ds = DataSource(clients=[client], cache_dir=tempfile.mkdtemp())
+    next(ds.get_waveforms(*MAVZ, starttime, now, cache=True))
+    days = [starttime + i * 86400 for i in range(4)]
+    cached = [os.path.exists(ds.to_sds(None, *MAVZ, day)) for day in days]
+    assert cached == [True, False, False, False]
+    calls = client.calls
+    tr = next(ds.get_waveforms(*MAVZ, starttime, now, cache=True))
+    assert tr.stats.cached == False
+    assert client.calls == calls + 3
+
+
+def test_cache_ignores_old_layout(setup_temporary_sds):
+    """
+    Test that processed files from the old cache layout are not read.
+    """
+    day = UTCDateTime(2020, 7, 18)
+    client = FakeClient(day, 86400)
+    cache_dir = tempfile.mkdtemp()
+    old = synthetic_trace(starttime=day, nsec=86400, sampling_rate=1.0)
+    old.stats.station, old.stats.location = "MAVZ", "10"
+    path = os.path.join(
+        cache_dir, "2020", "NZ", "MAVZ", "HHZ.D", "NZ.MAVZ.10.HHZ.D.2020.200"
+    )
+    os.makedirs(os.path.dirname(path))
+    old.write(path, format="MSEED")
+    ds = DataSource(clients=[client], cache_dir=cache_dir)
+    tr = next(ds.get_waveforms(*MAVZ, day, day + 86400, cache=True))
+    assert client.calls == 1
+    assert tr.stats.cached == False
 
 
 """

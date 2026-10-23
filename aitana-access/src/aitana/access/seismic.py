@@ -1,7 +1,7 @@
 import inspect
 import logging
 import os
-import warnings
+import tempfile
 from datetime import timedelta
 
 import fsspec
@@ -289,49 +289,111 @@ def get_instrument_response(
 
 
 class WaveformBaseclass:
-    pass
+    """
+    Base class for waveform clients.
 
+    Clients implement `get_raw`. Sensitivity removal, gap filling and
+    trimming happen in `process`, so that `SeismicData` can apply them to
+    raw data read from its cache as well.
+    """
 
-class SDSWaveforms(WaveformBaseclass):
-    def __init__(self, sds_dir, fdsn_urls, fill_value=np.nan):
+    def get_raw(self, net, site, loc, comp, start, end):
         """
-        Get seismic waveforms from a local SDS archive.
-        """
-        self.client = SDS_Client(sds_dir)
-        self.fdsn_urls = fdsn_urls
-        self.fill_value = fill_value
+        Get waveform data as delivered by the source.
 
-    def get_waveforms(self, net, site, loc, comp, startdate, enddate):
+        Parameters
+        ----------
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        start, end : UTCDateTime
+            Start and end of the requested time span.
+
+        Returns
+        -------
+        Stream
+            Unmerged waveform data in counts.
         """
-        :param fill_value: Default value used to fill gaps and pad traces to
-                           cover the whole time period defined by `startdate`
-                           and `enddate`. If 'interpolate' is chosen, the
-                           traces will not be padded.
-        :type fill_value: int, float, 'interpolate', np.nan, or None
+        raise NotImplementedError
+
+    def process(self, st, net, site, loc, comp, start, end):
+        """
+        Remove the instrument sensitivity, fill gaps and trim to the
+        requested time span.
+
+        Parameters
+        ----------
+        st : Stream
+            Raw waveform data as returned by `get_raw`.
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        start, end : UTCDateTime
+            Start and end of the requested time span.
+
+        Returns
+        -------
+        Trace
+            Waveform data with the instrument sensitivity removed.
         """
         inv = get_instrument_response(net, site, loc, fdsn_urls=self.fdsn_urls)
-
-        st = self.client.get_waveforms(
-            net, site, loc, comp, startdate, enddate, dtype="float64"
-        )
-
         inv_dt = inv.select(
-            location=loc, channel=comp, starttime=startdate, endtime=enddate - 1
+            location=loc, channel=comp, starttime=start, endtime=end - 1
         )
+        # Integer counts can't hold NaN as fill value. Not every PostProcess
+        # output merges, and they all return only the first trace.
+        for tr in st:
+            tr.data = tr.data.astype(np.float64)
+        st.merge(fill_value=self.fill_value)
 
         # Post-process to remove sensitivity and account for gaps
         pp = PostProcess(
             st=st,
             inv=inv,
             inv_dt=inv_dt,
-            startdate=startdate,
-            enddate=enddate,
+            startdate=start,
+            enddate=end,
             loc=loc,
             comp=comp,
             fill_value=self.fill_value,
         )
-        tr = pp.run_post_processing()
-        return tr
+        return pp.run_post_processing()
+
+    def get_waveforms(self, net, site, loc, comp, start, end):
+        """
+        Get waveform data with the instrument sensitivity removed.
+
+        Parameters
+        ----------
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        start, end : UTCDateTime
+            Start and end of the requested time span.
+
+        Returns
+        -------
+        Trace
+            Waveform data with the instrument sensitivity removed.
+        """
+        st = self.get_raw(net, site, loc, comp, start, end)
+        return self.process(st, net, site, loc, comp, start, end)
+
+
+class SDSWaveforms(WaveformBaseclass):
+    def __init__(self, sds_dir, fdsn_urls, fill_value=np.nan):
+        """
+        Get seismic waveforms from a local SDS archive.
+
+        :param fill_value: Default value used to fill gaps and pad traces to
+                           cover the whole time period defined by `startdate`
+                           and `enddate`. If 'interpolate' is chosen, the
+                           traces will not be padded.
+        :type fill_value: int, float, 'interpolate', np.nan, or None
+        """
+        self.client = SDS_Client(sds_dir)
+        self.fdsn_urls = fdsn_urls
+        self.fill_value = fill_value
+
+    def get_raw(self, net, site, loc, comp, startdate, enddate):
+        return self.client.get_waveforms(net, site, loc, comp, startdate, enddate)
 
 
 class MockSDSWaveforms(WaveformBaseclass):
@@ -419,7 +481,7 @@ class MockSDSWaveforms(WaveformBaseclass):
             self.save2sds(tr, rootdir)
             _tstart += 86400
 
-    def get_waveforms(self, net, site, loc, comp, startdate, enddate):
+    def get_raw(self, net, site, loc, comp, startdate, enddate):
         """
         Generate synthetic daily files that start at midnight on the
         startdate and end at midnight on the enddate. The return the requested
@@ -428,9 +490,29 @@ class MockSDSWaveforms(WaveformBaseclass):
         self.generate_dataset(
             self.client.sds_root, net, site, loc, comp, startdate, enddate
         )
-        st = self.client.get_waveforms(
+        return self.client.get_waveforms(
             net, site, loc, comp, startdate, enddate, dtype="float64"
         )
+
+    def process(self, st, net, site, loc, comp, startdate, enddate):
+        """
+        Return the first trace unchanged, since synthetic data have no
+        station metadata.
+
+        Parameters
+        ----------
+        st : Stream
+            Synthetic waveform data as returned by `get_raw`.
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        startdate, enddate : UTCDateTime
+            Start and end of the requested time span.
+
+        Returns
+        -------
+        Trace
+            First trace of `st`.
+        """
         return st[0]
 
 
@@ -440,29 +522,11 @@ class FDSNWaveforms(WaveformBaseclass):
         Get seismic waveforms from FDSN web service.
         """
         self.client = FDSN_Client(base_url=url, debug=debug)
+        self.fdsn_urls = (self.client.base_url,)
         self.fill_value = fill_value
 
-    def get_waveforms(self, net, site, loc, comp, startdate, enddate):
-        st = self.client.get_waveforms(net, site, loc, comp, startdate, enddate)
-        # Prepare seismic time series
-        inv = get_instrument_response(
-            net,
-            site,
-            loc,
-            fdsn_urls=(self.client.base_url,),
-        )
-        st.remove_sensitivity(inv)
-        # in case stream has more than one trace
-        st.merge(fill_value=self.fill_value)
-        if self.fill_value != "interpolate":
-            st.trim(
-                startdate,
-                enddate,
-                pad=True,
-                fill_value=self.fill_value,
-                nearest_sample=False,
-            )
-        return st[0]
+    def get_raw(self, net, site, loc, comp, startdate, enddate):
+        return self.client.get_waveforms(net, site, loc, comp, startdate, enddate)
 
 
 class S3Waveforms(WaveformBaseclass):
@@ -486,7 +550,7 @@ class S3Waveforms(WaveformBaseclass):
         self.fill_value = fill_value
         self.bucket = "geonet-open-data"
 
-    def get_waveforms(self, net, site, loc, comp, start, end):
+    def get_raw(self, net, site, loc, comp, start, end):
         """
         Download waveforms.
 
@@ -507,9 +571,9 @@ class S3Waveforms(WaveformBaseclass):
 
         Returns
         -------
-        Trace
-            An ObsPy Trace object containing the waveform data with sensitivity
-            removed.
+        Stream
+            The day files' waveform data in counts, trimmed to the requested
+            time span.
         """
         PATH_FORMAT = (
             "{bucket}/waveforms/miniseed/{year}/{year}.{julday:03d}/{station}."
@@ -533,36 +597,37 @@ class S3Waveforms(WaveformBaseclass):
             if self.debug:
                 logger.debug("Requesting {}".format(s3_file_path))
             with self.fsclient.open(s3_file_path) as f:
-                _st = read(f, dtype="float64")
+                _st = read(f)
             _st.trim(t_start, t_end, nearest_sample=False)
             st += _st
             t_start = t_end
             t_end = t_start + timedelta(days=1)
             t_end = min(t_end, end)
-
-        st.merge(fill_value=self.fill_value)
-        inv = get_instrument_response(net, site, loc, fdsn_urls=self.fdsn_urls)
-        inv_dt = inv.select(
-            location=loc, channel=comp, starttime=t_start, endtime=t_end
-        )
-
-        # Post-process to remove sensitivity and account for gaps
-        pp = PostProcess(
-            st=st,
-            inv=inv,
-            inv_dt=inv_dt,
-            startdate=start,
-            enddate=end,
-            loc=loc,
-            comp=comp,
-            fill_value=self.fill_value,
-        )
-        tr = pp.run_post_processing()
-        return tr
+        return st
 
 
 class SeismicData:
-    def __init__(self, clients, chunk_size=None, cache_dir=None):
+    def __init__(
+        self, clients, chunk_size=None, cache_dir=None, cache_min_age=2 * 86400.0
+    ):
+        """
+        Get seismic waveforms from the first of several clients that has
+        data, optionally through a local cache of raw day files.
+
+        Parameters
+        ----------
+        clients : list of WaveformBaseclass
+            Waveform clients, tried in order.
+        chunk_size : float, optional
+            Length in seconds of the chunks `get_waveforms` yields.
+        cache_dir : str, optional
+            Parent directory of the cache, by default ``~/aitana_cache``.
+            Raw day files go into its ``raw`` subdirectory in SDS layout.
+            Files directly in ``cache_dir`` are processed data written by
+            earlier versions and are never read.
+        cache_min_age : float
+            Seconds after the end of a UTC day before it is cached.
+        """
         self.chunk_size = chunk_size
 
         if len(clients) < 1:
@@ -576,19 +641,31 @@ class SeismicData:
                 raise ValueError(msg)
 
         self.clients = clients
-        self.cache_dir = os.path.join(os.environ["HOME"], "aitana_cache")
-        if cache_dir is not None:
-            self.cache_dir = cache_dir
+        if cache_dir is None:
+            cache_dir = os.path.join(os.environ["HOME"], "aitana_cache")
+        self.cache_dir = os.path.join(cache_dir, "raw")
+        self.cache_min_age = cache_min_age
 
         os.makedirs(self.cache_dir, exist_ok=True)
-        self.cache_client = SDS_Client(self.cache_dir)
 
-    def to_sds(self, tr: Trace):
+    def to_sds(self, st: Stream, net, site, loc, comp, day):
         """
-        Save trace to SDS directory.
+        Path of a day file in the cache, writing `st` to it if given.
+
+        Parameters
+        ----------
+        st : Stream or None
+            Raw data of one UTC day. If None, nothing is written.
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        day : UTCDateTime
+            Midnight at the start of the day.
+
+        Returns
+        -------
+        str
+            Path of the day file.
         """
-        start = tr.stats.starttime
-        end = tr.stats.endtime
         sds_fmtstr = os.path.join(
             "{year}",
             "{network}",
@@ -596,25 +673,86 @@ class SeismicData:
             "{channel}.{sds_type}",
             "{network}.{station}.{location}.{channel}.{sds_type}.{year}.{doy:03d}",
         )
-
-        current_date = start.date
-        while current_date <= end.date:
-            _tr = tr.slice(UTCDateTime(current_date), UTCDateTime(current_date) + 86400)
-            # print(_tr.stats.starttime, _tr.stats.endtime)
-            fullpath = sds_fmtstr.format(
-                year=_tr.stats.starttime.year,
-                doy=_tr.stats.starttime.julday,
-                sds_type="D",
-                **_tr.stats,
-            )
-            fullpath = os.path.join(self.cache_dir, fullpath)
+        fullpath = sds_fmtstr.format(
+            year=day.year,
+            doy=day.julday,
+            sds_type="D",
+            network=net,
+            station=site,
+            location=loc,
+            channel=comp,
+        )
+        fullpath = os.path.join(self.cache_dir, fullpath)
+        if st is not None:
             dirname, _ = os.path.split(fullpath)
             os.makedirs(dirname, exist_ok=True)
-            logger.debug(f"writing {_tr} to {fullpath}")
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                _tr.write(fullpath, format="MSEED")
-            current_date += timedelta(days=1)
+            logger.debug(f"writing {st} to {fullpath}")
+            # Concurrent readers must never see a partially written day
+            fd, tmp = tempfile.mkstemp(dir=dirname)
+            os.close(fd)
+            st.write(tmp, format="MSEED")
+            os.replace(tmp, fullpath)
+        return fullpath
+
+    def get_raw(self, net, site, loc, comp, start, end):
+        """
+        Get raw data per UTC day from the cache or from the first client
+        that has data. Days that ended more than `cache_min_age` ago are
+        fetched whole and written to the cache.
+
+        Parameters
+        ----------
+        net, site, loc, comp : str
+            Network, station, location and channel codes.
+        start, end : UTCDateTime
+            Start and end of the requested time span.
+
+        Returns
+        -------
+        st : Stream
+            Raw data between `start` and `end`.
+        client : WaveformBaseclass or None
+            First client that delivered data, None if all of it came from
+            the cache.
+        """
+        st = Stream()
+        answered = None
+        day = UTCDateTime(start.date)
+        while day < end:
+            path = self.to_sds(None, net, site, loc, comp, day)
+            if os.path.exists(path):
+                st += read(path)
+                day += 86400
+                continue
+            cacheable = day + 86400 < UTCDateTime() - self.cache_min_age
+            if cacheable:
+                t0, t1 = day, day + 86400
+            else:
+                t0, t1 = max(start, day), min(end, day + 86400)
+            for client in self.clients:
+                try:
+                    _st = client.get_raw(net, site, loc, comp, t0, t1)
+                except Exception as e:
+                    logger.warning(
+                        "{} failed to get waveforms for {} between {} "
+                        "and {} ({!r}), trying next client.".format(
+                            client.__class__.__name__,
+                            ".".join((net, site, loc, comp)),
+                            t0,
+                            t1,
+                            e,
+                        )
+                    )
+                    continue
+                if _st:
+                    answered = answered or client
+                    if cacheable:
+                        self.to_sds(_st, net, site, loc, comp, day)
+                    st += _st
+                    break
+            day += 86400
+        st.trim(start, end, nearest_sample=False)
+        return st, answered
 
     def get_waveforms(self, net, site, loc, comp, start, end, cache=False):
         """Yield waveform data for requested time span.
@@ -631,7 +769,9 @@ class SeismicData:
         start, end : UTCDateTime
             Start and end times.
         cache : bool
-            If True, fetched data are written to the local SDS-style cache.
+            If True, raw data of UTC days that ended more than
+            `cache_min_age` ago are read from, or written to, the local
+            SDS cache.
 
         Yields
         ------
@@ -666,22 +806,26 @@ class SeismicData:
             """Inner helper replicating previous single-component logic.
             Returns a Trace (may be empty Trace() if not found)."""
             tr = Trace()
-            try:
-                if not cache:
-                    raise AttributeError
-                st = self.cache_client.get_waveforms(
-                    net, site, loc, single_comp, t_start, t_end, dtype="float64"
-                )
-                tr = st.merge(fill_value=np.nan)[0]
-                t_diff = int(t_end - t_start)
-                if abs(t_diff - (tr.stats.npts - 1) * tr.stats.delta) > 1:
-                    raise IndexError
-                tr.stats["cached"] = True
-            except (IndexError, AttributeError):
-                msg = "Data for {} between {} and {} not found in cache."
-                logger.debug(
-                    msg.format(".".join((net, site, loc, single_comp)), t_start, t_end)
-                )
+            if cache:
+                st, client = self.get_raw(net, site, loc, single_comp, t_start, t_end)
+                if st:
+                    try:
+                        tr = (client or self.clients[0]).process(
+                            st, net, site, loc, single_comp, t_start, t_end
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to process waveforms for {} between {} "
+                            "and {} ({!r}).".format(
+                                ".".join((net, site, loc, single_comp)),
+                                t_start,
+                                t_end,
+                                e,
+                            )
+                        )
+                    else:
+                        tr.stats["cached"] = client is None
+            else:
                 for client in self.clients:
                     try:
                         tr = client.get_waveforms(
@@ -701,15 +845,12 @@ class SeismicData:
                         continue
                     else:
                         break
-                if not tr:
-                    logger.info(
-                        "No data found for {}".format(
-                            ".".join((net, site, loc, single_comp))
-                        )
+            if not tr:
+                logger.info(
+                    "No data found for {}".format(
+                        ".".join((net, site, loc, single_comp))
                     )
-                else:
-                    if cache:
-                        self.to_sds(tr)
+                )
             return tr
 
         t_start = start
