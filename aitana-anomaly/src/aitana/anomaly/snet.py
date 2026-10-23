@@ -153,7 +153,7 @@ def main(argv=None):
     configure_logging(args.log_file, logging.DEBUG)
     logger.info("Starting snet with args: %s", args)
 
-    s3w = S3Waveforms(staxml_dir=args.data_dir) 
+    s3w = S3Waveforms()
     ds = DataSource(clients=[s3w], chunk_size=86400)
     starttime = floor_datetime(UTCDateTime(args.starttime), 1200)
     endtime = floor_datetime(UTCDateTime(args.endtime), 1200)
