@@ -1,5 +1,5 @@
 {
-  "version": "31.4.4",
+  "version": "32.5.2",
   "pages": [
     {
       "id": "K4vr-UjvMzJEVTvYP6Wg",
@@ -98,35 +98,17 @@
           "label": "aitana-bot"
         },
         {
-          "id": "BtrKE-p-im5WdQwZc4YX-15",
-          "type": "edge",
-          "parent": "1"
-        },
-        {
-          "id": "CHbCPYwtZRlayoww0xyX-3",
-          "type": "edge",
-          "parent": "1",
-          "source": "BtrKE-p-im5WdQwZc4YX-16",
-          "target": "CHbCPYwtZRlayoww0xyX-1"
-        },
-        {
           "id": "BtrKE-p-im5WdQwZc4YX-16",
           "type": "node",
           "parent": "1",
           "label": "slack"
         },
         {
-          "id": "CHbCPYwtZRlayoww0xyX-16",
+          "id": "6d61cuP-puHxBdDy0nQE-2",
           "type": "edge",
           "parent": "1",
-          "source": "CHbCPYwtZRlayoww0xyX-1",
-          "target": "BtrKE-p-im5WdQwZc4YX-6"
-        },
-        {
-          "id": "CHbCPYwtZRlayoww0xyX-1",
-          "type": "node",
-          "parent": "1",
-          "label": "Review annotations"
+          "source": "CHbCPYwtZRlayoww0xyX-4",
+          "target": "6d61cuP-puHxBdDy0nQE-1"
         },
         {
           "id": "CHbCPYwtZRlayoww0xyX-4",
@@ -172,6 +154,12 @@
           "type": "node",
           "parent": "1",
           "label": "WFS"
+        },
+        {
+          "id": "6d61cuP-puHxBdDy0nQE-1",
+          "type": "node",
+          "parent": "1",
+          "label": "Review annotations"
         }
       ]
     }
