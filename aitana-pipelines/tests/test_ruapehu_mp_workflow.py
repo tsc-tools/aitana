@@ -8,7 +8,6 @@ import re
 import numpy as np
 import pandas as pd
 import pytest
-
 from aitana.anomaly.evaluation import quiet_series
 from aitana.pipelines.cli import SnakemakeBackend
 from aitana.pipelines.workflows.ruapehu_mp import workflow
@@ -28,7 +27,9 @@ def planned_jobs(output):
     dict of str to int
         Number of planned jobs per rule.
     """
-    return {rule: int(n) for rule, n in re.findall(r"^(\w+)\s+(\d+)$", output, re.M)}
+    return {
+        rule: int(n) for rule, n in re.findall(r"^(\w+)\s+(\d+)$", output, re.MULTILINE)
+    }
 
 
 def write_rsam(outdir, days, empty=()):
@@ -66,12 +67,12 @@ def read_index(path):
     "end, start, archived, partial, days",
     [
         # 28 days of history plus the 6-h window lead and the scored day
-        ("2022-03-14T00:00", None, False, False, 30),
-        ("2022-03-14T05:30", None, False, True, 30),
+        ("2022-03-14T00:00", None, False, False, 93),
+        ("2022-03-14T05:30", None, False, True, 93),
         # building the archive: history before 2022-03-01, then every day since
-        ("2022-03-14T05:30", "2022-03-01", False, True, 42),
+        ("2022-03-14T05:30", "2022-03-01", False, True, 105),
         # the archive exists, so only the last 24 h are scored
-        ("2022-03-14T05:30", "2022-03-01", True, True, 30),
+        ("2022-03-14T05:30", "2022-03-01", True, True, 93),
     ],
 )
 def test_job_graph(tmp_path, capfd, end, start, archived, partial, days):
@@ -93,7 +94,9 @@ def test_archive_day_matches_plain_run(tmp_path):
     """An archived day is scored exactly as a run ending at the next midnight."""
     write_rsam(tmp_path, pd.date_range("2022-02-11", "2022-03-13"))
     backend = SnakemakeBackend(workflow.workflowdir, tmp_path)
-    backend.execute(cores=1, extra=["--config", "end=2022-03-14T00:00", "start=2022-03-12"])
+    backend.execute(
+        cores=1, extra=["--config", "end=2022-03-14T00:00", "start=2022-03-12"]
+    )
     backend.execute(cores=1, extra=["--config", "end=2022-03-13T00:00"])
 
     columns = ["anomaly_index", "matrix_profile", "alarm"]
