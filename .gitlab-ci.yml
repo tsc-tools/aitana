@@ -48,6 +48,7 @@ deploy-ruapehu-mp:
     {
       "Image": "${IMAGE}",
       "Cmd": ["aitana-pipelines", "run", "ruapehu", "/home/bayes/data/ruapehu_mp",
+              "--workflow", "ruapehu_mp",
               "--cron", "2-59/10 * * * *", "--cores", "8",
               "--config", "start=2022-01-01"],
       "HostConfig": {

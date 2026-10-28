@@ -57,8 +57,11 @@ registered by third-party packages via the `aitana.pipelines.workflows` entry-po
 | Command | Description |
 |---|---|
 | `aitana-pipelines list` | List all registered workflows (name, volcano, description). |
-| `aitana-pipelines run <volcano> <outdir>` | Run every registered workflow for a volcano. |
+| `aitana-pipelines run <volcano> <outdir>` | Run the workflow registered for a volcano. |
 | `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
+
+Where a volcano has several workflows, choose one with `--workflow <name>`; each needs its own
+`<outdir>`.
 
 `aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
 

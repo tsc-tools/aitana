@@ -127,9 +127,10 @@ stacking utilities and Matplotlib/Plotly visualisation.
   forecasted-rate computation.
 - `visualise` — `trellis_plot` (multi-panel time series with ensemble/uncertainty overlays)
   and `scoring_plot`.
-- Two bundled workflows: `egu2026`, a Bayesian network vs decision tree benchmark for
-  Whakaari, and `ruapehu_mp`, the Ruapehu RSAM matrix-profile alert (see
-  [below](#the-ruapehu-rsam-alert-end-to-end)).
+- Three bundled workflows: `egu2026`, a Bayesian network vs decision tree benchmark for
+  Whakaari, `ruapehu_mp`, the Ruapehu RSAM matrix-profile alert (see
+  [below](#the-ruapehu-rsam-alert-end-to-end)), and `ruapehu_snet`, which stores
+  scattering-network coefficients of Ruapehu's three-component data.
 
 ### `aitana-anomaly`
 - `AnomalyDetectionBaseClass` — the shared contract every detector implements, including
@@ -139,7 +140,10 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `AutoEncoder` / `TiedAutoEncoder` — working per-timestep autoencoder with training,
   checkpointing and inference; `FuzzyCluster` for cluster assignment. This and
   `ZizouDataset` need the `pytorch` extra (`aitana-anomaly[pytorch]`).
-- `SNet` — scattering-network feature extraction (via `scatseisnet`).
+- `SNet` — scattering-network feature extraction (via `scatseisnet`): `preprocess()` puts
+  three components on a common 25 Hz grid with an anti-alias filter, `compute()` gives first-
+  and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a
+  component is missing. The `ruapehu_snet` workflow runs it.
 - `MatrixProfile` — z-normalized left matrix profile (`stumpy`) of a single series, scored
   against its own trailing history and mapped to `[0, 1]` with `normalize_score()`. Sensitive
   to changes in *shape*, deliberately blind to amplitude.
@@ -263,8 +267,11 @@ registered by third-party packages via the `aitana.pipelines.workflows` entry-po
 | Command | Description |
 |---|---|
 | `aitana-pipelines list` | List all registered workflows (name, volcano, description). |
-| `aitana-pipelines run <volcano> <outdir>` | Run every registered workflow for a volcano. |
+| `aitana-pipelines run <volcano> <outdir>` | Run the workflow registered for a volcano. |
 | `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
+
+Where a volcano has several workflows, choose one with `--workflow <name>`; each needs its own
+`<outdir>`, since a run copies the workflow's `Snakefile` and `config.yaml` into it.
 
 `aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
 With `--cron "<crontab expression>"` it keeps running and repeats on that schedule (UTC),
@@ -294,6 +301,7 @@ aitana-pipelines clean whakaari ./results
 |---|---|---|
 | `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
 | `ruapehu_mp` | ruapehu | Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana |
+| `ruapehu_snet` | ruapehu | Scattering-network coefficients of three-component Ruapehu seismic data, stored for detectors |
 
 ### The Ruapehu RSAM alert, end to end
 
@@ -316,13 +324,13 @@ delete it to rebuild the archive, e.g. after a retune or an outage of more than 
 
 ```bash
 # Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
-aitana-pipelines run ruapehu ~/rsam_mp --cores 4 --config end=2022-03-20T00:00
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 4 --config end=2022-03-20T00:00
 
 # Archive since 2022-01-01 (streams ~14 GB of waveforms; keeps ~10 MB of RSAM)
-aitana-pipelines run ruapehu ~/rsam_mp --cores 8 --config start=2022-01-01
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 8 --config start=2022-01-01
 
 # Keep scoring every 10 min and serve the stored series for Grafana
-aitana-pipelines run ruapehu ~/rsam_mp --cron "2-59/10 * * * *" &
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cron "2-59/10 * * * *" &
 aitana-api --rootdir ~/rsam_mp/storage --port 8003
 ```
 
@@ -343,6 +351,25 @@ threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per 
 months and on about 20 % of days during the March–May 2022 unrest. It did not flag the abrupt
 2022-03-13 onset itself (a step looks like any other step once z-normalized); the first alarm
 after it was 2022-03-19 17:30 UTC, on an unusually steady stretch of tremor.
+
+### Scattering coefficients of Ruapehu
+
+`ruapehu_snet` fetches `NZ.FWVZ.10.HH?` (Z, N, E) the same way, resamples it to 25 Hz with an
+anti-alias filter and computes first- and second-order scattering coefficients with `SNet`
+(20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC
+day under `snet/` and stores `snet_order1` (datetime, channel, frequency) and `snet_order2`
+(datetime, channel, frequency, order2 frequency) under `ruapehu/FWVZ/10/HH` in
+`<outdir>/storage`; channel 0 is Z. Each run plots the vertical first-order coefficients to
+`results/<end>/order1.png`. A run covers the last 24 h, or every day since `start`. A day takes
+about 2.5 CPU-minutes and ~27 MB of waveforms. No detector consumes the coefficients yet.
+
+```bash
+# Replay the 2022-03-13 onset
+aitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 4 --config end=2022-03-14T05:30
+
+# Backfill since 2022-01-01
+aitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 8 --config start=2022-01-01
+```
 
 ### Running the EGU 2026 workflow with Docker
 

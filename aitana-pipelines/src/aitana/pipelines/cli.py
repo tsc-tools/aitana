@@ -100,12 +100,26 @@ class SnakemakeBackend:
         subprocess.run(cmd, check=True)
 
 
-def _resolve(volcano: str) -> list[WorkflowDescriptor]:
+def _resolve(volcano: str, workflow: str | None) -> WorkflowDescriptor:
     matches = [w for w in discover_workflows().values() if w.volcano == volcano]
     if not matches:
         typer.echo(f"No workflows registered for '{volcano}'", err=True)
         raise typer.Exit(1)
-    return matches
+    if workflow is not None:
+        matches = [w for w in matches if w.name == workflow]
+        if not matches:
+            typer.echo(f"No workflow '{workflow}' registered for '{volcano}'", err=True)
+            raise typer.Exit(1)
+    if len(matches) > 1:
+        # they would overwrite each other's Snakefile and config.yaml in outdir
+        names = ", ".join(w.name for w in matches)
+        typer.echo(
+            f"Several workflows registered for '{volcano}' ({names}); "
+            "choose one with --workflow.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    return matches[0]
 
 
 @app.command(
@@ -117,35 +131,37 @@ def run(
     outdir: str,
     cores: int = 1,
     cron: str | None = None,
+    workflow: str | None = None,
 ):
-    """Run all registered workflows for a volcano.
+    """Run the workflow registered for a volcano.
 
+    With several workflows registered for the volcano, choose one with
+    ``--workflow NAME`` (see ``list``); each needs its own output directory.
     Extra arguments are passed to Snakemake, e.g. ``--config end=2022-03-20T00:00``.
     With ``--cron``, keep running and repeat on a crontab schedule in UTC, e.g.
     ``--cron "*/10 * * * *"``; a run that is due while the previous one is still
     going is skipped.
     """
-    workflows = _resolve(volcano)
+    w = _resolve(volcano, workflow)
 
-    def run_all():
-        for w in workflows:
-            SnakemakeBackend(w.workflowdir, Path(outdir)).execute(
-                cores=cores, extra=ctx.args
-            )
+    def run_workflow():
+        SnakemakeBackend(w.workflowdir, Path(outdir)).execute(
+            cores=cores, extra=ctx.args
+        )
 
     if cron is None:
-        run_all()
+        run_workflow()
         return
     scheduler = BlockingScheduler(timezone="UTC")
-    scheduler.add_job(run_all, CronTrigger.from_crontab(cron, timezone="UTC"))
+    scheduler.add_job(run_workflow, CronTrigger.from_crontab(cron, timezone="UTC"))
     scheduler.start()
 
 
 @app.command()
-def clean(volcano: str, outdir: str):
-    """Delete all workflow outputs for a volcano."""
-    for w in _resolve(volcano):
-        SnakemakeBackend(w.workflowdir, Path(outdir)).clean()
+def clean(volcano: str, outdir: str, workflow: str | None = None):
+    """Delete the outputs of a volcano's workflow, chosen with ``--workflow`` if it has several."""
+    w = _resolve(volcano, workflow)
+    SnakemakeBackend(w.workflowdir, Path(outdir)).clean()
 
 
 @app.command(name="list")

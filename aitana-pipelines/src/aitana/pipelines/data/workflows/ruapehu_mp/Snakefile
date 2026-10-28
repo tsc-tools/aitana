@@ -15,7 +15,7 @@ that file and score only the last ``lookback_hours``; delete it to rebuild.
 Rules run in the active Python environment, which must provide aitana-access,
 aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
 workspace). Override config values on the command line, e.g.
-``aitana-pipelines run ruapehu OUT --config end=2022-03-20T00:00``.
+``aitana-pipelines run ruapehu OUT --workflow ruapehu_mp --config end=2022-03-20T00:00``.
 """
 
 import os
