@@ -29,6 +29,7 @@ aitana-pipelines = "aitana.pipelines.cli:app"
 [project.entry-points."aitana.pipelines.workflows"]
 whakaari_bn_2026 = "aitana.pipelines.workflows.whakaari_bn_2026:workflow"
 ruapehu_mp = "aitana.pipelines.workflows.ruapehu_mp:workflow"
+ruapehu_snet = "aitana.pipelines.workflows.ruapehu_snet:workflow"
 
 [tool.uv.sources]
 aitana-volcanoes = { workspace = true }

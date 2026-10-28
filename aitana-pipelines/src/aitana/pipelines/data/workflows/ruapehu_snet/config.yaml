@@ -1,0 +1,11 @@
+# End of the computed period (UTC): "now" or an ISO timestamp, e.g. 2022-03-20T00:00
+end: now
+# Start of the computed period, e.g. 2022-01-01 to backfill every day since then;
+# null computes the last lookback_hours before end
+start: null
+# Hours computed per run when start is null
+lookback_hours: 24
+# Three components, e.g. HH? for HHZ, HHN, HHE
+seed_id: NZ.FWVZ.10.HH?
+# aitana-storage root for the coefficients, relative to the output directory
+storage_dir: storage

@@ -1,0 +1,93 @@
+"""
+Scattering-network coefficients of three-component Ruapehu seismic data.
+
+Computes first- and second-order scattering coefficients of ``seed_id`` from
+GeoNet waveforms with ``aitana.anomaly.snet.SNet`` (20-min windows every 10 min,
+each labelled by its first sample), one job per UTC day so that completed days
+are reused across runs, and stores them in aitana-storage. A run covers the last
+``lookback_hours`` before ``end``, or every day since ``start`` when that is set,
+e.g. ``--config start=2022-01-01`` to backfill.
+
+Rules run in the active Python environment, which must provide aitana-access,
+aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
+workspace). Override config values on the command line, e.g.
+``aitana-pipelines run ruapehu OUT --workflow ruapehu_snet --config end=2022-03-20T00:00``.
+"""
+
+import pandas as pd
+
+
+configfile: "config.yaml"
+
+
+STEP = pd.Timedelta("10min")  # SNet's windows advance by 10 min
+WINDOW = pd.Timedelta("20min")  # and span 20 min
+
+
+def utc(value):
+    ts = pd.Timestamp(value)
+    return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+
+
+def naive(ts):
+    """ISO string in UTC without an offset, matching the SNet timestamps."""
+    return ts.tz_convert(None).isoformat()
+
+
+END = utc("now" if str(config["end"]) == "now" else str(config["end"])).floor(STEP)
+if config["start"]:
+    START = utc(str(config["start"]))
+else:
+    START = END - pd.Timedelta(hours=config["lookback_hours"])
+TAG = END.strftime("%Y%m%dT%H%M")
+# A day is complete once the window starting at 23:50 has ended, 10 min into the
+# next day. The windows of the first incomplete day that have ended form the
+# partial day.
+PARTIAL_START = (END - WINDOW + STEP).floor("D")
+# not inclusive="left": with equal ends it keeps the day
+DAYS = pd.date_range(
+    START.floor("D"), PARTIAL_START - pd.Timedelta(days=1), freq="D"
+).strftime("%Y-%m-%d")
+PARTIAL = [f"snet/partial_{TAG}.nc"] if END - PARTIAL_START >= WINDOW else []
+
+
+wildcard_constraints:
+    day=r"\d{4}-\d{2}-\d{2}",
+
+
+rule all:
+    input:
+        f"results/{TAG}/order1.png",
+
+
+# Coefficients of the windows starting on one complete UTC day, cached in
+# snet/<day>.nc: later runs reuse the file. Delete it to fetch and recompute that
+# day, e.g. after a data gap is filled.
+rule snet_day:
+    output:
+        "snet/{day}.nc",
+    params:
+        start=lambda wc: pd.Timestamp(wc.day).isoformat(),
+        end=lambda wc: (pd.Timestamp(wc.day) + pd.Timedelta(days=1) + WINDOW - STEP).isoformat(),
+    script:
+        "scripts/snet.py"
+
+
+# The incomplete day, recomputed for every new end time.
+rule snet_partial:
+    output:
+        temp(f"snet/partial_{TAG}.nc"),
+    params:
+        start=naive(PARTIAL_START),
+        end=naive(END),
+    script:
+        "scripts/snet.py"
+
+
+rule store:
+    input:
+        expand("snet/{day}.nc", day=DAYS) + PARTIAL,
+    output:
+        plot=f"results/{TAG}/order1.png",
+    script:
+        "scripts/store.py"
