@@ -18,8 +18,6 @@ dev = [
   "twine>=6.2.0,<7",
   "import-linter",
   "moto[s3]>=5.1.19,<6",
-  "mkdocs>=1.6.1,<2",
-  "mkdocstrings[python]>=1.0.4,<2",
   "plotly>=6.5.0,<7",
   "ipykernel>=6.31.0,<7",
   "pyyaml",
@@ -27,6 +25,7 @@ dev = [
   "nbformat",
   "pip-audit",
   "torch>=2.13.0",
+  "great-docs>=0.17.0,<0.18",
 ]
 
 [tool.pytest.ini_options]

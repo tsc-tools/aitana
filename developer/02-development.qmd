@@ -1,0 +1,16 @@
+---
+title: "Development setup"
+---
+
+The repo is a [uv](https://docs.astral.sh/uv/) workspace with a single lockfile:
+
+```bash
+git clone https://github.com/tsc-tools/aitana.git
+cd aitana
+uv sync                    # installs all distributions in editable mode
+uv run pytest              # run the test suite
+uv run lint-imports        # check the layering contracts
+```
+
+A [devcontainer](https://github.com/tsc-tools/aitana/blob/main/.devcontainer/devcontainer.json) is provided with the full toolchain
+(uv, Apptainer, Quarto, Node) preinstalled.

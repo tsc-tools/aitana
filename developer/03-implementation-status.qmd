@@ -1,0 +1,74 @@
+---
+title: "Implementation status"
+---
+
+## `aitana-storage`
+- `Storage` — hierarchical feature archives (site/sensor/channel) backed by NetCDF or Zarr,
+  with gap filling, incremental merging and time-range queries.
+- `AitanaDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
+  configurable stride.
+- `aitana-api` — FastAPI service exposing `/feature` and `/inventory`.
+- `grafana_annotations` — sync the labels drawn on any Grafana dashboard with one label
+  file; restores them to a freshly deployed Grafana.
+- Background `IngestWorker` for queued dataset writes.
+
+## `aitana-access`
+- `tilde_request()` — GeoNet Tilde v4 observations (lake temperature and level, gas, GNSS,
+  water chemistry).
+- `wfs_request()` — GeoNet WFS earthquake catalogue by radius or polygon.
+- `SeismicData` with pluggable clients tried in order: `S3Waveforms` (GeoNet's anonymous
+  AWS Open Data bucket), `FDSNWaveforms`, `SDSWaveforms`, `MockSDSWaveforms`; includes
+  validation, gap filling and instrument-response removal.
+- `cache_dataframe()` — transparent disk caching with incremental date-range updates.
+- `eqRate()` / `gradient()` — moving-window earthquake rate and trend estimation.
+- `AitanaAPI` — FastAPI service adding `/waveform` and `/spectrogram`.
+
+## `aitana-features`
+RSAM (with wideband energy ratio), SSAM (filterbank and sonogram), DSAR, spectral features
+(predominant/central frequency, bandwidth, cepstral coefficients), complex-trace attributes
+(instantaneous frequency and bandwidth, normalised envelope, centroids), plus windowing and
+stacking utilities and Matplotlib/Plotly visualisation.
+
+## `aitana-volcanoes`
+- **Ruapehu** — `CraterLake` (temperature, level), `Gas` (SO₂, CO₂, H₂S), `Seismicity`
+  (regional and cone), `eruptions()`, `load_all()`, lake-height scaling.
+- **Whakaari** — `Gas`, `Seismicity` (RSAM, quakes), `eruptions()`, `load_all()`.
+- `assimilate` — state-space Kalman models: `SO2FusionModel` (multi-sensor SO₂ fusion),
+  `LocalLinearTrend`, `SemiLinearTrend`.
+
+## `aitana-pipelines`
+- `aitana-pipelines` CLI (`list` / `run` / `clean`) driving Snakemake workflows discovered via
+  the `aitana.pipelines.workflows` entry-point group — third-party packages can register their own.
+- `scoring` — pre-eruption-window evaluation, TP/FP/TN/FN thresholding, ROC curves,
+  forecasted-rate computation.
+- `visualise` — `trellis_plot` (multi-panel time series with ensemble/uncertainty overlays)
+  and `scoring_plot`.
+- Three bundled workflows: `egu2026`, a Bayesian network vs decision tree benchmark for
+  Whakaari, `ruapehu_mp`, the Ruapehu RSAM matrix-profile alert (see
+  [Running workflows](../user-guide/running-workflows.qmd#the-ruapehu-rsam-alert-end-to-end)), and `ruapehu_snet`, which stores
+  scattering-network coefficients of Ruapehu's three-component data.
+
+## `aitana-anomaly`
+- `AnomalyDetectionBaseClass` — the shared contract every detector implements, including
+  `normalize_score()`, the ECDF/percentile-rank normaliser that makes different algorithms'
+  raw statistics comparable against a quiet reference period.
+- `ZizouDataset` — feature loading and scaling for model input.
+- `AutoEncoder` / `TiedAutoEncoder` — working per-timestep autoencoder with training,
+  checkpointing and inference; `FuzzyCluster` for cluster assignment. This and
+  `ZizouDataset` need the `pytorch` extra (`aitana-anomaly[pytorch]`).
+- `SNet` — scattering-network feature extraction (via `scatseisnet`): `preprocess()` puts
+  three components on a common 25 Hz grid with an anti-alias filter, `compute()` gives first-
+  and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a
+  component is missing. The `ruapehu_snet` workflow runs it.
+- `MatrixProfile` — z-normalized left matrix profile (`stumpy`) of a single series, scored
+  against its own trailing history and mapped to `[0, 1]` with `normalize_score()`. Sensitive
+  to changes in *shape*, deliberately blind to amplitude.
+- `evaluation` — the synthetic validation harness: `inject_faults()` (independent per-stream
+  Bernoulli faults and coupled multi-stream faults), `inject_change_points()` (persistent
+  regime shifts), `simulate_regime_series()` (synthetic data with known states) and
+  `score_detector()` (ROC/AUC against the injected ground-truth mask). Documented with
+  worked examples in [Evaluating anomaly detectors](../user-guide/evaluating-detectors.qmd).
+
+**Not yet working in `aitana-anomaly`:** `MatrixProfile` is the only detector that implements
+`compute_anomaly_index()`. `pca.py` needs a rewrite (its test suite is entirely skipped), and
+`SNet` has no downstream scoring layer.

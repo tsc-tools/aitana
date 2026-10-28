@@ -53,23 +53,22 @@ python3 -m twine upload dist/*
 When prompted for the username enter `__token__` and paste in your pypi token as the password.
 
 ## Documentation
-Install the [mkdocs](https://www.mkdocs.org/) package as well as the [mkdocstrings](https://mkdocstrings.github.io/) and the [mkdocs-jupyter](https://github.com/danielfrg/mkdocs-jupyter) plugin:
+The documentation is built with [Great Docs](https://posit-dev.github.io/great-docs/) (part of the workspace dev dependencies), which needs [Quarto](https://quarto.org/docs/get-started/) (preinstalled in the devcontainer). It is configured in `great-docs.yml`; the homepage is `README.md`, and the pages come from `user_guide/` and `developer/`. The API reference lists every class and function explicitly in `great-docs.yml`, so add new public ones there.
+
+To generate the documentation run:
 ```
-python3 -m pip install --upgrade mkdocs "mkdocstrings[python]" mkdocs-jupyter
+uv run great-docs build
 ```
+The user guide pages execute their code, so build from the synced workspace (`uv sync`). The site is written to `great-docs/_site`.
 
 To view the documentation locally run:
 ```
-mkdocs serve -a 0.0.0.0:8000
-```
-To generate documentation run:
-```
-mkdocs build
+uv run great-docs preview
 ```
 
 To publish the documentation to [Github pages](https://pages.github.com/) run:
 
 ```
-mkdocs gh-deploy -r origin
+uvx ghp-import -n -p -r origin great-docs/_site
 ```
 where origin is the remote name that you have given to the github repo. This will then publish the documentation under https://tsc-tools.github.io/aitana
