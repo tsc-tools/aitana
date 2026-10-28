@@ -1,0 +1,11 @@
+{
+  "skills": [
+    {
+      "name": "aitana",
+      "description": "Validation and benchmarking framework for AI/ML in volcano monitoring. Use when writing Python code that uses the aitana package.",
+      "files": [
+        "SKILL.md"
+      ]
+    }
+  ]
+}

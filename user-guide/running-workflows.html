@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Running workflows – Aitana | Aitana</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../user-guide/evaluating-detectors.html" rel="next">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f136df0d3d203ef43b2f23fa229b87e4.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script>document.head.appendChild(Object.assign(document.createElement('link'),{rel:'stylesheet',href:(document.querySelector('meta[name="quarto:offset"]')||{content:''}).content+'termshow.css'}));</script>
+<script>document.head.appendChild(Object.assign(document.createElement('link'),{rel:'stylesheet',href:(document.querySelector('meta[name="quarto:offset"]')||{content:''}).content+'gd-lightbox.css'}));</script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'gd-lightbox.js';s.defer=true;document.head.appendChild(s);})();</script>
+<script>document.head.appendChild(Object.assign(document.createElement('link'),{rel:'stylesheet',href:(document.querySelector('meta[name="quarto:offset"]')||{content:''}).content+'gd-lightbox-compare.css'}));</script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'gd-lightbox-compare.js';s.defer=true;document.head.appendChild(s);})();</script>
+<script>document.head.appendChild(Object.assign(document.createElement('link'),{rel:'stylesheet',href:(document.querySelector('meta[name="quarto:offset"]')||{content:''}).content+'gd-lightbox-annotate.css'}));</script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'gd-lightbox-annotate.js';s.defer=true;document.head.appendChild(s);})();</script>
+<script src="../theme-init.js"></script>
+
+
+  <link rel="alternate" type="text/markdown" href="running-workflows.md">
+  <link rel="canonical" href="https://tsc-tools.github.io/aitana/user-guide/running-workflows.html">
+  <meta name="description" content="The aitana-pipelines command drives Snakemake workflows bundled with Aitana or registered by third-party packages via the aitana.pipelines.workflows...">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Running workflows – Aitana | Aitana">
+  <meta property="og:description" content="The aitana-pipelines command drives Snakemake workflows bundled with Aitana or registered by third-party packages via the aitana.pipelines.workflows...">
+  <meta property="og:url" content="https://tsc-tools.github.io/aitana/user-guide/running-workflows.html">
+  <meta property="og:site_name" content="Aitana">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Running workflows – Aitana | Aitana">
+  <meta name="twitter:description" content="The aitana-pipelines command drives Snakemake workflows bundled with Aitana or registered by third-party packages via the aitana.pipelines.workflows...">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Aitana</span>
+    </a>
+  </div>
+            <div id="quarto-search" class=""></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../user-guide/running-workflows.html" aria-current="page"> 
+<span class="menu-text">User Guide</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../developer/architecture.html"> 
+<span class="menu-text">Developers</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <span class="nav-link">
+<div id="github-widget" data-owner="tsc-tools" data-repo="aitana" data-stars="0" data-forks="0"></div>
+    </span>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <h1 class="quarto-secondary-nav-title no-breadcrumbs">Running workflows</h1>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../user-guide/running-workflows.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Running workflows</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../user-guide/evaluating-detectors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Evaluating anomaly detectors</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul class="collapse">
+  <li><a href="#commands" id="toc-commands" class="nav-link active" data-scroll-target="#commands">Commands</a></li>
+  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
+  <li><a href="#bundled-workflows" id="toc-bundled-workflows" class="nav-link" data-scroll-target="#bundled-workflows">Bundled workflows</a></li>
+  <li><a href="#the-ruapehu-rsam-alert-end-to-end" id="toc-the-ruapehu-rsam-alert-end-to-end" class="nav-link" data-scroll-target="#the-ruapehu-rsam-alert-end-to-end">The Ruapehu RSAM alert, end to end</a></li>
+  <li><a href="#scattering-coefficients-of-ruapehu" id="toc-scattering-coefficients-of-ruapehu" class="nav-link" data-scroll-target="#scattering-coefficients-of-ruapehu">Scattering coefficients of Ruapehu</a></li>
+  <li><a href="#running-the-egu-2026-workflow-with-docker" id="toc-running-the-egu-2026-workflow-with-docker" class="nav-link" data-scroll-target="#running-the-egu-2026-workflow-with-docker">Running the EGU 2026 workflow with Docker</a></li>
+  <li><a href="#registering-your-own-workflow" id="toc-registering-your-own-workflow" class="nav-link" data-scroll-target="#registering-your-own-workflow">Registering your own workflow</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title d-none d-lg-block">Running workflows</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The <code>aitana-pipelines</code> command drives Snakemake workflows bundled with Aitana or registered by third-party packages via the <code>aitana.pipelines.workflows</code> entry-point group.</p>
+<section id="commands" class="level1">
+<h1>Commands</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>aitana-pipelines list</code></td>
+<td>List all registered workflows (name, volcano, description).</td>
+</tr>
+<tr class="even">
+<td><code>aitana-pipelines run &lt;volcano&gt; &lt;outdir&gt;</code></td>
+<td>Run the workflow registered for a volcano.</td>
+</tr>
+<tr class="odd">
+<td><code>aitana-pipelines clean &lt;volcano&gt; &lt;outdir&gt;</code></td>
+<td>Delete all outputs produced by the workflow.</td>
+</tr>
+</tbody>
+</table>
+<p>Where a volcano has several workflows, choose one with <code>--workflow &lt;name&gt;</code>; each needs its own <code>&lt;outdir&gt;</code>, since a run copies the workflow’s <code>Snakefile</code> and <code>config.yaml</code> into it.</p>
+<p><code>aitana-pipelines run</code> accepts <code>--cores N</code> (default <code>1</code>) to control Snakemake parallelism. With <code>--cron "&lt;crontab expression&gt;"</code> it keeps running and repeats on that schedule (UTC), skipping a run that is due while the previous one is still going. Any further arguments are passed to Snakemake, e.g.&nbsp;<code>--config end=2022-03-20T00:00</code> or <code>-n</code> for a dry run.</p>
+</section>
+<section id="examples" class="level1">
+<h1>Examples</h1>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># See what workflows are available</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> list</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the Whakaari Bayesian-network benchmark, writing results to ./results</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run whakaari ./results</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Run with 4 parallel cores</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run whakaari ./results <span class="at">--cores</span> 4</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove all outputs</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> clean whakaari ./results</span></code></pre></div>
+</section>
+<section id="bundled-workflows" class="level1">
+<h1>Bundled workflows</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Volcano</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>egu2026</code></td>
+<td>whakaari</td>
+<td>Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026)</td>
+</tr>
+<tr class="even">
+<td><code>ruapehu_mp</code></td>
+<td>ruapehu</td>
+<td>Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana</td>
+</tr>
+<tr class="odd">
+<td><code>ruapehu_snet</code></td>
+<td>ruapehu</td>
+<td>Scattering-network coefficients of three-component Ruapehu seismic data, stored for detectors</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-ruapehu-rsam-alert-end-to-end" class="level1">
+<h1>The Ruapehu RSAM alert, end to end</h1>
+<p><code>ruapehu_mp</code> fetches <code>NZ.FWVZ.10.HHZ</code> waveforms (GeoNet’s S3 archive, falling back to the near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day, scores the last 24 h against the preceding 28 days with <a href="../reference/anomaly.matrix_profile.MatrixProfile.html#aitana.anomaly.matrix_profile.MatrixProfile" class="gdls-link gdls-code">MatrixProfile</a>, and stores RSAM (<a href="../reference/volcanoes.whakaari.Seismicity.html#aitana.volcanoes.whakaari.Seismicity.rsam" class="gdls-link gdls-code">rsam</a>), the anomaly index (<code>rsam_mp_index</code>), the raw left matrix profile it is the percentile of (<code>rsam_mp_profile</code>: each 6-h window’s z-normalized distance to its nearest earlier window, 0 to 12), its alarm series (<code>rsam_mp_alarm</code>: 1 where the index reaches <code>threshold</code>, 0 below, NaN where there is no index) and the threshold in force when each sample was scored (<code>rsam_mp_threshold</code>, so retunes stay traceable and Grafana can draw it on the index panel) in <code>aitana-storage</code> under <code>&lt;outdir&gt;/storage</code>. Each run also writes <code>results/&lt;end&gt;/index.csv</code> with RSAM, index, matrix profile and alarm. Completed days are reused across runs. Its rules run in the active environment, so run it from the uv workspace (<code>uv sync</code>). With <code>--config start=2022-01-01</code>, the first run also builds the archive: it scores every complete UTC day since <code>start</code> exactly as a run ending at the next midnight would, and writes <code>results/archive_&lt;start&gt;.csv</code> instead. Later runs find that file and only score the last 24 h; delete it to rebuild the archive, e.g.&nbsp;after a retune or an outage of more than a day.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run ruapehu ~/rsam_mp <span class="at">--workflow</span> ruapehu_mp <span class="at">--cores</span> 4 <span class="at">--config</span> end=2022-03-20T00:00</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Archive since 2022-01-01 (streams ~14 GB of waveforms; keeps ~10 MB of RSAM)</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run ruapehu ~/rsam_mp <span class="at">--workflow</span> ruapehu_mp <span class="at">--cores</span> 8 <span class="at">--config</span> start=2022-01-01</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep scoring every 10 min and serve the stored series for Grafana</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run ruapehu ~/rsam_mp <span class="at">--workflow</span> ruapehu_mp <span class="at">--cron</span> <span class="st">"2-59/10 * * * *"</span> <span class="kw">&amp;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-api</span> <span class="at">--rootdir</span> ~/rsam_mp/storage <span class="at">--port</span> 8003</span></code></pre></div>
+<p>Grafana reads the series from <code>aitana-api</code> with the Infinity data source (CSV, <strong>Backend</strong> parser, which alerting requires), e.g. <code>/feature?path=ruapehu,FWVZ,10,HHZ&amp;name=rsam_mp_alarm&amp;starttime=${__from:date:iso}&amp;endtime=${__to:date:iso}</code>. An alert rule on the maximum of <code>rsam_mp_alarm</code> posts to Slack, and a No Data rule on <code>rsam_mp_index</code> catches a stalled pipeline (or a station data gap).</p>
+<p>On the default branch, <a href="https://github.com/tsc-tools/aitana/blob/main/.gitlab-ci.yml">.gitlab-ci.yml</a> deploys these two commands as the <code>aitana-ruapehu-mp</code> and <code>aitana-ruapehu-api</code> containers, plus <code>aitana-label-sync</code>, which syncs the labels drawn in Grafana with <code>labels.json</code> every 10 minutes (see <a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/README.md">aitana-storage</a>). All three share the data directory <code>DATA_VOLUME</code>.</p>
+<p>The z-normalized matrix profile responds to changes in RSAM <em>shape</em>, not level; an amplitude threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet months and on about 20 % of days during the March–May 2022 unrest. It did not flag the abrupt 2022-03-13 onset itself (a step looks like any other step once z-normalized); the first alarm after it was 2022-03-19 17:30 UTC, on an unusually steady stretch of tremor.</p>
+</section>
+<section id="scattering-coefficients-of-ruapehu" class="level1">
+<h1>Scattering coefficients of Ruapehu</h1>
+<p><code>ruapehu_snet</code> fetches <code>NZ.FWVZ.10.HH?</code> (Z, N, E) the same way, resamples it to 25 Hz with an anti-alias filter and computes first- and second-order scattering coefficients with <a href="../reference/anomaly.snet.SNet.html#aitana.anomaly.snet.SNet" class="gdls-link gdls-code">SNet</a> (20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC day under <code>snet/</code> and stores <code>snet_order1</code> (datetime, channel, frequency) and <code>snet_order2</code> (datetime, channel, frequency, order2 frequency) under <code>ruapehu/FWVZ/10/HH</code> in <code>&lt;outdir&gt;/storage</code>; channel 0 is Z. Each run plots the vertical first-order coefficients to <code>results/&lt;end&gt;/order1.png</code>. A run covers the last 24 h, or every day since <code>start</code>. A day takes about 2.5 CPU-minutes and ~27 MB of waveforms. No detector consumes the coefficients yet.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replay the 2022-03-13 onset</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run ruapehu ~/snet <span class="at">--workflow</span> ruapehu_snet <span class="at">--cores</span> 4 <span class="at">--config</span> end=2022-03-14T05:30</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Backfill since 2022-01-01</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">aitana-pipelines</span> run ruapehu ~/snet <span class="at">--workflow</span> ruapehu_snet <span class="at">--cores</span> 8 <span class="at">--config</span> start=2022-01-01</span></code></pre></div>
+</section>
+<section id="running-the-egu-2026-workflow-with-docker" class="level1">
+<h1>Running the EGU 2026 workflow with Docker</h1>
+<p><code>scripts/run_egu2026.sh</code> is a convenience wrapper that builds the project’s Docker image, installs Aitana from source inside the container, and runs the bundled <code>egu2026</code> workflow — no local Python environment needed.</p>
+<p><strong>Prerequisites:</strong> Docker must be installed and running.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run with defaults (output → ./egu_2026_output, all available cores)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./scripts/run_egu2026.sh</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Custom output directory and core count</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">./scripts/run_egu2026.sh</span> <span class="at">-o</span> /data/results <span class="at">-c</span> 8</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Show help</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="ex">./scripts/run_egu2026.sh</span> <span class="at">-h</span></span></code></pre></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>-o OUTDIR</code></td>
+<td><code>./egu_2026_output</code></td>
+<td>Directory for workflow outputs</td>
+</tr>
+<tr class="even">
+<td><code>-c CORES</code></td>
+<td>all logical CPUs</td>
+<td>Snakemake parallelism</td>
+</tr>
+</tbody>
+</table>
+<p>The Docker image (<code>aitana-workflow</code>) is built from <code>docker/Dockerfile</code> on first run and cached by Docker. Conda environments for individual workflow rules are cached in a named Docker volume (<code>aitana-conda-envs</code>) and reused across runs, so subsequent invocations are significantly faster.</p>
+<p>The poster-generation step uses Apptainer inside Docker (to run an Inkscape container), which requires elevated capabilities (<code>SYS_ADMIN</code>, <code>/dev/fuse</code>). These are passed automatically by the script.</p>
+</section>
+<section id="registering-your-own-workflow" class="level1">
+<h1>Registering your own workflow</h1>
+<p>Any Python package can register a workflow by exposing a <a href="../reference/pipelines.cli.WorkflowDescriptor.html#aitana.pipelines.cli.WorkflowDescriptor" class="gdls-link gdls-code">WorkflowDescriptor</a> instance under the <code>aitana.pipelines.workflows</code> entry-point group:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># pyproject.toml</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[project.entry-points."</span><span class="dt">aitana.pipelines.workflows"</span><span class="kw">]</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="dt">my_workflow</span> <span class="op">=</span> <span class="st">"my_package.workflows:my_workflow"</span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># my_package/workflows.py</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> aitana.pipelines.cli <span class="im">import</span> WorkflowDescriptor</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>my_workflow <span class="op">=</span> WorkflowDescriptor(</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"my_workflow"</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    volcano<span class="op">=</span><span class="st">"ruapehu"</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span><span class="st">"My custom eruption forecast model"</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    workflowdir<span class="op">=</span>Path(<span class="va">__file__</span>).parent <span class="op">/</span> <span class="st">"snakemake"</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    outputs<span class="op">=</span>{</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        <span class="st">"forecast"</span>: <span class="st">"results/forecasts.nc"</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<p>The workflow directory must contain a <code>Snakefile</code>. Aitana copies it into <code>outdir</code> before execution, so the original is never modified.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/tsc-tools\.github\.io\/aitana\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../user-guide/evaluating-detectors.html" class="pagination-link" aria-label="Evaluating anomaly detectors">
+        <span class="nav-page-text">Evaluating anomaly detectors</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+<div class="nav-footer-center">
+<p>Site created with <strong>Great&nbsp;Docs</strong>.</p>
+</div>
+</div>
+</footer>
+<script src="../github-widget.js"></script>
+<script src="../copy-page.js"></script>
+<script src="../sidebar-wrap.js"></script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'sidebar-float.js';document.body.appendChild(s);})();</script>
+<script src="../sidebar-filter.js"></script>
+<script src="../dark-mode-toggle.js"></script>
+<script src="../back-to-top.js"></script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'on-this-page.js';document.body.appendChild(s);})();</script>
+<script src="../keyboard-nav.js"></script>
+<script src="../copy-code.js"></script>
+<script src="../details.js"></script>
+<script src="../mermaid-renderer.js"></script>
+<script src="../tooltips.js"></script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'color-swatch.js';document.body.appendChild(s);})();</script>
+<script src="../responsive-tables.js"></script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'video-embed.js';document.body.appendChild(s);})();</script>
+<script>(function(){var s=document.createElement('script');var m=document.querySelector('meta[name="quarto:offset"]');s.src=(m?m.content:'')+'termshow.js';document.body.appendChild(s);})();</script>
+<script src="../navbar-widgets.js"></script>
+
+
+
+
+</body></html>

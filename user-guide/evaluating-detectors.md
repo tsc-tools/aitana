@@ -1,0 +1,348 @@
+# Evaluating anomaly detectors
+
+
+# Why synthetic evaluation?
+
+Genuine, labelled volcanic anomalies are rare, so `aitana.anomaly.evaluation` takes a different approach: inject *known* synthetic faults or regime shifts into otherwise normal data, then check whether a detector's anomaly score recovers the injected ground truth. This notebook walks through each tool in that module on a synthetic 3-feature dataset (think: RSAM, SO\_2, earthquake rate) and shows the kind of plot each one is meant to produce.
+
+
+Code
+
+``` python
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
+from aitana.anomaly.evaluation import (
+    inject_change_points,
+    inject_faults,
+    score_detector,
+    simulate_regime_series,
+)
+
+rng = np.random.default_rng(0)
+n = 720  # 30 days of hourly data
+index = pd.date_range("2024-01-01", periods=n, freq="h")
+
+df = pd.DataFrame(
+    {
+        "rsam": 50 + rng.normal(0, 3, n).cumsum() * 0.05 + rng.normal(0, 2, n),
+        "so2": 20 + rng.normal(0, 1, n).cumsum() * 0.02 + rng.normal(0, 1, n),
+        "eq_rate": rng.poisson(3, n).astype(float),
+    },
+    index=index,
+)
+
+FEATURE_COLORS = {"rsam": "#4C78A8", "so2": "#F58518", "eq_rate": "#54A24B"}
+df.head()
+```
+
+
+|                     | rsam      | so2       | eq_rate |
+|---------------------|-----------|-----------|---------|
+| 2024-01-01 00:00:00 | 50.900273 | 20.310864 | 3.0     |
+| 2024-01-01 01:00:00 | 50.684075 | 19.543732 | 3.0     |
+| 2024-01-01 02:00:00 | 51.043001 | 19.007313 | 4.0     |
+| 2024-01-01 03:00:00 | 49.576225 | 21.727882 | 1.0     |
+| 2024-01-01 04:00:00 | 52.407148 | 19.817685 | 2.0     |
+
+
+# [inject_faults](../reference/anomaly.evaluation.inject_faults.md#aitana.anomaly.evaluation.inject_faults): independent point faults
+
+Each column gets its own Bernoulli draw of fault timesteps, offset by a random multiple of that column's diff-std. `offset_range="hard"` produces small, easy-to-miss deviations; `"easy"` produces large, obvious ones. Use the buttons to compare.
+
+
+Code
+
+``` python
+corrupted_hard, mask_hard = inject_faults(
+    df, rate=0.04, offset_range="hard", mode="independent", rng=1
+)
+corrupted_easy, mask_easy = inject_faults(
+    df, rate=0.04, offset_range="easy", mode="independent", rng=1
+)
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))
+
+for i, col in enumerate(df.columns, start=1):
+    fig.add_trace(
+        go.Scatter(x=df.index, y=df[col], name=f"{col} (clean)",
+                    line=dict(color=FEATURE_COLORS[col], width=1),
+                    legendgroup=col, showlegend=(i == 1)),
+        row=i, col=1,
+    )
+    for label, corrupted, mask, visible in [
+        ("hard", corrupted_hard, mask_hard, True),
+        ("easy", corrupted_easy, mask_easy, False),
+    ]:
+        flagged = corrupted.loc[mask[col], col]
+        fig.add_trace(
+            go.Scatter(
+                x=flagged.index, y=flagged.values, mode="markers",
+                marker=dict(color="crimson", size=7, symbol="x"),
+                name=f"injected fault ({label})", legendgroup=f"fault-{label}",
+                showlegend=(i == 1), visible=visible,
+            ),
+            row=i, col=1,
+        )
+
+fig.update_layout(
+    height=600,
+    updatemenus=[dict(
+        type="buttons", direction="right", x=0.5, y=1.12, xanchor="center",
+        buttons=[
+            dict(label="hard", method="update",
+                 args=[{"visible": [True, True, False] * 3}]),
+            dict(label="easy", method="update",
+                 args=[{"visible": [True, False, True] * 3}]),
+        ],
+    )],
+    margin=dict(t=80),
+)
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 1: Independent fault injection at 'hard' and 'easy' difficulty.</figcaption>
+</figure>
+
+
+# [inject_faults](../reference/anomaly.evaluation.inject_faults.md#aitana.anomaly.evaluation.inject_faults): coupled faults
+
+In `mode="coupled"`, the *same* fault timestamps are injected across every column in a group -- a synthetic stand-in for a multi-sensor precursor, where several instruments should light up together. Here [rsam](../reference/volcanoes.whakaari.Seismicity.md#aitana.volcanoes.whakaari.Seismicity.rsam) and [so2](../reference/volcanoes.whakaari.Gas.md#aitana.volcanoes.whakaari.Gas.so2) are coupled while `eq_rate` is left untouched.
+
+
+Code
+
+``` python
+corrupted_coupled, mask_coupled = inject_faults(
+    df, mode="coupled", coupled_groups=[["rsam", "so2"]],
+    rate=0.03, offset_range="easy", rng=2,
+)
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))
+for i, col in enumerate(df.columns, start=1):
+    fig.add_trace(
+        go.Scatter(x=df.index, y=df[col], name=col,
+                    line=dict(color=FEATURE_COLORS[col], width=1), showlegend=False),
+        row=i, col=1,
+    )
+    flagged = corrupted_coupled.loc[mask_coupled[col], col]
+    fig.add_trace(
+        go.Scatter(x=flagged.index, y=flagged.values, mode="markers",
+                    marker=dict(color="crimson", size=7, symbol="x"),
+                    name="injected fault", showlegend=(i == 1)),
+        row=i, col=1,
+    )
+fig.update_layout(height=600, margin=dict(t=40))
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 2: Coupled fault injection: rsam and so2 fire at identical timestamps.</figcaption>
+</figure>
+
+
+# [inject_change_points](../reference/anomaly.evaluation.inject_change_points.md#aitana.anomaly.evaluation.inject_change_points): persistent regime shifts
+
+Unlike a point fault, a change point offsets the signal from its onset **onward**, mimicking a genuine regime change rather than a sensor glitch. The mask marks only the onset timestep -- the shift itself persists in the data.
+
+
+Code
+
+``` python
+corrupted_cp, change_points = inject_change_points(
+    df, columns=["rsam"], n_changes=3, offset_range="easy", mode="independent", rng=3
+)
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df.index, y=df["rsam"], name="clean",
+                          line=dict(color="lightgray", width=1)))
+fig.add_trace(go.Scatter(x=corrupted_cp.index, y=corrupted_cp["rsam"], name="with regime shift",
+                          line=dict(color=FEATURE_COLORS["rsam"], width=1.5)))
+onsets = change_points.index[change_points["rsam"]]
+fig.add_trace(go.Scatter(x=onsets, y=corrupted_cp.loc[onsets, "rsam"], mode="markers",
+                          marker=dict(color="crimson", size=10, symbol="diamond"),
+                          name="change-point onset"))
+fig.update_layout(height=350, margin=dict(t=30))
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 3: Persistent regime shift injected into rsam; markers show onsets only.</figcaption>
+</figure>
+
+
+# [simulate_regime_series](../reference/anomaly.evaluation.simulate_regime_series.md#aitana.anomaly.evaluation.simulate_regime_series): known-state synthetic data
+
+For state/change-point detectors (e.g. CLaP, ClaSP) it's useful to generate data *from* discrete regimes rather than perturb existing data, so both the regime labels and the change points are exact ground truth. Repeated labels (`"A"` appears twice below) share the same mean -- a recurring regime a state detector should recognise as the same state.
+
+
+Code
+
+``` python
+series, cp_idx, labels = simulate_regime_series(
+    ["A", "B", "A", "C"], segment_length=120, n_features=3,
+    state_noise_std={"A": 0.6, "B": 0.6, "C": 0.6}, rng=4,
+)
+series.columns = ["rsam", "so2", "eq_rate"]
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(series.columns))
+palette = {"A": "#4C78A8", "B": "#F58518", "C": "#54A24B"}
+for i, col in enumerate(series.columns, start=1):
+    for state in labels.unique():
+        seg = series[col].where(labels == state)
+        fig.add_trace(
+            go.Scatter(x=series.index, y=seg, name=f"state {state}",
+                        line=dict(color=palette[state]), legendgroup=state,
+                        showlegend=(i == 1), connectgaps=False),
+            row=i, col=1,
+        )
+    for cp in cp_idx:
+        fig.add_vline(x=cp, line=dict(color="black", dash="dot", width=1), row=i, col=1)
+fig.update_layout(height=600, margin=dict(t=40))
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 4: Synthetic 3-feature series stitched from regimes A, B, A, C.</figcaption>
+</figure>
+
+
+# [score_detector](../reference/anomaly.evaluation.score_detector.md#aitana.anomaly.evaluation.score_detector): ROC/AUC against the injected ground truth
+
+Once faults are injected, any candidate anomaly score can be checked against the mask. Here a trivial detector -- absolute deviation from each feature's mean, averaged across features and min-max scaled to `[0, 1]` -- is scored against both the `"hard"` and `"easy"` fault sets from earlier, showing how injection difficulty changes detectability.
+
+
+Code
+
+``` python
+def trivial_anomaly_index(corrupted, clean):
+    raw = (corrupted - clean).abs().mean(axis=1)
+    return (raw / raw.max()).to_numpy()
+
+results = {}
+for label, corrupted, mask in [("hard", corrupted_hard, mask_hard), ("easy", corrupted_easy, mask_easy)]:
+    scores = trivial_anomaly_index(corrupted, df)
+    results[label] = score_detector(scores, mask, threshold=0.5)
+
+fig = go.Figure()
+for label, color in [("hard", "#B279A2"), ("easy", "#54A24B")]:
+    r = results[label]
+    fig.add_trace(go.Scatter(
+        x=r["fpr"], y=r["tpr"], mode="lines",
+        name=f"{label} (AUC={r['auc']:.3f})", line=dict(color=color, width=2),
+    ))
+fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines",
+                          line=dict(color="gray", dash="dash"), name="chance", showlegend=True))
+fig.update_layout(
+    xaxis_title="False positive rate", yaxis_title="True positive rate",
+    height=450, width=550, margin=dict(t=30),
+)
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 5: ROC curves for a trivial mean-deviation detector, hard vs easy faults.</figcaption>
+</figure>
+
+
+The confusion-matrix counts at a chosen operating threshold are also part of the result. Slide through thresholds to see the TP/FP/TN/FN trade-off for the `"hard"` fault set:
+
+
+Code
+
+``` python
+scores_hard = trivial_anomaly_index(corrupted_hard, df)
+thresholds = np.linspace(0.05, 0.95, 19)
+counts = pd.DataFrame(
+    [score_detector(scores_hard, mask_hard, threshold=t) for t in thresholds]
+)[["tp", "fp", "tn", "fn"]]
+counts.index = thresholds
+
+fig = go.Figure()
+bar_colors = {"tp": "#54A24B", "fp": "#E45756", "tn": "#4C78A8", "fn": "#F58518"}
+frames = []
+for t in thresholds:
+    frames.append(go.Frame(
+        name=f"{t:.2f}",
+        data=[go.Bar(x=list(counts.columns), y=counts.loc[t].values,
+                      marker_color=[bar_colors[c] for c in counts.columns])],
+    ))
+fig.add_trace(go.Bar(x=list(counts.columns), y=counts.loc[thresholds[0]].values,
+                      marker_color=[bar_colors[c] for c in counts.columns]))
+fig.frames = frames
+fig.update_layout(
+    height=400, width=500, margin=dict(t=30),
+    yaxis=dict(range=[0, int(counts.values.max() * 1.1)]),
+    sliders=[dict(
+        steps=[dict(method="animate", label=f"{t:.2f}",
+                     args=[[f"{t:.2f}"], {"mode": "immediate", "frame": {"duration": 0}}])
+               for t in thresholds],
+        currentvalue=dict(prefix="threshold = "),
+    )],
+)
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 6: Confusion-matrix counts across thresholds for the hard fault set.</figcaption>
+</figure>
+
+
+# [normalize_score](../reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.md#aitana.anomaly.anomaly_base.AnomalyDetectionBaseClass.normalize_score): ECDF percentile ranking
+
+Raw anomaly scores from different detectors live on different scales. [normalize_score](../reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.md#aitana.anomaly.anomaly_base.AnomalyDetectionBaseClass.normalize_score) (on [AnomalyDetectionBaseClass](../reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.md#aitana.anomaly.anomaly_base.AnomalyDetectionBaseClass)) percentile-ranks a score against a reference distribution -- typically drawn from a known-quiet period -- so 1.0 means "more anomalous than every reference observation."
+
+
+Code
+
+``` python
+quiet_scores = trivial_anomaly_index(df, df.rolling(24, min_periods=1).mean())
+normalized = AnomalyDetectionBaseClass.normalize_score(scores_hard, quiet_scores)
+
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                     subplot_titles=("raw anomaly index", "ECDF-normalized"))
+fig.add_trace(go.Scatter(x=df.index, y=scores_hard, line=dict(color="#4C78A8"), showlegend=False), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=normalized, line=dict(color="#54A24B"), showlegend=False), row=2, col=1)
+fig.update_layout(height=500, margin=dict(t=40))
+fig.show()
+```
+
+
+<figure class="quarto-float quarto-float-fig figure">
+
+
+<figcaption>Figure 7: Raw hard-fault scores percentile-ranked against a quiet-period reference.</figcaption>
+</figure>
+
+
+# Summary
+
+| Tool | Purpose | Ground truth produced |
+|----|----|----|
+| [inject_faults](../reference/anomaly.evaluation.inject_faults.md#aitana.anomaly.evaluation.inject_faults) | Point-wise sensor-glitch faults, independent or coupled across streams | Boolean mask per timestep/column |
+| [inject_change_points](../reference/anomaly.evaluation.inject_change_points.md#aitana.anomaly.evaluation.inject_change_points) | Persistent regime shifts, for change-point detectors | Boolean mask at onset timesteps only |
+| [simulate_regime_series](../reference/anomaly.evaluation.simulate_regime_series.md#aitana.anomaly.evaluation.simulate_regime_series) | Fully synthetic multi-regime series | Change-point indices + per-timestep state labels |
+| [score_detector](../reference/anomaly.evaluation.score_detector.md#aitana.anomaly.evaluation.score_detector) | ROC/AUC and confusion matrix vs. a fault/change-point mask | -- |
+| [normalize_score](../reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.md#aitana.anomaly.anomaly_base.AnomalyDetectionBaseClass.normalize_score) | ECDF percentile rank against a reference distribution | -- |

@@ -1,0 +1,154 @@
+# aitana
+
+> Validation and benchmarking framework for AI/ML in volcano monitoring.
+
+## Docs
+
+### API Reference
+
+#### aitana.access
+> Pure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).
+
+- [access.tilde.tilde_request](https://tsc-tools.github.io/aitana/reference/access.tilde.tilde_request.html)
+- [access.wfs.wfs_request](https://tsc-tools.github.io/aitana/reference/access.wfs.wfs_request.html)
+- [access.seismic.SeismicData](https://tsc-tools.github.io/aitana/reference/access.seismic.SeismicData.html)
+- [access.seismic.WaveformBaseclass](https://tsc-tools.github.io/aitana/reference/access.seismic.WaveformBaseclass.html)
+- [access.seismic.SDSWaveforms](https://tsc-tools.github.io/aitana/reference/access.seismic.SDSWaveforms.html)
+- [access.seismic.FDSNWaveforms](https://tsc-tools.github.io/aitana/reference/access.seismic.FDSNWaveforms.html)
+- [access.seismic.S3Waveforms](https://tsc-tools.github.io/aitana/reference/access.seismic.S3Waveforms.html)
+- [access.seismic.MockSDSWaveforms](https://tsc-tools.github.io/aitana/reference/access.seismic.MockSDSWaveforms.html)
+- [access.seismic.PostProcess](https://tsc-tools.github.io/aitana/reference/access.seismic.PostProcess.html)
+- [access.seismic.PostProcessException](https://tsc-tools.github.io/aitana/reference/access.seismic.PostProcessException.html)
+- [access.seismic.get_instrument_response](https://tsc-tools.github.io/aitana/reference/access.seismic.get_instrument_response.html)
+- [access.api.AitanaAPI](https://tsc-tools.github.io/aitana/reference/access.api.AitanaAPI.html)
+- [access.util.get_defaults_with_names](https://tsc-tools.github.io/aitana/reference/access.util.get_defaults_with_names.html)
+- [access.util.generate_cache_key](https://tsc-tools.github.io/aitana/reference/access.util.generate_cache_key.html)
+- [access.util.cache_dataframe](https://tsc-tools.github.io/aitana/reference/access.util.cache_dataframe.html)
+- [access.util.gradient](https://tsc-tools.github.io/aitana/reference/access.util.gradient.html)
+- [access.util.eqRate](https://tsc-tools.github.io/aitana/reference/access.util.eqRate.html)
+- [access.util.reindex](https://tsc-tools.github.io/aitana/reference/access.util.reindex.html)
+- [access.util.hex_to_rgb](https://tsc-tools.github.io/aitana/reference/access.util.hex_to_rgb.html)
+- [access.util.rgb_to_hex](https://tsc-tools.github.io/aitana/reference/access.util.rgb_to_hex.html)
+- [access.util.get_color](https://tsc-tools.github.io/aitana/reference/access.util.get_color.html)
+- [access.logging_config.setup_logging](https://tsc-tools.github.io/aitana/reference/access.logging_config.setup_logging.html)
+- [access.logging_config.get_logger](https://tsc-tools.github.io/aitana/reference/access.logging_config.get_logger.html)
+
+#### aitana.volcanoes
+> Per-volcano domain aggregates for Ruapehu, Whakaari, and Taupo.
+
+- [volcanoes.whakaari.Gas](https://tsc-tools.github.io/aitana/reference/volcanoes.whakaari.Gas.html)
+- [volcanoes.whakaari.Seismicity](https://tsc-tools.github.io/aitana/reference/volcanoes.whakaari.Seismicity.html)
+- [volcanoes.whakaari.eruptions](https://tsc-tools.github.io/aitana/reference/volcanoes.whakaari.eruptions.html)
+- [volcanoes.whakaari.load_all](https://tsc-tools.github.io/aitana/reference/volcanoes.whakaari.load_all.html)
+- [volcanoes.ruapehu.CraterLake](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.CraterLake.html)
+- [volcanoes.ruapehu.Gas](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.Gas.html)
+- [volcanoes.ruapehu.Seismicity](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.Seismicity.html)
+- [volcanoes.ruapehu.eruptions](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.eruptions.html)
+- [volcanoes.ruapehu.load_all](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.load_all.html)
+- [volcanoes.ruapehu.lake_height_scaling](https://tsc-tools.github.io/aitana/reference/volcanoes.ruapehu.lake_height_scaling.html)
+- [volcanoes.assimilate.SemiLinearTrend](https://tsc-tools.github.io/aitana/reference/volcanoes.assimilate.SemiLinearTrend.html)
+- [volcanoes.assimilate.LocalLinearTrend](https://tsc-tools.github.io/aitana/reference/volcanoes.assimilate.LocalLinearTrend.html)
+- [volcanoes.assimilate.SO2FusionModel](https://tsc-tools.github.io/aitana/reference/volcanoes.assimilate.SO2FusionModel.html)
+- [volcanoes.get_data](https://tsc-tools.github.io/aitana/reference/volcanoes.get_data.html)
+
+#### aitana.features
+> Algorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM).
+
+- [features.feature_base.FeatureBaseClass](https://tsc-tools.github.io/aitana/reference/features.feature_base.FeatureBaseClass.html)
+- [features.rsam.RSAM](https://tsc-tools.github.io/aitana/reference/features.rsam.RSAM.html)
+- [features.rsam.rsam_wideband_energy_ratio](https://tsc-tools.github.io/aitana/reference/features.rsam.rsam_wideband_energy_ratio.html)
+- [features.dsar.DSAR](https://tsc-tools.github.io/aitana/reference/features.dsar.DSAR.html)
+- [features.ssam.SSAM](https://tsc-tools.github.io/aitana/reference/features.ssam.SSAM.html)
+- [features.spectral_features.SpectralFeatures](https://tsc-tools.github.io/aitana/reference/features.spectral_features.SpectralFeatures.html)
+- [features.cpxtrace.Inst_Band](https://tsc-tools.github.io/aitana/reference/features.cpxtrace.Inst_Band.html)
+- [features.cpxtrace.Inst_Freq](https://tsc-tools.github.io/aitana/reference/features.cpxtrace.Inst_Freq.html)
+- [features.cpxtrace.Norm_Env](https://tsc-tools.github.io/aitana/reference/features.cpxtrace.Norm_Env.html)
+- [features.cpxtrace.Centroid](https://tsc-tools.github.io/aitana/reference/features.cpxtrace.Centroid.html)
+- [features.cpxtrace.WindowCentroid](https://tsc-tools.github.io/aitana/reference/features.cpxtrace.WindowCentroid.html)
+- [features.util.stride_windows](https://tsc-tools.github.io/aitana/reference/features.util.stride_windows.html)
+- [features.util.demean](https://tsc-tools.github.io/aitana/reference/features.util.demean.html)
+- [features.util.apply_hanning](https://tsc-tools.github.io/aitana/reference/features.util.apply_hanning.html)
+- [features.util.window_array](https://tsc-tools.github.io/aitana/reference/features.util.window_array.html)
+- [features.util.trace_window_times](https://tsc-tools.github.io/aitana/reference/features.util.trace_window_times.html)
+- [features.util.trace_window_data](https://tsc-tools.github.io/aitana/reference/features.util.trace_window_data.html)
+- [features.util.apply_freq_filter](https://tsc-tools.github.io/aitana/reference/features.util.apply_freq_filter.html)
+- [features.util.round_time](https://tsc-tools.github.io/aitana/reference/features.util.round_time.html)
+- [features.util.stack_feature](https://tsc-tools.github.io/aitana/reference/features.util.stack_feature.html)
+- [features.visualise.spectrogram_preprocessing](https://tsc-tools.github.io/aitana/reference/features.visualise.spectrogram_preprocessing.html)
+- [features.visualise.plot_ssam_mpl](https://tsc-tools.github.io/aitana/reference/features.visualise.plot_ssam_mpl.html)
+- [features.visualise.multi_feature_plot_mpl](https://tsc-tools.github.io/aitana/reference/features.visualise.multi_feature_plot_mpl.html)
+- [features.visualise.plot_ssam_plotly](https://tsc-tools.github.io/aitana/reference/features.visualise.plot_ssam_plotly.html)
+- [features.visualise.get_trace](https://tsc-tools.github.io/aitana/reference/features.visualise.get_trace.html)
+- [features.visualise.multi_feature_plot](https://tsc-tools.github.io/aitana/reference/features.visualise.multi_feature_plot.html)
+- [features.get_data](https://tsc-tools.github.io/aitana/reference/features.get_data.html)
+
+#### aitana.anomaly
+> Anomaly detection in time-series data.
+
+- [anomaly.anomaly_base.AnomalyDetectionBaseClass](https://tsc-tools.github.io/aitana/reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html)
+- [anomaly.anomaly_base.min_max_scale_netcdf](https://tsc-tools.github.io/aitana/reference/anomaly.anomaly_base.min_max_scale_netcdf.html)
+- [anomaly.pca.PCA](https://tsc-tools.github.io/aitana/reference/anomaly.pca.PCA.html)
+- [anomaly.pca.runPca](https://tsc-tools.github.io/aitana/reference/anomaly.pca.runPca.html)
+- [anomaly.pca.runPcaCore](https://tsc-tools.github.io/aitana/reference/anomaly.pca.runPcaCore.html)
+- [anomaly.pca.ModelException](https://tsc-tools.github.io/aitana/reference/anomaly.pca.ModelException.html)
+- [anomaly.matrix_profile.MatrixProfile](https://tsc-tools.github.io/aitana/reference/anomaly.matrix_profile.MatrixProfile.html)
+- [anomaly.snet.SNet](https://tsc-tools.github.io/aitana/reference/anomaly.snet.SNet.html)
+- [anomaly.autoencoder.AutoEncoder](https://tsc-tools.github.io/aitana/reference/anomaly.autoencoder.AutoEncoder.html)
+- [anomaly.autoencoder.TiedAutoEncoder](https://tsc-tools.github.io/aitana/reference/anomaly.autoencoder.TiedAutoEncoder.html)
+- [anomaly.autoencoder.FuzzyCluster](https://tsc-tools.github.io/aitana/reference/anomaly.autoencoder.FuzzyCluster.html)
+- [anomaly.dataset.ZizouDataset](https://tsc-tools.github.io/aitana/reference/anomaly.dataset.ZizouDataset.html)
+- [anomaly.dataset.SliceBatchSampler](https://tsc-tools.github.io/aitana/reference/anomaly.dataset.SliceBatchSampler.html)
+- [anomaly.evaluation.inject_faults](https://tsc-tools.github.io/aitana/reference/anomaly.evaluation.inject_faults.html)
+- [anomaly.evaluation.inject_change_points](https://tsc-tools.github.io/aitana/reference/anomaly.evaluation.inject_change_points.html)
+- [anomaly.evaluation.simulate_regime_series](https://tsc-tools.github.io/aitana/reference/anomaly.evaluation.simulate_regime_series.html)
+- [anomaly.evaluation.quiet_series](https://tsc-tools.github.io/aitana/reference/anomaly.evaluation.quiet_series.html)
+- [anomaly.evaluation.score_detector](https://tsc-tools.github.io/aitana/reference/anomaly.evaluation.score_detector.html)
+
+#### aitana.storage
+> Store time series data as HDF5 (netCDF) or Zarr files and access them through an API.
+
+- [storage.storage.Storage](https://tsc-tools.github.io/aitana/reference/storage.storage.Storage.html)
+- [storage.storage.Path](https://tsc-tools.github.io/aitana/reference/storage.storage.Path.html)
+- [storage.storage.AitanaDataset](https://tsc-tools.github.io/aitana/reference/storage.storage.AitanaDataset.html)
+- [storage.ingest.IngestWorker](https://tsc-tools.github.io/aitana/reference/storage.ingest.IngestWorker.html)
+- [storage.ingest.enqueue_dataset](https://tsc-tools.github.io/aitana/reference/storage.ingest.enqueue_dataset.html)
+- [storage.api.StorageAPI](https://tsc-tools.github.io/aitana/reference/storage.api.StorageAPI.html)
+- [storage.api.parse_path](https://tsc-tools.github.io/aitana/reference/storage.api.parse_path.html)
+- [storage.xarray2netcdf.xarray2netcdf](https://tsc-tools.github.io/aitana/reference/storage.xarray2netcdf.xarray2netcdf.html)
+- [storage.xarray2zarr.xarray2zarr](https://tsc-tools.github.io/aitana/reference/storage.xarray2zarr.xarray2zarr.html)
+- [storage.xarray2zarr.PathNotFoundError](https://tsc-tools.github.io/aitana/reference/storage.xarray2zarr.PathNotFoundError.html)
+- [storage.grafana_annotations.sync_labels](https://tsc-tools.github.io/aitana/reference/storage.grafana_annotations.sync_labels.html)
+- [storage.grafana_annotations.is_label](https://tsc-tools.github.io/aitana/reference/storage.grafana_annotations.is_label.html)
+- [storage.utils.generate_test_data](https://tsc-tools.github.io/aitana/reference/storage.utils.generate_test_data.html)
+- [storage.utils.round_datetime](https://tsc-tools.github.io/aitana/reference/storage.utils.round_datetime.html)
+- [storage.utils.floor_datetime](https://tsc-tools.github.io/aitana/reference/storage.utils.floor_datetime.html)
+- [storage.utils.get_dt](https://tsc-tools.github.io/aitana/reference/storage.utils.get_dt.html)
+- [storage.utils.fill_time_gaps](https://tsc-tools.github.io/aitana/reference/storage.utils.fill_time_gaps.html)
+- [storage.utils.merge_arrays](https://tsc-tools.github.io/aitana/reference/storage.utils.merge_arrays.html)
+- [storage.get_data](https://tsc-tools.github.io/aitana/reference/storage.get_data.html)
+
+#### aitana.pipelines
+> Reproducible workflows that run and evaluate aitana components for volcano monitoring.
+
+- [pipelines.cli.WorkflowDescriptor](https://tsc-tools.github.io/aitana/reference/pipelines.cli.WorkflowDescriptor.html)
+- [pipelines.cli.PipelineBackend](https://tsc-tools.github.io/aitana/reference/pipelines.cli.PipelineBackend.html)
+- [pipelines.cli.SnakemakeBackend](https://tsc-tools.github.io/aitana/reference/pipelines.cli.SnakemakeBackend.html)
+- [pipelines.cli.PipelineError](https://tsc-tools.github.io/aitana/reference/pipelines.cli.PipelineError.html)
+- [pipelines.cli.discover_workflows](https://tsc-tools.github.io/aitana/reference/pipelines.cli.discover_workflows.html)
+- [pipelines.cli.run](https://tsc-tools.github.io/aitana/reference/pipelines.cli.run.html)
+- [pipelines.cli.clean](https://tsc-tools.github.io/aitana/reference/pipelines.cli.clean.html)
+- [pipelines.cli.list_workflows](https://tsc-tools.github.io/aitana/reference/pipelines.cli.list_workflows.html)
+- [pipelines.scoring.get_evaluation_windows](https://tsc-tools.github.io/aitana/reference/pipelines.scoring.get_evaluation_windows.html)
+- [pipelines.scoring.compute_rates](https://tsc-tools.github.io/aitana/reference/pipelines.scoring.compute_rates.html)
+- [pipelines.scoring.evaluate_threshold](https://tsc-tools.github.io/aitana/reference/pipelines.scoring.evaluate_threshold.html)
+- [pipelines.scoring.get_roc_curve](https://tsc-tools.github.io/aitana/reference/pipelines.scoring.get_roc_curve.html)
+- [pipelines.scoring.make_strictly_increasing](https://tsc-tools.github.io/aitana/reference/pipelines.scoring.make_strictly_increasing.html)
+- [pipelines.visualise.set_style](https://tsc-tools.github.io/aitana/reference/pipelines.visualise.set_style.html)
+- [pipelines.visualise.trellis_plot](https://tsc-tools.github.io/aitana/reference/pipelines.visualise.trellis_plot.html)
+- [pipelines.visualise.scoring_plot](https://tsc-tools.github.io/aitana/reference/pipelines.visualise.scoring_plot.html)
+- [pipelines.get_data](https://tsc-tools.github.io/aitana/reference/pipelines.get_data.html)
+
+#### aitana.testing
+> Synthetic seismic waveforms with known spectral content for testing aitana packages.
+
+- [testing.synthetic.synthetic_trace](https://tsc-tools.github.io/aitana/reference/testing.synthetic.synthetic_trace.html)

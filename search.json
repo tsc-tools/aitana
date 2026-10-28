@@ -1,0 +1,2235 @@
+[
+  {
+    "objectID": "user-guide/running-workflows.html",
+    "href": "user-guide/running-workflows.html",
+    "title": "Running workflows",
+    "section": "",
+    "text": "The aitana-pipelines command drives Snakemake workflows bundled with Aitana or registered by third-party packages via the aitana.pipelines.workflows entry-point group.\n\nCommands\n\n\n\n\n\n\n\nCommand\nDescription\n\n\n\n\naitana-pipelines list\nList all registered workflows (name, volcano, description).\n\n\naitana-pipelines run &lt;volcano&gt; &lt;outdir&gt;\nRun the workflow registered for a volcano.\n\n\naitana-pipelines clean &lt;volcano&gt; &lt;outdir&gt;\nDelete all outputs produced by the workflow.\n\n\n\nWhere a volcano has several workflows, choose one with --workflow &lt;name&gt;; each needs its own &lt;outdir&gt;, since a run copies the workflow’s Snakefile and config.yaml into it.\naitana-pipelines run accepts --cores N (default 1) to control Snakemake parallelism. With --cron \"&lt;crontab expression&gt;\" it keeps running and repeats on that schedule (UTC), skipping a run that is due while the previous one is still going. Any further arguments are passed to Snakemake, e.g. --config end=2022-03-20T00:00 or -n for a dry run.\n\n\nExamples\n# See what workflows are available\naitana-pipelines list\n\n# Run the Whakaari Bayesian-network benchmark, writing results to ./results\naitana-pipelines run whakaari ./results\n\n# Run with 4 parallel cores\naitana-pipelines run whakaari ./results --cores 4\n\n# Remove all outputs\naitana-pipelines clean whakaari ./results\n\n\nBundled workflows\n\n\n\n\n\n\n\n\nName\nVolcano\nDescription\n\n\n\n\negu2026\nwhakaari\nBayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026)\n\n\nruapehu_mp\nruapehu\nMatrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana\n\n\nruapehu_snet\nruapehu\nScattering-network coefficients of three-component Ruapehu seismic data, stored for detectors\n\n\n\n\n\nThe Ruapehu RSAM alert, end to end\nruapehu_mp fetches NZ.FWVZ.10.HHZ waveforms (GeoNet’s S3 archive, falling back to the near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day, scores the last 24 h against the preceding 28 days with MatrixProfile, and stores RSAM (rsam), the anomaly index (rsam_mp_index), the raw left matrix profile it is the percentile of (rsam_mp_profile: each 6-h window’s z-normalized distance to its nearest earlier window, 0 to 12), its alarm series (rsam_mp_alarm: 1 where the index reaches threshold, 0 below, NaN where there is no index) and the threshold in force when each sample was scored (rsam_mp_threshold, so retunes stay traceable and Grafana can draw it on the index panel) in aitana-storage under &lt;outdir&gt;/storage. Each run also writes results/&lt;end&gt;/index.csv with RSAM, index, matrix profile and alarm. Completed days are reused across runs. Its rules run in the active environment, so run it from the uv workspace (uv sync). With --config start=2022-01-01, the first run also builds the archive: it scores every complete UTC day since start exactly as a run ending at the next midnight would, and writes results/archive_&lt;start&gt;.csv instead. Later runs find that file and only score the last 24 h; delete it to rebuild the archive, e.g. after a retune or an outage of more than a day.\n# Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)\naitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 4 --config end=2022-03-20T00:00\n\n# Archive since 2022-01-01 (streams ~14 GB of waveforms; keeps ~10 MB of RSAM)\naitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 8 --config start=2022-01-01\n\n# Keep scoring every 10 min and serve the stored series for Grafana\naitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cron \"2-59/10 * * * *\" &\naitana-api --rootdir ~/rsam_mp/storage --port 8003\nGrafana reads the series from aitana-api with the Infinity data source (CSV, Backend parser, which alerting requires), e.g. /feature?path=ruapehu,FWVZ,10,HHZ&name=rsam_mp_alarm&starttime=${__from:date:iso}&endtime=${__to:date:iso}. An alert rule on the maximum of rsam_mp_alarm posts to Slack, and a No Data rule on rsam_mp_index catches a stalled pipeline (or a station data gap).\nOn the default branch, .gitlab-ci.yml deploys these two commands as the aitana-ruapehu-mp and aitana-ruapehu-api containers, plus aitana-label-sync, which syncs the labels drawn in Grafana with labels.json every 10 minutes (see aitana-storage). All three share the data directory DATA_VOLUME.\nThe z-normalized matrix profile responds to changes in RSAM shape, not level; an amplitude threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet months and on about 20 % of days during the March–May 2022 unrest. It did not flag the abrupt 2022-03-13 onset itself (a step looks like any other step once z-normalized); the first alarm after it was 2022-03-19 17:30 UTC, on an unusually steady stretch of tremor.\n\n\nScattering coefficients of Ruapehu\nruapehu_snet fetches NZ.FWVZ.10.HH? (Z, N, E) the same way, resamples it to 25 Hz with an anti-alias filter and computes first- and second-order scattering coefficients with SNet (20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC day under snet/ and stores snet_order1 (datetime, channel, frequency) and snet_order2 (datetime, channel, frequency, order2 frequency) under ruapehu/FWVZ/10/HH in &lt;outdir&gt;/storage; channel 0 is Z. Each run plots the vertical first-order coefficients to results/&lt;end&gt;/order1.png. A run covers the last 24 h, or every day since start. A day takes about 2.5 CPU-minutes and ~27 MB of waveforms. No detector consumes the coefficients yet.\n# Replay the 2022-03-13 onset\naitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 4 --config end=2022-03-14T05:30\n\n# Backfill since 2022-01-01\naitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 8 --config start=2022-01-01\n\n\nRunning the EGU 2026 workflow with Docker\nscripts/run_egu2026.sh is a convenience wrapper that builds the project’s Docker image, installs Aitana from source inside the container, and runs the bundled egu2026 workflow — no local Python environment needed.\nPrerequisites: Docker must be installed and running.\n# Run with defaults (output → ./egu_2026_output, all available cores)\n./scripts/run_egu2026.sh\n\n# Custom output directory and core count\n./scripts/run_egu2026.sh -o /data/results -c 8\n\n# Show help\n./scripts/run_egu2026.sh -h\n\n\n\nOption\nDefault\nDescription\n\n\n\n\n-o OUTDIR\n./egu_2026_output\nDirectory for workflow outputs\n\n\n-c CORES\nall logical CPUs\nSnakemake parallelism\n\n\n\nThe Docker image (aitana-workflow) is built from docker/Dockerfile on first run and cached by Docker. Conda environments for individual workflow rules are cached in a named Docker volume (aitana-conda-envs) and reused across runs, so subsequent invocations are significantly faster.\nThe poster-generation step uses Apptainer inside Docker (to run an Inkscape container), which requires elevated capabilities (SYS_ADMIN, /dev/fuse). These are passed automatically by the script.\n\n\nRegistering your own workflow\nAny Python package can register a workflow by exposing a WorkflowDescriptor instance under the aitana.pipelines.workflows entry-point group:\n# pyproject.toml\n[project.entry-points.\"aitana.pipelines.workflows\"]\nmy_workflow = \"my_package.workflows:my_workflow\"\n# my_package/workflows.py\nfrom pathlib import Path\nfrom aitana.pipelines.cli import WorkflowDescriptor\n\nmy_workflow = WorkflowDescriptor(\n    name=\"my_workflow\",\n    volcano=\"ruapehu\",\n    description=\"My custom eruption forecast model\",\n    workflowdir=Path(__file__).parent / \"snakemake\",\n    outputs={\n        \"forecast\": \"results/forecasts.nc\",\n    },\n)\nThe workflow directory must contain a Snakefile. Aitana copies it into outdir before execution, so the original is never modified.",
+    "crumbs": [
+      "User Guide",
+      "Running workflows"
+    ]
+  },
+  {
+    "objectID": "skills.html",
+    "href": "skills.html",
+    "title": "Skills",
+    "section": "",
+    "text": "A skill is a package of structured files that teaches an AI coding agent how to work with a specific tool or framework. The skill below was generated by Great Docs from this project’s documentation. Install it in your agent and it will be able to run commands, edit configuration, write content, and troubleshoot problems without step-by-step guidance from you.\n\n  \n    ▶    Install this skill\n  \n  \n    \n      \nAny agent — install with npx:\nnpx skills add https://tsc-tools.github.io/aitana/\nCodex / OpenCode\nTell the agent:Fetch the skill file at https://tsc-tools.github.io/aitana/skill.md and follow the instructions.\nManual — download the skill file:\ncurl -O https://tsc-tools.github.io/aitana/skill.md\nOr browse the SKILL.md file.\n      \n    \n  \n\n\nSKILL.md\n---\nname: aitana\ndescription: &gt;\n  Validation and benchmarking framework for AI/ML in volcano monitoring. Use when writing Python code that uses the aitana package.\n---\n\n# Aitana\n\nValidation and benchmarking framework for AI/ML in volcano monitoring.\n\n## Installation\n\n```bash\npip install aitana\n```\n\n## API overview\n\n### aitana.access\n\nPure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).\n\n- `access.tilde.tilde_request`\n- `access.wfs.wfs_request`\n- `access.seismic.SeismicData`\n- `access.seismic.WaveformBaseclass`\n- `access.seismic.SDSWaveforms`\n- `access.seismic.FDSNWaveforms`\n- `access.seismic.S3Waveforms`\n- `access.seismic.MockSDSWaveforms`\n- `access.seismic.PostProcess`\n- `access.seismic.PostProcessException`\n- `access.seismic.get_instrument_response`\n- `access.api.AitanaAPI`\n- `access.util.get_defaults_with_names`\n- `access.util.generate_cache_key`\n- `access.util.cache_dataframe`\n- `access.util.gradient`\n- `access.util.eqRate`\n- `access.util.reindex`\n- `access.util.hex_to_rgb`\n- `access.util.rgb_to_hex`\n- `access.util.get_color`\n- `access.logging_config.setup_logging`\n- `access.logging_config.get_logger`\n\n### aitana.volcanoes\n\nPer-volcano domain aggregates for Ruapehu, Whakaari, and Taupo.\n\n- `volcanoes.whakaari.Gas`\n- `volcanoes.whakaari.Seismicity`\n- `volcanoes.whakaari.eruptions`\n- `volcanoes.whakaari.load_all`\n- `volcanoes.ruapehu.CraterLake`\n- `volcanoes.ruapehu.Gas`\n- `volcanoes.ruapehu.Seismicity`\n- `volcanoes.ruapehu.eruptions`\n- `volcanoes.ruapehu.load_all`\n- `volcanoes.ruapehu.lake_height_scaling`\n- `volcanoes.assimilate.SemiLinearTrend`\n- `volcanoes.assimilate.LocalLinearTrend`\n- `volcanoes.assimilate.SO2FusionModel`\n- `volcanoes.get_data`\n\n### aitana.features\n\nAlgorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM).\n\n- `features.feature_base.FeatureBaseClass`\n- `features.rsam.RSAM`\n- `features.rsam.rsam_wideband_energy_ratio`\n- `features.dsar.DSAR`\n- `features.ssam.SSAM`\n- `features.spectral_features.SpectralFeatures`\n- `features.cpxtrace.Inst_Band`\n- `features.cpxtrace.Inst_Freq`\n- `features.cpxtrace.Norm_Env`\n- `features.cpxtrace.Centroid`\n- `features.cpxtrace.WindowCentroid`\n- `features.util.stride_windows`\n- `features.util.demean`\n- `features.util.apply_hanning`\n- `features.util.window_array`\n- `features.util.trace_window_times`\n- `features.util.trace_window_data`\n- `features.util.apply_freq_filter`\n- `features.util.round_time`\n- `features.util.stack_feature`\n- `features.visualise.spectrogram_preprocessing`\n- `features.visualise.plot_ssam_mpl`\n- `features.visualise.multi_feature_plot_mpl`\n- `features.visualise.plot_ssam_plotly`\n- `features.visualise.get_trace`\n- `features.visualise.multi_feature_plot`\n- `features.get_data`\n\n### aitana.anomaly\n\nAnomaly detection in time-series data.\n\n- `anomaly.anomaly_base.AnomalyDetectionBaseClass`\n- `anomaly.anomaly_base.min_max_scale_netcdf`\n- `anomaly.pca.PCA`\n- `anomaly.pca.runPca`\n- `anomaly.pca.runPcaCore`\n- `anomaly.pca.ModelException`\n- `anomaly.matrix_profile.MatrixProfile`\n- `anomaly.snet.SNet`\n- `anomaly.autoencoder.AutoEncoder`\n- `anomaly.autoencoder.TiedAutoEncoder`\n- `anomaly.autoencoder.FuzzyCluster`\n- `anomaly.dataset.ZizouDataset`\n- `anomaly.dataset.SliceBatchSampler`\n- `anomaly.evaluation.inject_faults`\n- `anomaly.evaluation.inject_change_points`\n- `anomaly.evaluation.simulate_regime_series`\n- `anomaly.evaluation.quiet_series`\n- `anomaly.evaluation.score_detector`\n\n### aitana.storage\n\nStore time series data as HDF5 (netCDF) or Zarr files and access them through an API.\n\n- `storage.storage.Storage`\n- `storage.storage.Path`\n- `storage.storage.AitanaDataset`\n- `storage.ingest.IngestWorker`\n- `storage.ingest.enqueue_dataset`\n- `storage.api.StorageAPI`\n- `storage.api.parse_path`\n- `storage.xarray2netcdf.xarray2netcdf`\n- `storage.xarray2zarr.xarray2zarr`\n- `storage.xarray2zarr.PathNotFoundError`\n- `storage.grafana_annotations.sync_labels`\n- `storage.grafana_annotations.is_label`\n- `storage.utils.generate_test_data`\n- `storage.utils.round_datetime`\n- `storage.utils.floor_datetime`\n- `storage.utils.get_dt`\n- `storage.utils.fill_time_gaps`\n- `storage.utils.merge_arrays`\n- `storage.get_data`\n\n### aitana.pipelines\n\nReproducible workflows that run and evaluate aitana components for volcano monitoring.\n\n- `pipelines.cli.WorkflowDescriptor`\n- `pipelines.cli.PipelineBackend`\n- `pipelines.cli.SnakemakeBackend`\n- `pipelines.cli.PipelineError`\n- `pipelines.cli.discover_workflows`\n- `pipelines.cli.run`\n- `pipelines.cli.clean`\n- `pipelines.cli.list_workflows`\n- `pipelines.scoring.get_evaluation_windows`\n- `pipelines.scoring.compute_rates`\n- `pipelines.scoring.evaluate_threshold`\n- `pipelines.scoring.get_roc_curve`\n- `pipelines.scoring.make_strictly_increasing`\n- `pipelines.visualise.set_style`\n- `pipelines.visualise.trellis_plot`\n- `pipelines.visualise.scoring_plot`\n- `pipelines.get_data`\n\n### aitana.testing\n\nSynthetic seismic waveforms with known spectral content for testing aitana packages.\n\n- `testing.synthetic.synthetic_trace`\n\n## Resources\n\n- [Full documentation](https://tsc-tools.github.io/aitana/)\n- [llms.txt](llms.txt) — Indexed API reference for LLMs\n- [llms-full.txt](llms-full.txt) — Comprehensive documentation for LLMs"
+  },
+  {
+    "objectID": "reference/volcanoes.whakaari.eruptions.html",
+    "href": "reference/volcanoes.whakaari.eruptions.html",
+    "title": "volcanoes.whakaari.eruptions()",
+    "section": "",
+    "text": "This function loads the eruption catalogue for White Island and\n\n\nUsage\nSource\n\n\nvolcanoes.whakaari.eruptions(min_size=0, dec_interval=None)\n\n\ndeclusters it.\n:param eruption_scale: The minimum eruption scale (between 0 and 4) to use. This is currently ignored as the White Island catalogue does not contain eruption scale. :type eruption_scale: int :param dec_interval: The declustering interval, which is the minimum distance in time between any two eruptions. :type dec_interval: :class:pandas.DateOffset or str :param datadir: Path that contains the catalogue file in csv format. :type datadir: str :returns: Declustered eruption catalogue :rtype: :class:pandas.DataFrame",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.whakaari.eruptions"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.whakaari.Gas.html#so2",
+    "href": "reference/volcanoes.whakaari.Gas.html#so2",
+    "title": "volcanoes.whakaari.Gas",
+    "section": "so2()",
+    "text": "so2()\n\nRetrieve SO2 gas flux for Whakaari. If fuse is True, the returned values\n\n\nUsage\nSource\n\n\nso2(fuse=False, smooth=True)\n\n\nwill be a fusion of airborne and scandoas SO2 gas flux measurements. Otherwise, the returned values will be the airborne SO2 gas flux measurements from cospec if available and contouring otherwise.\n\n\nParameters\n\n\nfuse: bool = False\n\nIf True, the returned values will be a fusion of airborne and scandoas SO2 gas flux measurements using a Kalman filter.\n\nsmooth: bool = True\n\nIf True, the returned values will be smoothed using a Kalman smoother.\n\n\n\n\n\nReturns\n\n\n pd.DataFrame\n\nDataframe with SO2 gas flux values.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.whakaari.Gas"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.lake_height_scaling.html",
+    "href": "reference/volcanoes.ruapehu.lake_height_scaling.html",
+    "title": "volcanoes.ruapehu.lake_height_scaling()",
+    "section": "",
+    "text": "Calculate the scaling factor between the lake height sensors 08 and 03.\n\n\nUsage\nSource\n\n\nvolcanoes.ruapehu.lake_height_scaling(recompute=False)\n\n\nParameters:\nrecompute : bool\n    If True, recompute the scaling factor. If False, load the\n    scaling factor from the cache.\n\n\nReturns:\ntuple\n    A tuple containing the intercept and slope of the linear regression\n    between the two sensors.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.lake_height_scaling"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.Seismicity.html#cone",
+    "href": "reference/volcanoes.ruapehu.Seismicity.html#cone",
+    "title": "volcanoes.ruapehu.Seismicity",
+    "section": "cone()",
+    "text": "cone()\n\nLoad an earthquake catalogue for an area of 7 km around the summit.\n\n\nUsage\nSource\n\n\ncone()",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.Seismicity"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.Seismicity.html#daily_rsam",
+    "href": "reference/volcanoes.ruapehu.Seismicity.html#daily_rsam",
+    "title": "volcanoes.ruapehu.Seismicity",
+    "section": "daily_rsam()",
+    "text": "daily_rsam()\n\nLoad RSAM values from DRZ, MAVZ and FWVZ combined by scaling\n\n\nUsage\nSource\n\n\ndaily_rsam(update=False)\n\n\nMAVZ and FWVZ RSAM values with DRZ.\n\n\nReturns:\n:param df: Dataframe with RSAM values.\n:type df: :class:`pandas.DataFrame`",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.Seismicity"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.Seismicity.html#regional",
+    "href": "reference/volcanoes.ruapehu.Seismicity.html#regional",
+    "title": "volcanoes.ruapehu.Seismicity",
+    "section": "regional()",
+    "text": "regional()\n\nLoad an earthquake catalogue for an area containing Waiouru and National Park.\n\n\nUsage\nSource\n\n\nregional()",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.Seismicity"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.Seismicity.html#rm_duplicates",
+    "href": "reference/volcanoes.ruapehu.Seismicity.html#rm_duplicates",
+    "title": "volcanoes.ruapehu.Seismicity",
+    "section": "rm_duplicates()",
+    "text": "rm_duplicates()\n\nRemove events from catalogue cat1 that are also in cat2 and return a new catalogue.\n\n\nUsage\nSource\n\n\nrm_duplicates(cat1, cat2)\n\n\nParameters:\ncat1 : pandas.DataFrame\n    The first catalogue.\ncat2 : pandas.DataFrame\n    The second catalogue.\n\n\nReturns:\npandas.DataFrame\n    A new catalogue with the events from cat1 that are not in cat2.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.Seismicity"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.CraterLake.html#temperature",
+    "href": "reference/volcanoes.ruapehu.CraterLake.html#temperature",
+    "title": "volcanoes.ruapehu.CraterLake",
+    "section": "temperature()",
+    "text": "temperature()\n\nRead crater lake temperature from Tilde (https://tilde.geonet.org.nz).\n\n\nUsage\nSource\n\n\ntemperature(resample=\"D\", interpolate=None, exclude1995=True, dropna=True)\n\n\nParameters:\n:param resample: Average over resampling interval and\n                linearly interpolate in between. The\n                interval should be one of 'D', 'W',\n                or 'M'\n:type resample: str\n:param interpolate: Interpolate between resampled points.\n                    Only takes effect if resample is not\n                    None.\n:type interpolate: str\n\n\nReturns:\n:param df: A dataframe with the temperature time series.\n:type df: :class:`pandas.Dataframe`",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.CraterLake"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.CraterLake.html#water_analyte",
+    "href": "reference/volcanoes.ruapehu.CraterLake.html#water_analyte",
+    "title": "volcanoes.ruapehu.CraterLake",
+    "section": "water_analyte()",
+    "text": "water_analyte()\n\nDownload water analyte data from Tilde (https://tilde.geonet.org.nz).\n\n\nUsage\nSource\n\n\nwater_analyte(\n    analyte,\n    resample=None,\n    interpolate=None,\n    exclude1995=True,\n    drop_duplicates=True\n)\n\n\nParameters:\nanalyte : str\n    The analyte to download. This can be one of\n        'Al, 'As', 'B', 'Br', 'Ca', 'Cl', 'Cs', 'F',\n        'Fe', 'H2S', 'K', 'Li', 'Mg', 'NH3', 'NO3-N', 'Na',\n        'PO4-P', 'Rb', 'SO4', 'SiO2', 'd18O', 'd2H', 'ph'\nresample : str\n    Resample the data to a given interval. This can be anything\n    allowed by :pandas.DataFrame.resample:.\ninterpolate : str\n    Interpolate between points. This can be anything allowed by\n    :pandas.DataFrame.interpolate:.\nexclude1995 : bool\n    Exclude data from 1995 when there wasn't a lake.\n\n\nReturns:\npandas.DataFrame\n    A dataframe with the water analyte time series.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.CraterLake"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.CraterLake.html#water_level",
+    "href": "reference/volcanoes.ruapehu.CraterLake.html#water_level",
+    "title": "volcanoes.ruapehu.CraterLake",
+    "section": "water_level()",
+    "text": "water_level()\n\nRead crater lake water level from Tilde (https://tilde.geonet.org.nz).\n\n\nUsage\nSource\n\n\nwater_level(resample=\"D\", interpolate=None, dropna=True)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.CraterLake"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.assimilate.SemiLinearTrend.html#init__",
+    "href": "reference/volcanoes.assimilate.SemiLinearTrend.html#init__",
+    "title": "volcanoes.assimilate.SemiLinearTrend",
+    "section": "__init__()",
+    "text": "__init__()\n\nUnivariate Local Linear Trend Model\n\n\nUsage\nSource\n\n\n__init__(endog)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.assimilate.SemiLinearTrend"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.assimilate.LocalLinearTrend.html#init__",
+    "href": "reference/volcanoes.assimilate.LocalLinearTrend.html#init__",
+    "title": "volcanoes.assimilate.LocalLinearTrend",
+    "section": "__init__()",
+    "text": "__init__()\n\nUnivariate Local Linear Trend Model\n\n\nUsage\nSource\n\n\n__init__(endog, obs_cov=None)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.assimilate.LocalLinearTrend"
+    ]
+  },
+  {
+    "objectID": "reference/storage.xarray2zarr.xarray2zarr.html",
+    "href": "reference/storage.xarray2zarr.xarray2zarr.html",
+    "title": "storage.xarray2zarr.xarray2zarr()",
+    "section": "",
+    "text": "Write xarray dataset to zarr files.\n\n\nUsage\nSource\n\n\nstorage.xarray2zarr.xarray2zarr(\n    xds,\n    path,\n    group=\"original\",\n    chunk_size=1000,\n    timedim=\"datetime\",\n    interval=None,\n    archive_starttime=datetime(2000, 1, 1)\n)\n\n\nParameters\n\n\nxds: xr.Dataset\n\nDataset to write.\n\npath: str\n\nPath to write the dataset.\n\nmode: str\n\nWrite mode, by default ‘a’.\n\ngroup: str = \"original\"\n\nGroup name, by default ‘original’\n\nchunk_size: int = 1000\n\nChunk size as the number of days.\n\ntimedim: str = \"datetime\"\n\nName of the time dimension, by default ‘datetime’\n\nfill_gaps: bool\n\nWhether to fill time gaps with NaN before writing, by default False\n\n\n\n\n\nReturns\n\n\n None",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.xarray2zarr.xarray2zarr"
+    ]
+  },
+  {
+    "objectID": "reference/storage.xarray2netcdf.xarray2netcdf.html",
+    "href": "reference/storage.xarray2netcdf.xarray2netcdf.html",
+    "title": "storage.xarray2netcdf.xarray2netcdf()",
+    "section": "",
+    "text": "Store an xarray dataset as an HDF5 file.\n\n\nUsage\nSource\n\n\nstorage.xarray2netcdf.xarray2netcdf(\n    xArray,\n    fdir,\n    group=\"original\",\n    timedim=\"datetime\",\n    archive_starttime=datetime(2000, 1, 1),\n    resolution=None,\n    mode=\"a\"\n)\n\n\nParameters\n\n\nxArray: xarray.Dataset\n\nData to store.\n\nfdir: str\n\nDirectory to store data under.\n\ngroup: str = \"original\"\n\nHdf5 group name.\n\ntimedim: str = \"datetime\"\n\nName of time dimension.\n\narchive_starttime: datetime = datetime(2000, 1, 1)\n\nStart time of archive. If the start time of the data is before this time, the data start time is used.\n\nresolution: float = None\n\nTime resolution of the data in hours. If None, the resolution is determined from the data.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.xarray2netcdf.xarray2netcdf"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.merge_arrays.html",
+    "href": "reference/storage.utils.merge_arrays.html",
+    "title": "storage.utils.merge_arrays()",
+    "section": "",
+    "text": "Merge two xarray datasets with the same datetime index.\n\n\nUsage\nSource\n\n\nstorage.utils.merge_arrays(\n    xds_old, xds_new, timedim=\"datetime\", resolution=None\n)\n\n\nParameters\n\n\nxds_old: xr.DataArray\n\nOld array.\n\nxds_new: xr.DataArray\n\nNew array.\n\nresolution: float = None\n\nTime resolution in hours.\n\n\n\n\n\nReturns\n\n\n xr.DataArray\n\nMerged array.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.merge_arrays"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.generate_test_data.html",
+    "href": "reference/storage.utils.generate_test_data.html",
+    "title": "storage.utils.generate_test_data()",
+    "section": "",
+    "text": "Generate a 1D or 2D feature for testing.\n\n\nUsage\nSource\n\n\nstorage.utils.generate_test_data(\n    dim=1,\n    ndays=30,\n    nfreqs=10,\n    tstart=datetime.now(),\n    freq=\"10min\",\n    intervals=None,\n    feature_names=None,\n    seed=42,\n    freq_names=None,\n    add_nans=True\n)\n\n\nParameters\n\n\ndim: int = 1\n\nDimension of the data (1 or 2).\n\nndays: int = 30\n\nNumber of days to generate data for.\n\nnfreqs: int = 10\n\nNumber of frequencies (only for dim=2).\n\ntstart: datetime = datetime.now()\n\nStart time of the data.\n\nfreq: str = \"10min\"\n\nFrequency of the data (e.g., ‘10min’).\n\nintervals: int = None\n\nNumber of intervals to generate. If None, calculated from ndays and freq.\n\nfeature_names: list = None\n\nNames of the features to generate.\n\nseed: int = 42\n\nRandom seed for reproducibility.\n\nfreq_names: list = None\n\nNames of the frequency dimensions (only for dim=2).\n\nadd_nans: bool = True\n\nWhether to add NaN values to the data.\n\n\n\n\n\nReturns\n\n\n xr.Dataset\n\nGenerated test dataset.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.generate_test_data"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.fill_time_gaps.html",
+    "href": "reference/storage.utils.fill_time_gaps.html",
+    "title": "storage.utils.fill_time_gaps()",
+    "section": "",
+    "text": "Fill gaps in time series with NaN values by reindexing to a complete datetime range.\n\n\nUsage\nSource\n\n\nstorage.utils.fill_time_gaps(xds, timedim=\"datetime\")\n\n\nParameters\n\n\nxds: xr.Dataset\n\nInput dataset with potential time gaps\n\nfreq: str\n\nFrequency string (e.g., ‘H’, ‘D’, ‘15min’). If None, will try to infer.\n\ntimedim: str = \"datetime\"\n\nName of the time dimension, by default ‘datetime’\n\n\n\n\n\nReturns\n\n\n xr.Dataset\n\nDataset with gaps filled with NaN",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.fill_time_gaps"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Path.html#call__",
+    "href": "reference/storage.storage.Path.html#call__",
+    "title": "storage.storage.Path",
+    "section": "__call__()",
+    "text": "__call__()\n\nRequest a particular feature\n\n\nUsage\nSource\n\n\n__call__(feature, group=\"original\", metadata=False)\n\n\n:param feature: Feature name :type feature: str",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Path.html#get_feature_info",
+    "href": "reference/storage.storage.Path.html#get_feature_info",
+    "title": "storage.storage.Path",
+    "section": "get_feature_info()",
+    "text": "get_feature_info()\n\nGet metadata about a feature without loading its data.\n\n\nUsage\nSource\n\n\nget_feature_info(feature)\n\n\n:param feature: Feature name :type feature: str :return: dict with keys name, recordCount (timestamps that hold data), earliestRecord and latestRecord (None without records) :rtype: dict",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Path.html#load",
+    "href": "reference/storage.storage.Path.html#load",
+    "title": "storage.storage.Path",
+    "section": "load()",
+    "text": "load()\n\nLoad a feature from disk\n\n\nUsage\nSource\n\n\nload(*args, **kwargs)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Path.html#save",
+    "href": "reference/storage.storage.Path.html#save",
+    "title": "storage.storage.Path",
+    "section": "save()",
+    "text": "save()\n\nSave a feature to disk\n\n\nUsage\nSource\n\n\nsave(data, **kwargs)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Path.html#shape",
+    "href": "reference/storage.storage.Path.html#shape",
+    "title": "storage.storage.Path",
+    "section": "shape()",
+    "text": "shape()\n\nGet shape of a feature on disk\n\n\nUsage\nSource\n\n\nshape(feature)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.ingest.enqueue_dataset.html",
+    "href": "reference/storage.ingest.enqueue_dataset.html",
+    "title": "storage.ingest.enqueue_dataset()",
+    "section": "",
+    "text": "Enqueue a dataset for ingestion.\n\n\nUsage\nSource\n\n\nstorage.ingest.enqueue_dataset(\n    data, target_path, *, backend, ingest_config, save_kwargs=None\n)\n\n\nParameters\n\n\ndata: xr.Dataset\n\nThe dataset to enqueue.\n\ntarget_path: str\n\nThe target path where the dataset should be saved.\n\nbackend: str\n\nThe backend to use for saving the dataset (‘zarr’ or ‘netcdf’).\n\ningest_config: dict\n\nConfiguration for the ingest queue, must include ‘queue_path’.\n\nsave_kwargs: Optional[dict] = None\n\nAdditional keyword arguments to pass to the save function, by default None.\n\n\n\n\n\nReturns\n\n\n dict\n\nA message dictionary representing the enqueued dataset.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.ingest.enqueue_dataset"
+    ]
+  },
+  {
+    "objectID": "reference/storage.grafana_annotations.sync_labels.html",
+    "href": "reference/storage.grafana_annotations.sync_labels.html",
+    "title": "storage.grafana_annotations.sync_labels()",
+    "section": "",
+    "text": "Bring the label annotations in Grafana and the stored labels in step.\n\n\nUsage\nSource\n\n\nstorage.grafana_annotations.sync_labels(baseurl, stored)\n\n\nThe result is the union of both. A label in both takes its text, tags and times from Grafana; labels drawn in Grafana, on any dashboard, are added; stored labels missing from Grafana are posted as organization annotations, so nothing is lost when an annotation is deleted or Grafana is redeployed. Annotations without an “Id: ” line get a new id appended to their text.\n\n\nParameters\n\n\nbaseurl: str\n\nThe base URL of the Grafana API, e.g. “http://:”. Authenticate with the environment variables GRAFANA_USER and GRAFANA_PASSWORD, or with “http://:@:”.\n\nstored: list of dict\n\nLabels from the previous sync, as returned by this function.\n\n\n\n\n\nReturns\n\n\nlabels: list of dict\n\nAll labels, ordered by time. Each has ‘time’ and ‘timeEnd’ (ms since epoch; ‘timeEnd’ is None for a point), ‘title’ (first line of the text), ‘description’ (the text without its “Id:” line), ‘tags’, ‘id’ (the stable label id), and where they were made: ‘user’ (login), ‘dashboardUID’ and ‘panelId’ (None for an annotation made through the API).\n\nreport: dict\n\nNumber of labels ‘restored’ to Grafana and ‘added’ from Grafana, and ‘untagged’: the labels without a volcano: tag, which no volcano dashboard shows.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.grafana_annotations.sync_labels"
+    ]
+  },
+  {
+    "objectID": "reference/storage.get_data.html",
+    "href": "reference/storage.get_data.html",
+    "title": "storage.get_data()",
+    "section": "",
+    "text": "Return path to aitana.storage package.\n\n\nUsage\nSource\n\n\nstorage.get_data(filename=None)\n\n\nParameters\n\n\nfilename: Pathlike = None\n\nAppend filename to returned path.\n\n\n\n\n\nReturns\n\n\n pkgdir_path",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.get_data"
+    ]
+  },
+  {
+    "objectID": "reference/storage.api.StorageAPI.html#preprocess_datetime",
+    "href": "reference/storage.api.StorageAPI.html#preprocess_datetime",
+    "title": "storage.api.StorageAPI",
+    "section": "preprocess_datetime()",
+    "text": "preprocess_datetime()\n\nConvert datetime string to datetime object.\n\n\nUsage\nSource\n\n\npreprocess_datetime(dt)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.api.StorageAPI"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.visualise.set_style.html",
+    "href": "reference/pipelines.visualise.set_style.html",
+    "title": "pipelines.visualise.set_style()",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.visualise.set_style()",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.visualise.set_style"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.scoring.make_strictly_increasing.html",
+    "href": "reference/pipelines.scoring.make_strictly_increasing.html",
+    "title": "pipelines.scoring.make_strictly_increasing()",
+    "section": "",
+    "text": "Make a sequence strictly increasing. Some of the ROC curves computed with\n\n\nUsage\nSource\n\n\npipelines.scoring.make_strictly_increasing(sequence)\n\n\nour own metric are not strictly increasing due to the way tps, fps, tns and fns are defined. This function makes sure that the sequence is strictly increasing so that we can caluculate the AUC value.\n\n\nArguments:\nsequence: Sequence\n    The sequence to make strictly increasing.\n\n\nReturns:\nSequence: The strictly increasing sequence.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.scoring.make_strictly_increasing"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.scoring.get_evaluation_windows.html",
+    "href": "reference/pipelines.scoring.get_evaluation_windows.html",
+    "title": "pipelines.scoring.get_evaluation_windows()",
+    "section": "",
+    "text": "Get the evaluation windows for the forecasted rates.\n\n\nUsage\nSource\n\n\npipelines.scoring.get_evaluation_windows(starttime, endtime, pew)\n\n\nArguments:\nstarttime: pd.Timestamp\n    The start time of the forecast.\nendtime: pd.Timestamp\n    The end time of the forecast.\npew: int\n    The pre-eruption window size.\n\n\nReturns:\npositive_windows: list\n    The pre-eruption windows.\nnegative_windows: list\n    Non pre-eruption windows.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.scoring.get_evaluation_windows"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.scoring.compute_rates.html",
+    "href": "reference/pipelines.scoring.compute_rates.html",
+    "title": "pipelines.scoring.compute_rates()",
+    "section": "",
+    "text": "Compute the forecasted rates for positive and negative windows.\n\n\nUsage\nSource\n\n\npipelines.scoring.compute_rates(model, pew, debug=False)\n\n\nArguments:\nmodel: pandas.DataFrame\n    The model probabilities.\npew: int\n    The pre-eruption window size.\ndebug: bool, optional\n    Whether to print debug information.\n\n\nReturns:\ndict: The forecasted rates for positive and negative windows as well as the overall rate.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.scoring.compute_rates"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.run.html",
+    "href": "reference/pipelines.cli.run.html",
+    "title": "pipelines.cli.run()",
+    "section": "",
+    "text": "Run the workflow registered for a volcano.\n\n\nUsage\nSource\n\n\npipelines.cli.run(ctx, volcano, outdir, cores=1, cron=None, workflow=None)\n\n\nWith several workflows registered for the volcano, choose one with --workflow NAME (see list); each needs its own output directory. Extra arguments are passed to Snakemake, e.g. --config end=2022-03-20T00:00. With --cron, keep running and repeat on a crontab schedule in UTC, e.g. --cron \"*/10 * * * *\"; a run that is due while the previous one is still going is skipped.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.run"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.discover_workflows.html",
+    "href": "reference/pipelines.cli.discover_workflows.html",
+    "title": "pipelines.cli.discover_workflows()",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.cli.discover_workflows()",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.discover_workflows"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.WorkflowDescriptor.html",
+    "href": "reference/pipelines.cli.WorkflowDescriptor.html",
+    "title": "pipelines.cli.WorkflowDescriptor",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.cli.WorkflowDescriptor(\n    name, volcano, description, workflowdir, outputs\n)\n\n\nParameter Attributes\n\n\nname: str\n\n\n\nvolcano: str\n\n\n\ndescription: str\n\n\n\nworkflowdir: Path\n\n\n\noutputs: dict[str, str]",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.WorkflowDescriptor"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.PipelineError.html",
+    "href": "reference/pipelines.cli.PipelineError.html",
+    "title": "pipelines.cli.PipelineError",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.cli.PipelineError()",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.PipelineError"
+    ]
+  },
+  {
+    "objectID": "reference/index.html",
+    "href": "reference/index.html",
+    "title": "API Reference",
+    "section": "",
+    "text": "aitana.access\n\nPure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).\n\n\naccess.tilde.tilde_request()\n\nRequest data from the tilde API (https://tilde.geonet.org.nz/v3/api-docs/).\n\naccess.wfs.wfs_request()\n\nLoad volcano-tectonic earthquake catalogues from GeoNet’s WFS service (http://wfs.geonet.org.nz).\n\naccess.seismic.SeismicData\n\n\n\naccess.seismic.WaveformBaseclass\n\nBase class for waveform clients.\n\naccess.seismic.SDSWaveforms\n\n\n\naccess.seismic.FDSNWaveforms\n\n\n\naccess.seismic.S3Waveforms\n\n\n\naccess.seismic.MockSDSWaveforms\n\nMock SDSWaveforms class for testing by creating\n\naccess.seismic.PostProcess\n\nClass for checking waveforms and station metadata for valid values,\n\naccess.seismic.PostProcessException\n\n\n\naccess.seismic.get_instrument_response()\n\nRetrieve instrument response file in STATIONXML format.\n\naccess.api.AitanaAPI\n\n\n\naccess.util.get_defaults_with_names()\n\nGet parameter names and their default values\n\naccess.util.generate_cache_key()\n\nGenerate a unique filename for caching based on function name and arguments.\n\naccess.util.cache_dataframe()\n\nDecorator to cache pandas DataFrames, handle date ranges, and persist the cache to disk.\n\naccess.util.gradient()\n\nCompute gradient for time series by first smoothing\n\naccess.util.eqRate()\n\nCompute earthquake rate.\n\naccess.util.reindex()\n\nReindex and forward fill to generate a\n\naccess.util.hex_to_rgb()\n\nReturn (red, green, blue) for the color given as #rrggbb.\n\naccess.util.rgb_to_hex()\n\nReturn color as #rrggbb for the given color values.\n\naccess.util.get_color()\n\nReturn a color from the matplotlib color cycle by index.\n\naccess.logging_config.setup_logging()\n\nConfigure logging for the aitana package.\n\naccess.logging_config.get_logger()\n\nGet a logger for a specific module within aitana.\n\n\n\n\naitana.volcanoes\n\nPer-volcano domain aggregates for Ruapehu, Whakaari, and Taupo.\n\n\nvolcanoes.whakaari.Gas\n\n\n\nvolcanoes.whakaari.Seismicity\n\n\n\nvolcanoes.whakaari.eruptions()\n\nThis function loads the eruption catalogue for White Island and\n\nvolcanoes.whakaari.load_all()\n\n\n\nvolcanoes.ruapehu.CraterLake\n\n\n\nvolcanoes.ruapehu.Gas\n\n\n\nvolcanoes.ruapehu.Seismicity\n\n\n\nvolcanoes.ruapehu.eruptions()\n\nThis function loads the eruption catalogue for Mt. Ruapehu and declusters\n\nvolcanoes.ruapehu.load_all()\n\n\n\nvolcanoes.ruapehu.lake_height_scaling()\n\nCalculate the scaling factor between the lake height sensors 08 and 03.\n\nvolcanoes.assimilate.SemiLinearTrend\n\n\n\nvolcanoes.assimilate.LocalLinearTrend\n\n\n\nvolcanoes.assimilate.SO2FusionModel\n\n\n\nvolcanoes.get_data()\n\nGet path to bundled data in the aitana.volcanoes package.\n\n\n\n\naitana.features\n\nAlgorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM).\n\n\nfeatures.feature_base.FeatureBaseClass\n\n\n\nfeatures.rsam.RSAM\n\nCompute RSAM as the mean of the absolute value of a signal filtered\n\nfeatures.rsam.rsam_wideband_energy_ratio()\n\n\n\nfeatures.dsar.DSAR\n\nDSAR is the ratio of\n\nfeatures.ssam.SSAM\n\nSSAM is basically the same as computing a spectrogram. Data are split into\n\nfeatures.spectral_features.SpectralFeatures\n\n\n\nfeatures.cpxtrace.Inst_Band\n\nComputes the instantaneous bandwidth of the given data which can be\n\nfeatures.cpxtrace.Inst_Freq\n\nComputes the instantaneous frequency of the given data which can be\n\nfeatures.cpxtrace.Norm_Env\n\nComputes the normalized envelope of the given data which can be\n\nfeatures.cpxtrace.Centroid\n\nComputes the centroid time of the given data which can be windowed or\n\nfeatures.cpxtrace.WindowCentroid\n\nComputes the centroid of a given time window,\n\nfeatures.util.stride_windows()\n\nGet all windows of x with length n as a single array,\n\nfeatures.util.demean()\n\nReturn x minus the mean(x).\n\nfeatures.util.apply_hanning()\n\nApply a hanning window to the given 1D or 2D array along\n\nfeatures.util.window_array()\n\nTake a 1-D numpy array and devide it into (overlapping)\n\nfeatures.util.trace_window_times()\n\nSubdivide an obspy.core.trace.Trace into windows of window_len\n\nfeatures.util.trace_window_data()\n\nSubdivide an obspy.core.trace.Trace into windows of interval\n\nfeatures.util.apply_freq_filter()\n\nApply frequency filter to seismic data.\n\nfeatures.util.round_time()\n\nFind closest multiple of interval to time.\n\nfeatures.util.stack_feature()\n\nStack features in a dataarray.\n\nfeatures.visualise.spectrogram_preprocessing()\n\n\n\nfeatures.visualise.plot_ssam_mpl()\n\nPlot spectrogram data using matplotlib.\n\nfeatures.visualise.multi_feature_plot_mpl()\n\nPlot two features in one figure. 2D features have to be plotted first.\n\nfeatures.visualise.plot_ssam_plotly()\n\nPlot spectrogram data using matplotlib.\n\nfeatures.visualise.get_trace()\n\nReturn a plotly graphics object from a feature.\n\nfeatures.visualise.multi_feature_plot()\n\nReturn a combined time-series plot of two features.\n\nfeatures.get_data()\n\nReturn path to aitana.features package.\n\n\n\n\naitana.anomaly\n\nAnomaly detection in time-series data.\n\n\nanomaly.anomaly_base.AnomalyDetectionBaseClass\n\n\n\nanomaly.anomaly_base.min_max_scale_netcdf()\n\n\n\nanomaly.pca.PCA\n\n\n\nanomaly.pca.runPca()\n\n\n\nanomaly.pca.runPcaCore()\n\n\n\nanomaly.pca.ModelException\n\n\n\nanomaly.matrix_profile.MatrixProfile\n\nScore how unlike its own past each subsequence of a time series is.\n\nanomaly.snet.SNet\n\n\n\nanomaly.autoencoder.AutoEncoder\n\n\n\nanomaly.autoencoder.TiedAutoEncoder\n\nApplies an tied-weight autoencoder to the incoming data.\n\nanomaly.autoencoder.FuzzyCluster\n\n\n\nanomaly.dataset.ZizouDataset\n\n\n\nanomaly.dataset.SliceBatchSampler\n\n\n\nanomaly.evaluation.inject_faults()\n\nInject synthetic faults into a DataFrame for anomaly detection evaluation.\n\nanomaly.evaluation.inject_change_points()\n\nInject persistent regime shifts (change points) into a DataFrame.\n\nanomaly.evaluation.simulate_regime_series()\n\nGenerate a synthetic multivariate time series stitched from discrete regimes.\n\nanomaly.evaluation.quiet_series()\n\nGenerate a quiet background: a repeating template plus small noise.\n\nanomaly.evaluation.score_detector()\n\nScore a detector against the fault-injection ground-truth mask.\n\n\n\n\naitana.storage\n\nStore time series data as HDF5 (netCDF) or Zarr files and access them through an API.\n\n\nstorage.storage.Storage\n\nQuery computed features\n\nstorage.storage.Path\n\n\n\nstorage.storage.AitanaDataset\n\nPyTorch Dataset wrapper for Aitana Storage.\n\nstorage.ingest.IngestWorker\n\n\n\nstorage.ingest.enqueue_dataset()\n\nEnqueue a dataset for ingestion.\n\nstorage.api.StorageAPI\n\n\n\nstorage.api.parse_path()\n\nSplit a comma-separated path string into (group, subdir_list).\n\nstorage.xarray2netcdf.xarray2netcdf()\n\nStore an xarray dataset as an HDF5 file.\n\nstorage.xarray2zarr.xarray2zarr()\n\nWrite xarray dataset to zarr files.\n\nstorage.xarray2zarr.PathNotFoundError\n\n\n\nstorage.grafana_annotations.sync_labels()\n\nBring the label annotations in Grafana and the stored labels in step.\n\nstorage.grafana_annotations.is_label()\n\nWhether tags mark an annotation as a label: label.\n\nstorage.utils.generate_test_data()\n\nGenerate a 1D or 2D feature for testing.\n\nstorage.utils.round_datetime()\n\nFind closest multiple of interval to given time.\n\nstorage.utils.floor_datetime()\n\nFloor a datetime to the latest multiple of a given interval.\n\nstorage.utils.get_dt()\n\nInfer the sampling of the time dimension.\n\nstorage.utils.fill_time_gaps()\n\nFill gaps in time series with NaN values by reindexing to a complete datetime range.\n\nstorage.utils.merge_arrays()\n\nMerge two xarray datasets with the same datetime index.\n\nstorage.get_data()\n\nReturn path to aitana.storage package.\n\n\n\n\naitana.pipelines\n\nReproducible workflows that run and evaluate aitana components for volcano monitoring.\n\n\npipelines.cli.WorkflowDescriptor\n\n\n\npipelines.cli.PipelineBackend\n\n\n\npipelines.cli.SnakemakeBackend\n\n\n\npipelines.cli.PipelineError\n\n\n\npipelines.cli.discover_workflows()\n\n\n\npipelines.cli.run()\n\nRun the workflow registered for a volcano.\n\npipelines.cli.clean()\n\nDelete the outputs of a volcano’s workflow, chosen with --workflow if it has several.\n\npipelines.cli.list_workflows()\n\nList all registered workflows.\n\npipelines.scoring.get_evaluation_windows()\n\nGet the evaluation windows for the forecasted rates.\n\npipelines.scoring.compute_rates()\n\nCompute the forecasted rates for positive and negative windows.\n\npipelines.scoring.evaluate_threshold()\n\nEvaluate the number of true positives, false positives, true negatives and false negatives for a given threshold.\n\npipelines.scoring.get_roc_curve()\n\nCompute the ROC curve for a given model and thresholds.\n\npipelines.scoring.make_strictly_increasing()\n\nMake a sequence strictly increasing. Some of the ROC curves computed with\n\npipelines.visualise.set_style()\n\n\n\npipelines.visualise.trellis_plot()\n\nCreate a trellis plot for the given models and data.\n\npipelines.visualise.scoring_plot()\n\nPlot the forecast probabilities and the evaluation windows.\n\npipelines.get_data()\n\nGet path to bundled data in the aitana.pipelines package (workflow files, etc.).\n\n\n\n\naitana.testing\n\nSynthetic seismic waveforms with known spectral content for testing aitana packages.\n\n\ntesting.synthetic.synthetic_trace()\n\nProduce a test signal for which we know where the peaks",
+    "crumbs": [
+      "Reference",
+      "API Index"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.plot_ssam_plotly.html",
+    "href": "reference/features.visualise.plot_ssam_plotly.html",
+    "title": "features.visualise.plot_ssam_plotly()",
+    "section": "",
+    "text": "Plot spectrogram data using matplotlib.\n\n\nUsage\nSource\n\n\nfeatures.visualise.plot_ssam_plotly(xdf, cmap=\"Ice_r\", new_fig=True, **kwargs)\n\n\n:param data: An xarray dataset as returned by :class:aitana.features.ssam.SSAM :type data: :class:xarray.Dataset :param log: Logarithmic frequency axis if True, linear frequency axis otherwise. :type log: bool :param dbscale: If True 10 * log10 of color values is taken, if False the sqrt is taken. :type dbscale: bool :param cmap: Specify a custom colormap instance from plotly.colors.sequential. :type cmap: list :param clip: adjust colormap to clip at lower and/or upper end. The given percentages of the amplitude range (linear or logarithmic depending on option dbscale) are clipped. :type clip: [float, float] :param new_fig: Whether to return a figure or just a graph object. :type new_flag: boolean :param max_tpoints: Maximum number of time intervals. If the datasets exceeds that number it will be resampled to max_tpoints. :type max_tpoints: int\n&gt;&gt;&gt; import numpy as np\n&gt;&gt;&gt; from aitana.features.ssam import SSAM\n&gt;&gt;&gt; from aitana.testing import synthetic_trace\n&gt;&gt;&gt; from aitana.features.visualise import plot_ssam_plotly\n&gt;&gt;&gt; ft = SSAM(interval=60, per_lap=.9, smooth=10,                   frequencies=np.arange(0., 25.1, .1),                   timestamp='start')\n&gt;&gt;&gt; _ = ft.compute(synthetic_trace())\n&gt;&gt;&gt; fig = plot_ssam_plotly(ft.feature[\"ssam\"])",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.plot_ssam_plotly"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.multi_feature_plot_mpl.html",
+    "href": "reference/features.visualise.multi_feature_plot_mpl.html",
+    "title": "features.visualise.multi_feature_plot_mpl()",
+    "section": "",
+    "text": "Plot two features in one figure. 2D features have to be plotted first.\n\n\nUsage\nSource\n\n\nfeatures.visualise.multi_feature_plot_mpl(\n    feature1, feature2, figsize=(12, 5), **kwargs\n)\n\n\nParameters\n\n\nfeature1: xarray.DataArray\n\nFirst feature to plot. Can be 1D or 2D.\n\nfeature2: xarray.DataArray\n\nSecond feature to plot. Has to be 1D.\n\nfigsize: tuple = (12, 5)\n\nFigure size, by default (12, 5)\n\n\n\n\n\nReturns\n\n\n matplotlib.figure.Figure\n\nFigure with two y-axis.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.multi_feature_plot_mpl"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.get_trace.html",
+    "href": "reference/features.visualise.get_trace.html",
+    "title": "features.visualise.get_trace()",
+    "section": "",
+    "text": "Return a plotly graphics object from a feature.\n\n\nUsage\nSource\n\n\nfeatures.visualise.get_trace(data, colour, kws_ssam)\n\n\n:param data: Feature data to plot. :type data: :class:xarray.DataArray :param colour: Colour for line plots. :type colour: str :returns: A 1-D line plot or a 2D heatmap. :rtype: :class:plotly.graph_objs.Scatter or :class:plotly.graph_objs.Figure",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.get_trace"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.trace_window_times.html",
+    "href": "reference/features.util.trace_window_times.html",
+    "title": "features.util.trace_window_times()",
+    "section": "",
+    "text": "Subdivide an obspy.core.trace.Trace into windows of window_len\n\n\nUsage\nSource\n\n\nfeatures.util.trace_window_times(trace, window_len, min_len=0.8)\n\n\nlength and iterate over window start & end times.\n:param trace: The data to be windowed. :type trace: :class:obspy.core.trace.Trace :param window_len: The window length in seconds. :type window_len: float :param min_len: Windows with length &lt; min_len * window_len are skipped, defaults to 0.8 :type min_len: float, optional :yield: The window start & end times :rtype: :class:obspy.core.utcdatetime.UTCDateTime, :class:obspy.core.utcdatetime.UTCDateTime,",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.trace_window_times"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.stride_windows.html",
+    "href": "reference/features.util.stride_windows.html",
+    "title": "features.util.stride_windows()",
+    "section": "",
+    "text": "Get all windows of x with length n as a single array,\n\n\nUsage\nSource\n\n\nfeatures.util.stride_windows(x, n, noverlap)\n\n\nusing strides to avoid data duplication.\n:param x: 1D array or sequence containing the data. :type x: :class:~numpy.ndarray :param n: The number of data points in each window. :type n: int :param noverlap: The overlap between adjacent windows. Default is 0 (no overlap) :type noverlap: int :return: Array with the windowed data in columns. :rtype: :class:~numpy.ndarray",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.stride_windows"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.round_time.html",
+    "href": "reference/features.util.round_time.html",
+    "title": "features.util.round_time()",
+    "section": "",
+    "text": "Find closest multiple of interval to time.\n\n\nUsage\nSource\n\n\nfeatures.util.round_time(time, interval)\n\n\n:param time: Time to round :type time: :class:obspy.UTCDateTime :param interval: Interval length in seconds :type interval: int :returns: The new time that is a multiple of interval :rtype: :class:obspy.UtCDateTime",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.round_time"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.apply_hanning.html",
+    "href": "reference/features.util.apply_hanning.html",
+    "title": "features.util.apply_hanning()",
+    "section": "",
+    "text": "Apply a hanning window to the given 1D or 2D array along\n\n\nUsage\nSource\n\n\nfeatures.util.apply_hanning(x, return_window=None)\n\n\nthe given axis.\n:param x: 1-D or 2-D array or sequence containing the data :type x: :class:numpy.ndarray :param return_window: If true, also return the 1D values of the window that was applied. :type return_window: bool :return: wtr[, wvals] input multiplied with the hanning window function, hanning window function",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.apply_hanning"
+    ]
+  },
+  {
+    "objectID": "reference/features.ssam.SSAM.html",
+    "href": "reference/features.ssam.SSAM.html",
+    "title": "features.ssam.SSAM",
+    "section": "",
+    "text": "SSAM is basically the same as computing a spectrogram. Data are split into",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.ssam.SSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.ssam.SSAM.html#compute",
+    "href": "reference/features.ssam.SSAM.html#compute",
+    "title": "features.ssam.SSAM",
+    "section": "compute()",
+    "text": "compute()\n\nCompute SSAM for the given trace.\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:param trace: The seismic waveform data. :type trace: :class:obspy.Trace :return: spectrogram, frequencies, times :rtype: tuple",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.ssam.SSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.ssam.SSAM.html#filterbank",
+    "href": "reference/features.ssam.SSAM.html#filterbank",
+    "title": "features.ssam.SSAM",
+    "section": "filterbank()",
+    "text": "filterbank()\n\nComputes the integral in an array of bandpass filters that\n\n\nUsage\nSource\n\n\nfilterbank(nfilters, nfft, fs)\n\n\nseparates the input signal into multiple components. Each component consists of a single frequency sub-band of the original signal.\n:param nfilters: Number of filters in the filter bank. :type nfitlers: int :param nfft: Number of samples :type nfft: int :param fs: Sampling frquency :type fs: float",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.ssam.SSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.ssam.SSAM.html#sonogram",
+    "href": "reference/features.ssam.SSAM.html#sonogram",
+    "title": "features.ssam.SSAM",
+    "section": "sonogram()",
+    "text": "sonogram()\n\nComputes the sonogram of the given data which can be windowed or not.\n\n\nUsage\nSource\n\n\nsonogram(data, fs, fc1, nofb=8)\n\n\nThe sonogram is determined by the power in half octave bands of the given data.\nIf data are windowed the analytic signal and the envelope of each window is returned.\n:param data: Data to make envelope of. :type data: :class:~numpy.ndarray :param fs: Sampling frequency in Hz. :param fc1: Center frequency of lowest half octave band. :param nofb: Number of half octave bands. :param no_win: Number of data windows. :return: Central frequencies, Half octave bands.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.ssam.SSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.rsam.rsam_wideband_energy_ratio.html",
+    "href": "reference/features.rsam.rsam_wideband_energy_ratio.html",
+    "title": "features.rsam.rsam_wideband_energy_ratio()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nfeatures.rsam.rsam_wideband_energy_ratio(arr_rsam, arr_wideband, axis=-1)",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.rsam.rsam_wideband_energy_ratio"
+    ]
+  },
+  {
+    "objectID": "reference/features.get_data.html",
+    "href": "reference/features.get_data.html",
+    "title": "features.get_data()",
+    "section": "",
+    "text": "Return path to aitana.features package.\n\n\nUsage\nSource\n\n\nfeatures.get_data(filename=None)\n\n\nParameters\n\n\nfilename: Pathlike = None\n\nAppend filename to returned path.\n\n\n\n\n\nReturns\n\n\n pkgdir_path",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.get_data"
+    ]
+  },
+  {
+    "objectID": "reference/features.dsar.DSAR.html",
+    "href": "reference/features.dsar.DSAR.html",
+    "title": "features.dsar.DSAR",
+    "section": "",
+    "text": "DSAR is the ratio of",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.dsar.DSAR"
+    ]
+  },
+  {
+    "objectID": "reference/features.dsar.DSAR.html#compute",
+    "href": "reference/features.dsar.DSAR.html#compute",
+    "title": "features.dsar.DSAR",
+    "section": "compute()",
+    "text": "compute()\n\nCompute the displacement seismic amplitude ratio (DSAR).\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\nTODO:\nPublication is quite vague and doesn’t have enough detail to understand the method. Unclear whether median is every 10 minutes or every day. This affects the bootstrap calc- ulation too, but this might not be necessary..\n:param stream: The SLCN code for the seismic stream :type stream: str :param startdate: Datetime of the first sample. :type startdate: :class:obspy.UTCDateTime :param enddate: Datetime of the last sample. :type enddate: :class:obspy.UTCDateTime :param interval: Length of the time interval in seconds over which to compute DSAR (default 10 mins) :type interval: int, optional",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.dsar.DSAR"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Norm_Env.html",
+    "href": "reference/features.cpxtrace.Norm_Env.html",
+    "title": "features.cpxtrace.Norm_Env",
+    "section": "",
+    "text": "Computes the normalized envelope of the given data which can be",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Norm_Env"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Norm_Env.html#compute",
+    "href": "reference/features.cpxtrace.Norm_Env.html#compute",
+    "title": "features.cpxtrace.Norm_Env",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Norm_Env"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Inst_Band.html",
+    "href": "reference/features.cpxtrace.Inst_Band.html",
+    "title": "features.cpxtrace.Inst_Band",
+    "section": "",
+    "text": "Computes the instantaneous bandwidth of the given data which can be",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Inst_Band"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Inst_Band.html#compute",
+    "href": "reference/features.cpxtrace.Inst_Band.html#compute",
+    "title": "features.cpxtrace.Inst_Band",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Inst_Band"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.snet.SNet.html#preprocess",
+    "href": "reference/anomaly.snet.SNet.html#preprocess",
+    "title": "anomaly.snet.SNet",
+    "section": "preprocess()",
+    "text": "preprocess()\n\nResample traces onto a common grid at sampling_rate_hertz.\n\n\nUsage\nSource\n\n\npreprocess(st, starttime, endtime)\n\n\nGaps (NaN) are filled with the last valid sample so that each trace can be detrended and low-pass filtered against aliasing, then the trace is interpolated onto the grid. Grid samples in a gap or outside the trace are NaN, for compute to mask.\n\n\nParameters\n\n\nst: obspy.Stream\n\nTraces of the components, e.g. Z, N, E.\n\nstarttime: obspy.UTCDateTime\n\nFirst sample of the grid.\n\nendtime: obspy.UTCDateTime\n\nEnd of the grid (exclusive).\n\n\n\n\n\nReturns\n\n\n obspy.Stream\n\nOne trace per input trace, each with (endtime - starttime) * sampling_rate_hertz samples from starttime.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.snet.SNet"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.pca.runPca.html",
+    "href": "reference/anomaly.pca.runPca.html",
+    "title": "anomaly.pca.runPca()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.pca.runPca(argv=None)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.pca.runPca"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.pca.ModelException.html",
+    "href": "reference/anomaly.pca.ModelException.html",
+    "title": "anomaly.pca.ModelException",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.pca.ModelException()",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.pca.ModelException"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.evaluation.simulate_regime_series.html",
+    "href": "reference/anomaly.evaluation.simulate_regime_series.html",
+    "title": "anomaly.evaluation.simulate_regime_series()",
+    "section": "",
+    "text": "Generate a synthetic multivariate time series stitched from discrete regimes.\n\n\nUsage\nSource\n\n\nanomaly.evaluation.simulate_regime_series(\n    state_sequence,\n    segment_length,\n    n_features=1,\n    state_noise_std=None,\n    state_means=None,\n    rng=None\n)\n\n\nEach entry in state_sequence selects a regime label (e.g. [\"A\", \"B\", \"A\", \"C\"]); repeated labels reuse the same mean, so recurring regimes are known ground truth for state-detection algorithms (e.g. CLaP), and segment boundaries are the known ground-truth change points for change-point detectors (e.g. ClaSP).\n\n\nParameters\n\n\nstate_sequence: list of str\n\nSequence of regime labels, e.g. [\"A\", \"B\", \"A\", \"C\"].\n\nsegment_length: int or list of int\n\nNumber of timesteps per regime. A single int applies uniformly to every segment; a list must have the same length as state_sequence.\n\nn_features: int = 1\n\nNumber of feature columns to generate.\n\nstate_noise_std: dict = None\n\nMapping from regime label to the standard deviation of that state’s additive Gaussian noise. If not given, every state defaults to 1.0.\n\nstate_means: dict = None\n\nMapping from regime label to a length-n_features array of means. If not given, one is drawn per unique label from Normal(0, 5).\n\nrng: int, np.random.Generator, or None = None\n\nRandom seed or generator for reproducibility.\n\n\n\n\n\nReturns\n\n\nseries: pd.DataFrame\n\nSynthetic (n_timesteps, n_features) series with a RangeIndex.\n\nchange_points: np.ndarray of int\n\nIndex of the first timestep of each new segment (excludes 0).\n\nlabels: pd.Series\n\nPer-timestep ground-truth regime label, aligned to series.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.evaluation.simulate_regime_series"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.evaluation.quiet_series.html",
+    "href": "reference/anomaly.evaluation.quiet_series.html",
+    "title": "anomaly.evaluation.quiet_series()",
+    "section": "",
+    "text": "Generate a quiet background: a repeating template plus small noise.\n\n\nUsage\nSource\n\n\nanomaly.evaluation.quiet_series(n, period=144, noise=0.05, rng=None)\n\n\nThe template is a sine of length period plus a half-amplitude third harmonic, so normal behaviour recurs and every normal subsequence has close matches in the history. Similarity-based detectors (e.g. a z-normalized matrix profile) need this; on pure noise every subsequence is roughly equally far from all others.\n\n\nParameters\n\n\nn: int\n\nNumber of samples.\n\nperiod: int = 144\n\nSamples per template cycle; the default is one day of 10-min samples.\n\nnoise: float = 0.05\n\nStandard deviation of the additive Gaussian noise.\n\nrng: int, np.random.Generator, or None = None\n\nRandom seed or generator for reproducibility.\n\n\n\n\n\nReturns\n\n\n pd.Series\n\nSynthetic series on a RangeIndex.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.evaluation.quiet_series"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.evaluation.inject_change_points.html",
+    "href": "reference/anomaly.evaluation.inject_change_points.html",
+    "title": "anomaly.evaluation.inject_change_points()",
+    "section": "",
+    "text": "Inject persistent regime shifts (change points) into a DataFrame.\n\n\nUsage\nSource\n\n\nanomaly.evaluation.inject_change_points(\n    df,\n    columns=None,\n    n_changes=3,\n    offset_range=\"hard\",\n    mode=\"independent\",\n    coupled_groups=None,\n    rng=None\n)\n\n\nUnlike inject_faults, which perturbs isolated timesteps (sensor glitches), each injected change point offsets the signal from its onset onward until the next change point (or end of series) — a synthetic analogue of a genuine regime change, for evaluating change-point/state detectors (e.g. ClaSP) rather than pointwise anomaly detectors.\n\n\nParameters\n\n\ndf: pd.DataFrame\n\nInput time series DataFrame. Index should be a DatetimeIndex.\n\ncolumns: list of str = None\n\nColumns to target in independent mode. Defaults to all columns. Ignored in coupled mode (only columns in coupled_groups are affected).\n\nn_changes: int = 3\n\nNumber of change points to inject per column (independent) or per group (coupled).\n\noffset_range: str or tuple of float = \"hard\"\n\nPer-change-point offset magnitude as a multiplier of each column’s diff std, accumulated at each successive change point. Same presets as inject_faults.\n\nmode: str = \"independent\"\n\n\"independent\": per-column change points at independent onsets. \"coupled\": same onsets injected across each group in coupled_groups.\n\ncoupled_groups: list of list of str = None\n\nGroups of columns for coupled injection. Required when mode=\"coupled\".\n\nrng: int, np.random.Generator, or None = None\n\nRandom seed or generator for reproducibility.\n\n\n\n\n\nReturns\n\n\ncorrupted_df: pd.DataFrame\n\nCopy of df with persistent regime shifts injected.\n\nchange_points: pd.DataFrame\n\nBoolean DataFrame of the same shape as df; True at the onset timestep of a change point (not across the whole shifted segment).",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.evaluation.inject_change_points"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.dataset.SliceBatchSampler.html",
+    "href": "reference/anomaly.dataset.SliceBatchSampler.html",
+    "title": "anomaly.dataset.SliceBatchSampler",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.dataset.SliceBatchSampler(sampler, batch_size, drop_last)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.dataset.SliceBatchSampler"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.FuzzyCluster.html",
+    "href": "reference/anomaly.autoencoder.FuzzyCluster.html",
+    "title": "anomaly.autoencoder.FuzzyCluster",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.autoencoder.FuzzyCluster(\n    n_clusters=5, error=0.005, maxiter=1000, init=None\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.FuzzyCluster"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.min_max_scale_netcdf.html",
+    "href": "reference/anomaly.anomaly_base.min_max_scale_netcdf.html",
+    "title": "anomaly.anomaly_base.min_max_scale_netcdf()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.anomaly_base.min_max_scale_netcdf(\n    input_file, variable_name, scaling_params_file, chunk_size=144\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.min_max_scale_netcdf"
+    ]
+  },
+  {
+    "objectID": "reference/access.wfs.wfs_request.html",
+    "href": "reference/access.wfs.wfs_request.html",
+    "title": "access.wfs.wfs_request()",
+    "section": "",
+    "text": "Load volcano-tectonic earthquake catalogues from GeoNet’s WFS service (http://wfs.geonet.org.nz).\n\n\nUsage\nSource\n\n\naccess.wfs.wfs_request(\n    start_date,\n    end_date,\n    polygon=None,\n    radius=None,\n    center_point=None,\n    maxdepth=30\n)\n\n\nParameters:\npolygon : str\n    A string with the polygon coordinates in the format\n    \"lon1+lat1,lon2+lat2,...,lonN+latN,lon1+lat1\"\nradius : int\n    The radius around the volcano summit in meters.\ncenter_point : str\n    The center point of the radius in the format \"lon+lat\".\nmaxdepth : int\n    The maximum depth of the earthquakes in kilometers.\n\n\nReturns:\npandas.DataFrame\n    A dataframe with the earthquake catalogue.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.wfs.wfs_request"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.reindex.html",
+    "href": "reference/access.util.reindex.html",
+    "title": "access.util.reindex()",
+    "section": "",
+    "text": "Reindex and forward fill to generate a\n\n\nUsage\nSource\n\n\naccess.util.reindex(df, dates, fill_method=None, ffill_interval=14)\n\n\ntimeseries that can be used to set the evidence for a BN.\n:param df: Dataframe to reindex :type df: :class:pandas.DataFrame :param dates: new date index :type dates: :class:pandas.DataTimeIndex :param ffill_interval: Best-by interval for data :type ffill_interval: int",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.reindex"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.gradient.html",
+    "href": "reference/access.util.gradient.html",
+    "title": "access.util.gradient()",
+    "section": "",
+    "text": "Compute gradient for time series by first smoothing\n\n\nUsage\nSource\n\n\naccess.util.gradient(df, period=\"14D\")\n\n\nthe time series and then computing the first-order difference.\n\n\nParameters:\n:param df: Dataframe\n:type df: :class:`~pandas.DataFrame`\n:param period: Period over which to compute a rolling mean.\n:type period: str",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.gradient"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.get_color.html",
+    "href": "reference/access.util.get_color.html",
+    "title": "access.util.get_color()",
+    "section": "",
+    "text": "Return a color from the matplotlib color cycle by index.\n\n\nUsage\nSource\n\n\naccess.util.get_color(idx, alpha=1.0, style=\"seaborn-v0_8-paper\")\n\n\nParameters\n\n\nidx: int\n\nIndex of the color to return.\n\nalpha: float = 1.0\n\nOpacity of the color between 0 and 1, by default 1.\n\nstyle: str = \"seaborn-v0_8-paper\"\n\nmatplotlib style to choose colors from, by default ‘bmh’\n\n\n\n\n\nReturns\n\n\n _type_\n\ndescription",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.get_color"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.eqRate.html",
+    "href": "reference/access.util.eqRate.html",
+    "title": "access.util.eqRate()",
+    "section": "",
+    "text": "Compute earthquake rate.\n\n\nUsage\nSource\n\n\naccess.util.eqRate(\n    cat, fixed_time=None, fixed_nevents=None, enddate=datetime.utcnow()\n)\n\n\n:param cat: A catalogue of earthquakes as returned by :method:pyvolprob.load_ruapehu_earthquakes :type cat: :class:pandas.DataFrame :param fixed_time: If not ‘None’, compute the earthquake rate based on a fixed-length time window given in days. :type fixed_time: int :param fixed_nevents: If not None, compute the earthquake rate based on a fixed number of events. :type fixed_nevents: int :param enddate: The latest date of the time-series. Mainly needed for testing. :type enddate: :class:datetime.datetime",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.eqRate"
+    ]
+  },
+  {
+    "objectID": "reference/access.tilde.tilde_request.html",
+    "href": "reference/access.tilde.tilde_request.html",
+    "title": "access.tilde.tilde_request()",
+    "section": "",
+    "text": "Request data from the tilde API (https://tilde.geonet.org.nz/v3/api-docs/).\n\n\nUsage\nSource\n\n\naccess.tilde.tilde_request(\n    start_date,\n    end_date,\n    domain,\n    name,\n    station,\n    method=\"-\",\n    sensor=\"-\",\n    aspect=\"-\"\n)\n\n\nSee the tilde discovery tool for more information: https://tilde.geonet.org.nz/ui/data-discovery/\n\n\nParameters\n\n\ndomain: str\n\nThe domain of the data (e.g. ‘manualcollect’)\n\nname: str\n\nThe name of the data (e.g. ‘plume-SO2-gasflux’)\n\nstation: str\n\nThe station code (e.g. ‘WI000’)\n\nmethod: str = \"-\"\n\nThe method of the data (e.g. ‘contouring’)\n\nsensor: str = \"-\"\n\nThe sensor of the data (e.g. ‘MC01’)\n\naspect: str = \"-\"\n\nThe aspect of the data (e.g. ‘nil’)\n\nstart_date: date\n\nThe start date of the data\n\nend_date: date\n\nThe end date of the data\n\n\n\n\n\nReturns\n\n\n pd.DataFrame\n\nA pandas dataframe with the requested data",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.tilde.tilde_request"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.WaveformBaseclass.html",
+    "href": "reference/access.seismic.WaveformBaseclass.html",
+    "title": "access.seismic.WaveformBaseclass",
+    "section": "",
+    "text": "Base class for waveform clients.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.WaveformBaseclass"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.WaveformBaseclass.html#get_raw",
+    "href": "reference/access.seismic.WaveformBaseclass.html#get_raw",
+    "title": "access.seismic.WaveformBaseclass",
+    "section": "get_raw()",
+    "text": "get_raw()\n\nGet waveform data as delivered by the source.\n\n\nUsage\nSource\n\n\nget_raw(net, site, loc, comp, start, end)\n\n\nParameters\n\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nstart: UTCDateTime\n\nStart and end of the requested time span.\n\nend: UTCDateTime\n\nStart and end of the requested time span.\n\n\n\n\n\nReturns\n\n\n Stream\n\nUnmerged waveform data in counts.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.WaveformBaseclass"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.WaveformBaseclass.html#get_waveforms",
+    "href": "reference/access.seismic.WaveformBaseclass.html#get_waveforms",
+    "title": "access.seismic.WaveformBaseclass",
+    "section": "get_waveforms()",
+    "text": "get_waveforms()\n\nGet waveform data with the instrument sensitivity removed.\n\n\nUsage\nSource\n\n\nget_waveforms(net, site, loc, comp, start, end)\n\n\nParameters\n\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nstart: UTCDateTime\n\nStart and end of the requested time span.\n\nend: UTCDateTime\n\nStart and end of the requested time span.\n\n\n\n\n\nReturns\n\n\n Trace\n\nWaveform data with the instrument sensitivity removed.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.WaveformBaseclass"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.WaveformBaseclass.html#process",
+    "href": "reference/access.seismic.WaveformBaseclass.html#process",
+    "title": "access.seismic.WaveformBaseclass",
+    "section": "process()",
+    "text": "process()\n\nRemove the instrument sensitivity, fill gaps and trim to the\n\n\nUsage\nSource\n\n\nprocess(st, net, site, loc, comp, start, end)\n\n\nrequested time span.\n\n\nParameters\n\n\nst: Stream\n\nRaw waveform data as returned by get_raw.\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nstart: UTCDateTime\n\nStart and end of the requested time span.\n\nend: UTCDateTime\n\nStart and end of the requested time span.\n\n\n\n\n\nReturns\n\n\n Trace\n\nWaveform data with the instrument sensitivity removed.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.WaveformBaseclass"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.SDSWaveforms.html#init__",
+    "href": "reference/access.seismic.SDSWaveforms.html#init__",
+    "title": "access.seismic.SDSWaveforms",
+    "section": "__init__()",
+    "text": "__init__()\n\nGet seismic waveforms from a local SDS archive.\n\n\nUsage\nSource\n\n\n__init__(sds_dir, fdsn_urls, fill_value=np.nan)\n\n\n:param fill_value: Default value used to fill gaps and pad traces to cover the whole time period defined by startdate and enddate. If ‘interpolate’ is chosen, the traces will not be padded. :type fill_value: int, float, ‘interpolate’, np.nan, or None",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.SDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcessException.html",
+    "href": "reference/access.seismic.PostProcessException.html",
+    "title": "access.seismic.PostProcessException",
+    "section": "",
+    "text": "Usage\nSource\n\n\naccess.seismic.PostProcessException()",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcessException"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html",
+    "href": "reference/access.seismic.MockSDSWaveforms.html",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "",
+    "text": "Mock SDSWaveforms class for testing by creating",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html#init__",
+    "href": "reference/access.seismic.MockSDSWaveforms.html#init__",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "__init__()",
+    "text": "__init__()\n\nGet seismic waveforms from a local SDS archive.\n\n\nUsage\nSource\n\n\n__init__(sds_dir)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html#generate_dataset",
+    "href": "reference/access.seismic.MockSDSWaveforms.html#generate_dataset",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "generate_dataset()",
+    "text": "generate_dataset()\n\nGenerate a test dataset for the integration tests.\n\n\nUsage\nSource\n\n\ngenerate_dataset(rootdir, net, site, loc, comp, start, end)\n\n\nParameters\n\n\nrootdir: str\n\nParent directory for the test dataset.\n\nstart: str\n\nStart time for the test dataset in ISO 8601 format.\n\nend: str\n\nEnd time for the test dataset in ISO 8601 format.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html#get_raw",
+    "href": "reference/access.seismic.MockSDSWaveforms.html#get_raw",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "get_raw()",
+    "text": "get_raw()\n\nGenerate synthetic daily files that start at midnight on the\n\n\nUsage\nSource\n\n\nget_raw(net, site, loc, comp, startdate, enddate)\n\n\nstartdate and end at midnight on the enddate. The return the requested timespan from these files.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html#process",
+    "href": "reference/access.seismic.MockSDSWaveforms.html#process",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "process()",
+    "text": "process()\n\nReturn the first trace unchanged, since synthetic data have no\n\n\nUsage\nSource\n\n\nprocess(st, net, site, loc, comp, startdate, enddate)\n\n\nstation metadata.\n\n\nParameters\n\n\nst: Stream\n\nSynthetic waveform data as returned by get_raw.\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nstartdate: UTCDateTime\n\nStart and end of the requested time span.\n\nenddate: UTCDateTime\n\nStart and end of the requested time span.\n\n\n\n\n\nReturns\n\n\n Trace\n\nFirst trace of st.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.MockSDSWaveforms.html#save2sds",
+    "href": "reference/access.seismic.MockSDSWaveforms.html#save2sds",
+    "title": "access.seismic.MockSDSWaveforms",
+    "section": "save2sds()",
+    "text": "save2sds()\n\nSave a trace to a SDS directory structure.\n\n\nUsage\nSource\n\n\nsave2sds(trace, rootdir)\n\n\nParameters\n\n\ntrace: obspy.Trace\n\nSeismic/acoustic trace to be written to disk.\n\nrootdir: str\n\nRoot directory for the SDS directory structure.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.MockSDSWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.logging_config.setup_logging.html",
+    "href": "reference/access.logging_config.setup_logging.html",
+    "title": "access.logging_config.setup_logging()",
+    "section": "",
+    "text": "Configure logging for the aitana package.\n\n\nUsage\nSource\n\n\naccess.logging_config.setup_logging(level=logging.INFO)\n\n\nBy default, INFO and DEBUG messages go to stdout, WARNING, ERROR, and CRITICAL go to stderr.\n\n\nParameters:\nlevel : int\n    The logging level (e.g., logging.DEBUG, logging.INFO)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.logging_config.setup_logging"
+    ]
+  },
+  {
+    "objectID": "reference/access.api.AitanaAPI.html#waveform",
+    "href": "reference/access.api.AitanaAPI.html#waveform",
+    "title": "access.api.AitanaAPI",
+    "section": "waveform()",
+    "text": "waveform()\n\nGet instrument-corrected waveforms.\n\n\nUsage\nSource\n\n\nwaveform(\n    network,\n    station,\n    location,\n    channel,\n    starttime,\n    duration,\n    maxResLimit=1.0,\n    resolution=\"full\"\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.api.AitanaAPI"
+    ]
+  },
+  {
+    "objectID": "developer/roadmap.html",
+    "href": "developer/roadmap.html",
+    "title": "Roadmap",
+    "section": "",
+    "text": "The expert panel (aitana-anomaly)\nThe research goal is to treat the volcano as a dynamical system with a hidden state vector, detect recurring state regimes, and answer two operational questions directly: “is this normal?” and “when did it last look like this?”. Rather than crowning a single best method, four algorithms of increasing complexity run as an expert panel, and their agreement is itself the signal:\n\n\n\n\n\n\n\nAlgorithm\nRung\n\n\n\n\nPCA + Hidden Markov Model\nBaseline: orthogonal feature space with state propagation\n\n\n1D-convolutional autoencoder\nTemporal dynamics over a sliding window\n\n\nScattering network + novelty detector\nWaveform-level representation\n\n\nClaSP / CLaP state detection\nRecurring-regime segmentation with transition structure\n\n\n\nAgreement is layered: per-algorithm alarm bits summed into a vote count, rolling rank correlation as consensus strength, and inferred state labels as context against the eruption chronology. Validation runs on two tracks — synthetic fault injection (as a per-fault-type sensitivity diagnostic, not a leaderboard) and real eruption catalogues (Whakaari 2018–2020 quantitatively; Ruapehu’s H1 2022 unrest as a qualitative case study).\n\n\nThe duty-officer companion (aitana-bot)\nTwo capabilities, deliberately different architectures, both Ruapehu-first:\n\nVolcanic Activity Bulletins — a linear pipeline (fetch → digest to statistics → one structured LLM call → provenance check) that drafts a daily report. Three rules are enforced structurally, not by prompt: the agent never infers the Volcanic Alert Level (it transcribes it from meeting notes), raw time series never reach the LLM, and everything produced is a draft with no auto-publish path.\nEruption confirmation — an on-demand agentic tool loop (webcam imagery, seismic and infrasound data, anomaly baselines) that produces a hedged, evidence-cited assessment. The output schema has no boolean verdict field; the full tool-call transcript is logged as an audit trail.\n\n\n\nCross-cutting\n\nA camera module in aitana-access for GeoNet webcam imagery (same S3 bucket as waveforms).\nCadence alignment: resampling all streams onto a shared 10-minute grid in aitana-access and aitana-features.\nTemporal cross-validation schemes and proper scoring rules (log-likelihood, CRPS, reliability diagrams).\nSemantic versioning of datasets and evaluation protocols.\nIntegration with community tools (SeisBench, WOVOdat formats).",
+    "crumbs": [
+      "Developers",
+      "Roadmap"
+    ]
+  },
+  {
+    "objectID": "developer/development.html",
+    "href": "developer/development.html",
+    "title": "Development setup",
+    "section": "",
+    "text": "The repo is a uv workspace with a single lockfile:\ngit clone https://github.com/tsc-tools/aitana.git\ncd aitana\nuv sync                    # installs all distributions in editable mode\nuv run pytest              # run the test suite\nuv run lint-imports        # check the layering contracts\nA devcontainer is provided with the full toolchain (uv, Apptainer, Quarto, Node) preinstalled.",
+    "crumbs": [
+      "Developers",
+      "Development setup"
+    ]
+  },
+  {
+    "objectID": "developer/architecture.html",
+    "href": "developer/architecture.html",
+    "title": "Architecture",
+    "section": "",
+    "text": "Package boundaries are drawn along the axis of change — who has to change when X changes, and which way dependencies point — not along a taxonomy of what the data is. Two rules are load-bearing and enforced by import-linter contracts in pyproject.toml:\n\nDependencies point downward only. Lower layers never import higher ones.\nComputation packages never fetch. features operates on in-memory waveforms and must not import access. They are siblings that never import each other.\n\n                                 aitana-pipelines runs Snakemake workflows\n                                        ┆\n                                        ▼\n                                 aitana-anomaly     detection\n                                     │    │\n                                     ▼    ▼\n                       aitana-access   aitana-features   siblings: I/O ── computation\n                                     │    |\n                                     ▼    ▼\n                                 aitana-storage     persistence\n(Solid arrows are depends on. aitana-pipelines is where components are combined into reproducible pipelines: its Snakemake workflows run the lower layers in the active environment but aitana.pipelines never imports them (it depends on aitana-volcanoes and aitana-storage only). Grafana reads workflow results from aitana-storage through aitana-api. aitana-bot is a stub so far and imports no aitana package.)\naitana-testing provides synthetic waveforms for the package tests and is a dependency of aitana-access.\nThe aitana-volcanoes package is a convenience package that combines various datasets for a particular volcano.",
+    "crumbs": [
+      "Developers",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "developer/implementation-status.html",
+    "href": "developer/implementation-status.html",
+    "title": "Implementation status",
+    "section": "",
+    "text": "aitana-storage\n\nStorage — hierarchical feature archives (site/sensor/channel) backed by NetCDF or Zarr, with gap filling, incremental merging and time-range queries.\nAitanaDataset — PyTorch dataset yielding [window_size, n_features] windows with configurable stride.\naitana-api — FastAPI service exposing /feature and /inventory.\ngrafana_annotations — sync the labels drawn on any Grafana dashboard with one label file; restores them to a freshly deployed Grafana.\nBackground IngestWorker for queued dataset writes.\n\n\n\naitana-access\n\ntilde_request() — GeoNet Tilde v4 observations (lake temperature and level, gas, GNSS, water chemistry).\nwfs_request() — GeoNet WFS earthquake catalogue by radius or polygon.\nSeismicData with pluggable clients tried in order: S3Waveforms (GeoNet’s anonymous AWS Open Data bucket), FDSNWaveforms, SDSWaveforms, MockSDSWaveforms; includes validation, gap filling and instrument-response removal.\ncache_dataframe() — transparent disk caching with incremental date-range updates.\neqRate() / gradient() — moving-window earthquake rate and trend estimation.\nAitanaAPI — FastAPI service adding /waveform and /spectrogram.\n\n\n\naitana-features\nRSAM (with wideband energy ratio), SSAM (filterbank and sonogram), DSAR, spectral features (predominant/central frequency, bandwidth, cepstral coefficients), complex-trace attributes (instantaneous frequency and bandwidth, normalised envelope, centroids), plus windowing and stacking utilities and Matplotlib/Plotly visualisation.\n\n\naitana-volcanoes\n\nRuapehu — CraterLake (temperature, level), Gas (SO₂, CO₂, H₂S), Seismicity (regional and cone), eruptions(), load_all(), lake-height scaling.\nWhakaari — Gas, Seismicity (RSAM, quakes), eruptions(), load_all().\nassimilate — state-space Kalman models: SO2FusionModel (multi-sensor SO₂ fusion), LocalLinearTrend, SemiLinearTrend.\n\n\n\naitana-pipelines\n\naitana-pipelines CLI (list / run / clean) driving Snakemake workflows discovered via the aitana.pipelines.workflows entry-point group — third-party packages can register their own.\nscoring — pre-eruption-window evaluation, TP/FP/TN/FN thresholding, ROC curves, forecasted-rate computation.\nvisualise — trellis_plot (multi-panel time series with ensemble/uncertainty overlays) and scoring_plot.\nThree bundled workflows: egu2026, a Bayesian network vs decision tree benchmark for Whakaari, ruapehu_mp, the Ruapehu RSAM matrix-profile alert (see Running workflows), and ruapehu_snet, which stores scattering-network coefficients of Ruapehu’s three-component data.\n\n\n\naitana-anomaly\n\nAnomalyDetectionBaseClass — the shared contract every detector implements, including normalize_score(), the ECDF/percentile-rank normaliser that makes different algorithms’ raw statistics comparable against a quiet reference period.\nZizouDataset — feature loading and scaling for model input.\nAutoEncoder / TiedAutoEncoder — working per-timestep autoencoder with training, checkpointing and inference; FuzzyCluster for cluster assignment. This and ZizouDataset need the pytorch extra (aitana-anomaly[pytorch]).\nSNet — scattering-network feature extraction (via scatseisnet): preprocess() puts three components on a common 25 Hz grid with an anti-alias filter, compute() gives first- and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a component is missing. The ruapehu_snet workflow runs it.\nMatrixProfile — z-normalized left matrix profile (stumpy) of a single series, scored against its own trailing history and mapped to [0, 1] with normalize_score(). Sensitive to changes in shape, deliberately blind to amplitude.\nevaluation — the synthetic validation harness: inject_faults() (independent per-stream Bernoulli faults and coupled multi-stream faults), inject_change_points() (persistent regime shifts), simulate_regime_series() (synthetic data with known states) and score_detector() (ROC/AUC against the injected ground-truth mask). Documented with worked examples in Evaluating anomaly detectors.\n\nNot yet working in aitana-anomaly: MatrixProfile is the only detector that implements compute_anomaly_index(). pca.py needs a rewrite (its test suite is entirely skipped), and SNet has no downstream scoring layer.",
+    "crumbs": [
+      "Developers",
+      "Implementation status"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "",
+    "text": "View on PyPI\n\n\n\nSkills llms.txt llms-full.txt"
+  },
+  {
+    "objectID": "index.html#the-vision",
+    "href": "index.html#the-vision",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "The vision",
+    "text": "The vision\n\n\n\nAitana system architecture\n\n\n(The diagram source is aitana.json, editable with draw.io.)\nThe target system is a closed loop, with aitana-storage as the hub:\n\nIngest — aitana-access pulls observations from GeoNet’s Tilde API, the WFS earthquake catalogue and FDSN/S3 waveform archives.\nCompute — aitana-features turns waveforms into features (RSAM, SSAM, DSAR, spectral and complex-trace attributes). It never fetches; it takes data in and returns results out.\nStore — everything lands in aitana-storage as NetCDF/Zarr archives. It comes with a FastAPI endpoint that can serve datasets to Grafana.\nDetect — aitana-anomaly runs a panel of state- and anomaly-detection algorithms over the stored features, each producing a comparable [0,1] anomaly index rather than one method being anointed as “the” detector.\nRun & evaluate — aitana-pipelines combines the layers below into reproducible Snakemake workflows: operational runs that feed alerts, and evaluation runs that score methods against real eruption catalogues and synthetic fault injection.\nCommunicate — workflows store an alarm series next to each anomaly index, and Grafana alerting posts to Slack when it is raised. aitana-bot (planned) is a Slack bot for investigating further. It can also draft a daily “volcano weather report” and assists duty officers with on-demand eruption confirmation.\nClose the loop — a human expert reviews what the system flagged. Their annotations flow back into aitana-storage as confirmed or revised labels, becoming ground truth for the next round of training and evaluation. Grafana provides the visual front end for that review."
+  },
+  {
+    "objectID": "index.html#package-status",
+    "href": "index.html#package-status",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "Package status",
+    "text": "Package status\n\n\n\nDistribution\nImport package\nRole\nStatus\n\n\n\n\naitana-storage\naitana.storage\nNetCDF/Zarr feature archives, HTTP API, PyTorch datasets, Grafana annotations\nWorking (0.1.1)\n\n\naitana-access\naitana.access\nPure I/O: Tilde, WFS, FDSN/S3/SDS waveforms\nWorking (0.1.2)\n\n\naitana-features\naitana.features\nRSAM, SSAM, DSAR, spectral & complex-trace features\nWorking (0.1.0)\n\n\naitana-volcanoes\naitana.volcanoes\nRuapehu & Whakaari domain aggregates, eruption catalogues, Kalman fusion\nWorking (0.1.0)\n\n\naitana-pipelines\naitana.pipelines\naitana-pipelines CLI, scoring, plotting, Snakemake workflows\nWorking (0.1.0)\n\n\naitana-anomaly\naitana.anomaly\nState & anomaly detection expert panel\nPartial — see Implementation status\n\n\naitana-testing\naitana.testing\nSynthetic waveforms with known spectral content for tests\nWorking (0.1.0)\n\n\naitana-bot\naitana.bot\nPlanned: interactive Slack companion, VAB drafting, eruption confirmation\nStub (0.1.0)"
+  },
+  {
+    "objectID": "index.html#installation",
+    "href": "index.html#installation",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "Installation",
+    "text": "Installation\nEach distribution installs independently with its own narrow dependency set — installing aitana-features gets you numpy/scipy/obspy, not the FDSN clients or storage backends:\npip install aitana-storage     # feature archives + HTTP API only\npip install aitana-features    # feature computation only\npip install aitana-access      # I/O only (pulls storage)\npip install aitana-volcanoes   # per-volcano aggregates (pulls access + features)\npip install aitana-pipelines   # workflow CLI\naitana-anomaly is not published yet — install it from the workspace (see Development setup).\nThey share the aitana. namespace, so installing several gives you import aitana.access, import aitana.features, and so on. There is no parent aitana distribution."
+  },
+  {
+    "objectID": "index.html#running-workflows",
+    "href": "index.html#running-workflows",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "Running workflows",
+    "text": "Running workflows\nThe aitana-pipelines command drives Snakemake workflows bundled with Aitana or registered by third-party packages:\naitana-pipelines list                     # see what workflows are available\naitana-pipelines run whakaari ./results   # run the Whakaari Bayesian-network benchmark\nRunning workflows covers the commands, the bundled workflows and how to register your own."
+  },
+  {
+    "objectID": "index.html#documentation",
+    "href": "index.html#documentation",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "Documentation",
+    "text": "Documentation\nThe documentation has a user guide, the API reference for every aitana.* package, and developer notes on the architecture, implementation status and roadmap."
+  },
+  {
+    "objectID": "index.html#get-in-touch",
+    "href": "index.html#get-in-touch",
+    "title": "Aitana: a human-in-the-loop framework for volcano monitoring",
+    "section": "Get in touch",
+    "text": "Get in touch\nReport bugs, suggest features, view the source code, and ask questions on GitHub."
+  },
+  {
+    "objectID": "reference/access.logging_config.get_logger.html",
+    "href": "reference/access.logging_config.get_logger.html",
+    "title": "access.logging_config.get_logger()",
+    "section": "",
+    "text": "Get a logger for a specific module within aitana.\n\n\nUsage\nSource\n\n\naccess.logging_config.get_logger(name)\n\n\nParameters:\nname : str\n    The name of the module (e.g., 'aitana.volcanoes.ruapehu')\n\n\nReturns:\nlogging.Logger\n    A configured logger instance",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.logging_config.get_logger"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.FDSNWaveforms.html#init__",
+    "href": "reference/access.seismic.FDSNWaveforms.html#init__",
+    "title": "access.seismic.FDSNWaveforms",
+    "section": "__init__()",
+    "text": "__init__()\n\nGet seismic waveforms from FDSN web service.\n\n\nUsage\nSource\n\n\n__init__(url, debug=False, fill_value=np.nan)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.FDSNWaveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcess.html",
+    "href": "reference/access.seismic.PostProcess.html",
+    "title": "access.seismic.PostProcess",
+    "section": "",
+    "text": "Class for checking waveforms and station metadata for valid values,",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcess"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcess.html#check_case_incomplete_station_metadata",
+    "href": "reference/access.seismic.PostProcess.html#check_case_incomplete_station_metadata",
+    "title": "access.seismic.PostProcess",
+    "section": "check_case_incomplete_station_metadata()",
+    "text": "check_case_incomplete_station_metadata()\n\nThe case where a a channel period start/stops during the\n\n\nUsage\nSource\n\n\ncheck_case_incomplete_station_metadata()\n\n\nselected time window. Some parts of the trace in the stream might not correspond to a valid period according to station metadata.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcess"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcess.html#check_case_multiple_channel_periods",
+    "href": "reference/access.seismic.PostProcess.html#check_case_multiple_channel_periods",
+    "title": "access.seismic.PostProcess",
+    "section": "check_case_multiple_channel_periods()",
+    "text": "check_case_multiple_channel_periods()\n\nChecks if there are multiple channel operation periods in a given\n\n\nUsage\nSource\n\n\ncheck_case_multiple_channel_periods()\n\n\ntime period. If so, different response removal is required.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcess"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcess.html#check_case_no_data",
+    "href": "reference/access.seismic.PostProcess.html#check_case_no_data",
+    "title": "access.seismic.PostProcess",
+    "section": "check_case_no_data()",
+    "text": "check_case_no_data()\n\nChecks if either no stream, or no station metadata exist.\n\n\nUsage\nSource\n\n\ncheck_case_no_data()",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcess"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.PostProcess.html#output_case_multiple_channel_periods",
+    "href": "reference/access.seismic.PostProcess.html#output_case_multiple_channel_periods",
+    "title": "access.seismic.PostProcess",
+    "section": "output_case_multiple_channel_periods()",
+    "text": "output_case_multiple_channel_periods()\n\nStitches two response periods together to make a single merged\n\n\nUsage\nSource\n\n\noutput_case_multiple_channel_periods()\n\n\ntrace.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.PostProcess"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.S3Waveforms.html#init__",
+    "href": "reference/access.seismic.S3Waveforms.html#init__",
+    "title": "access.seismic.S3Waveforms",
+    "section": "__init__()",
+    "text": "__init__()\n\nGet seismic waveforms from GeoNet’s open data archive on AWS S3.\n\n\nUsage\nSource\n\n\n__init__(debug=False, fill_value=np.nan)\n\n\nParameters\n\n\ndebug: bool = False\n\nIf True, debug messages will be printed to the console.\n\nfill_value: int, float, ‘interpolate’, np.nan, or None = np.nan\n\nValue to use for filling gaps in the data.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.S3Waveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.S3Waveforms.html#get_raw",
+    "href": "reference/access.seismic.S3Waveforms.html#get_raw",
+    "title": "access.seismic.S3Waveforms",
+    "section": "get_raw()",
+    "text": "get_raw()\n\nDownload waveforms.\n\n\nUsage\nSource\n\n\nget_raw(net, site, loc, comp, start, end)\n\n\nParameters\n\n\nnet: str\n\nNetwork code.\n\nsite: str\n\nStation code.\n\nloc: str\n\nLocation code.\n\ncomp: str\n\nChannel code.\n\nstart: UTCDateTime\n\nStart time of the data to be downloaded.\n\nend: UTCDateTime\n\nEnd time of the data to be downloaded.\n\n\n\n\n\nReturns\n\n\n Stream\n\nThe day files’ waveform data in counts, trimmed to the requested time span.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.S3Waveforms"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.SeismicData.html#init__",
+    "href": "reference/access.seismic.SeismicData.html#init__",
+    "title": "access.seismic.SeismicData",
+    "section": "__init__()",
+    "text": "__init__()\n\nGet seismic waveforms from the first of several clients that has\n\n\nUsage\nSource\n\n\n__init__(clients, chunk_size=None, cache_dir=None, cache_min_age=2 * 86400.0)\n\n\ndata, optionally through a local cache of raw day files.\n\n\nParameters\n\n\nclients: list of WaveformBaseclass\n\nWaveform clients, tried in order.\n\nchunk_size: float = None\n\nLength in seconds of the chunks get_waveforms yields.\n\ncache_dir: str = None\n\nParent directory of the cache, by default ~/aitana_cache. Raw day files go into its raw subdirectory in SDS layout. Files directly in cache_dir are processed data written by earlier versions and are never read.\n\ncache_min_age: float = 2 * 86400.0\n\nSeconds after the end of a UTC day before it is cached.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.SeismicData"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.SeismicData.html#get_raw",
+    "href": "reference/access.seismic.SeismicData.html#get_raw",
+    "title": "access.seismic.SeismicData",
+    "section": "get_raw()",
+    "text": "get_raw()\n\nGet raw data per UTC day from the cache or from the first client\n\n\nUsage\nSource\n\n\nget_raw(net, site, loc, comp, start, end)\n\n\nthat has data. Days that ended more than cache_min_age ago are fetched whole and written to the cache.\n\n\nParameters\n\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nstart: UTCDateTime\n\nStart and end of the requested time span.\n\nend: UTCDateTime\n\nStart and end of the requested time span.\n\n\n\n\n\nReturns\n\n\nst: Stream\n\nRaw data between start and end.\n\nclient: WaveformBaseclass or None\n\nFirst client that delivered data, None if all of it came from the cache.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.SeismicData"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.SeismicData.html#get_waveforms",
+    "href": "reference/access.seismic.SeismicData.html#get_waveforms",
+    "title": "access.seismic.SeismicData",
+    "section": "get_waveforms()",
+    "text": "get_waveforms()\n\nYield waveform data for requested time span.\n\n\nUsage\nSource\n\n\nget_waveforms(net, site, loc, comp, start, end, cache=False)\n\n\nParameters\n\n\nnet: str\n\nNetwork, station, location and channel codes. comp may include a simple wildcard of the form ?? or ? or patterns like HH? to request multiple components (e.g. HH? -&gt; HHZ, HHN, HHE). Only a single wildcard character is currently supported and will expand to the common three-component set Z, N, E (or Z, 1, 2 if those exist in the data – both tried).\n\nsite: str\n\nNetwork, station, location and channel codes. comp may include a simple wildcard of the form ?? or ? or patterns like HH? to request multiple components (e.g. HH? -&gt; HHZ, HHN, HHE). Only a single wildcard character is currently supported and will expand to the common three-component set Z, N, E (or Z, 1, 2 if those exist in the data – both tried).\n\nloc: str\n\nNetwork, station, location and channel codes. comp may include a simple wildcard of the form ?? or ? or patterns like HH? to request multiple components (e.g. HH? -&gt; HHZ, HHN, HHE). Only a single wildcard character is currently supported and will expand to the common three-component set Z, N, E (or Z, 1, 2 if those exist in the data – both tried).\n\ncomp: str\n\nNetwork, station, location and channel codes. comp may include a simple wildcard of the form ?? or ? or patterns like HH? to request multiple components (e.g. HH? -&gt; HHZ, HHN, HHE). Only a single wildcard character is currently supported and will expand to the common three-component set Z, N, E (or Z, 1, 2 if those exist in the data – both tried).\n\nstart: UTCDateTime\n\nStart and end times.\n\nend: UTCDateTime\n\nStart and end times.\n\ncache: bool = False\n\nIf True, raw data of UTC days that ended more than cache_min_age ago are read from, or written to, the local SDS cache.\n\n\n\n\n\nYields\n\n\n Trace or Stream\n\nFor a single component request, yields an ObsPy Trace (backwards compatible). For a wildcard multi-component request, yields an ObsPy Stream with one Trace per component for each chunk.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.SeismicData"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.SeismicData.html#to_sds",
+    "href": "reference/access.seismic.SeismicData.html#to_sds",
+    "title": "access.seismic.SeismicData",
+    "section": "to_sds()",
+    "text": "to_sds()\n\nPath of a day file in the cache, writing st to it if given.\n\n\nUsage\nSource\n\n\nto_sds(st, net, site, loc, comp, day)\n\n\nParameters\n\n\nst: Stream or None\n\nRaw data of one UTC day. If None, nothing is written.\n\nnet: str\n\nNetwork, station, location and channel codes.\n\nsite: str\n\nNetwork, station, location and channel codes.\n\nloc: str\n\nNetwork, station, location and channel codes.\n\ncomp: str\n\nNetwork, station, location and channel codes.\n\nday: UTCDateTime\n\nMidnight at the start of the day.\n\n\n\n\n\nReturns\n\n\n str\n\nPath of the day file.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.SeismicData"
+    ]
+  },
+  {
+    "objectID": "reference/access.seismic.get_instrument_response.html",
+    "href": "reference/access.seismic.get_instrument_response.html",
+    "title": "access.seismic.get_instrument_response()",
+    "section": "",
+    "text": "Retrieve instrument response file in STATIONXML format.\n\n\nUsage\nSource\n\n\naccess.seismic.get_instrument_response(\n    net, site, loc, fdsn_urls=\"https://service.geonet.org.nz\"\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.seismic.get_instrument_response"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.cache_dataframe.html",
+    "href": "reference/access.util.cache_dataframe.html",
+    "title": "access.util.cache_dataframe()",
+    "section": "",
+    "text": "Decorator to cache pandas DataFrames, handle date ranges, and persist the cache to disk.\n\n\nUsage\nSource\n\n\naccess.util.cache_dataframe(cache_dir=\"\")\n\n\nArgs: cache_key (str): The attribute name for the cached DataFrame. use_class_attrs (bool): If True, fetch start_date and end_date from the class instance if available. cache_file (str): Filepath for persisting the cache.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.cache_dataframe"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.generate_cache_key.html",
+    "href": "reference/access.util.generate_cache_key.html",
+    "title": "access.util.generate_cache_key()",
+    "section": "",
+    "text": "Generate a unique filename for caching based on function name and arguments.\n\n\nUsage\nSource\n\n\naccess.util.generate_cache_key(func_name, args, kwargs)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.generate_cache_key"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.get_defaults_with_names.html",
+    "href": "reference/access.util.get_defaults_with_names.html",
+    "title": "access.util.get_defaults_with_names()",
+    "section": "",
+    "text": "Get parameter names and their default values\n\n\nUsage\nSource\n\n\naccess.util.get_defaults_with_names(func)\n\n\nfrom a function object.",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.get_defaults_with_names"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.hex_to_rgb.html",
+    "href": "reference/access.util.hex_to_rgb.html",
+    "title": "access.util.hex_to_rgb()",
+    "section": "",
+    "text": "Return (red, green, blue) for the color given as #rrggbb.\n\n\nUsage\nSource\n\n\naccess.util.hex_to_rgb(value, alpha=1.0)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.hex_to_rgb"
+    ]
+  },
+  {
+    "objectID": "reference/access.util.rgb_to_hex.html",
+    "href": "reference/access.util.rgb_to_hex.html",
+    "title": "access.util.rgb_to_hex()",
+    "section": "",
+    "text": "Return color as #rrggbb for the given color values.\n\n\nUsage\nSource\n\n\naccess.util.rgb_to_hex(red, green, blue)",
+    "crumbs": [
+      "Reference",
+      "aitana.access",
+      "access.util.rgb_to_hex"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#compute_anomaly_index",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#compute_anomaly_index",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "compute_anomaly_index()",
+    "text": "compute_anomaly_index()\n\nA scalar value between 0 and 1 indicating\n\n\nUsage\nSource\n\n\ncompute_anomaly_index()\n\n\nthe degree of anomaly (1=most anomaluous).",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#fit",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#fit",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "fit()",
+    "text": "fit()\n\nTrain the model.\n\n\nUsage\nSource\n\n\nfit(starttime, endtime)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#infer",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#infer",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "infer()",
+    "text": "infer()\n\nUse the model to infer.\n\n\nUsage\nSource\n\n\ninfer(starttime, endtime)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#normalize_score",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#normalize_score",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "normalize_score()",
+    "text": "normalize_score()\n\nPercentile rank (ECDF) of raw_scores against a reference distribution.\n\n\nUsage\nSource\n\n\nnormalize_score(raw_scores, reference_scores)\n\n\nParameters\n\n\nraw_scores: array - like\n\nScores to normalize (e.g. from the evaluation period).\n\nreference_scores: array - like\n\nReference distribution from a quiet period.\n\n\n\n\n\nReturns\n\n\n np.ndarray\n\nValues in [0, 1]; 1.0 means the score exceeds all reference scores.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#read_model_parameters",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#read_model_parameters",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "read_model_parameters()",
+    "text": "read_model_parameters()\n\nRead principal components or\n\n\nUsage\nSource\n\n\nread_model_parameters()\n\n\nmodel weights from file",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#write_hyperparameters",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#write_hyperparameters",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "write_hyperparameters()",
+    "text": "write_hyperparameters()\n\nStore things like random seed,\n\n\nUsage\nSource\n\n\nwrite_hyperparameters()\n\n\nlearning rate, number of principal components etc.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#write_model_parameters",
+    "href": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.html#write_model_parameters",
+    "title": "anomaly.anomaly_base.AnomalyDetectionBaseClass",
+    "section": "write_model_parameters()",
+    "text": "write_model_parameters()\n\nWrite principal components or\n\n\nUsage\nSource\n\n\nwrite_model_parameters()\n\n\nmodel weights to file",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.anomaly_base.AnomalyDetectionBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.AutoEncoder.html",
+    "href": "reference/anomaly.autoencoder.AutoEncoder.html",
+    "title": "anomaly.autoencoder.AutoEncoder",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.autoencoder.AutoEncoder(\n    store,\n    features=None,\n    layers=[2000, 500, 200, 6],\n    epochs=5,\n    batch_size=1024,\n    patience=10,\n    device=\"cpu\",\n    n_clusters=5,\n    configfile=None\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.AutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "",
+    "text": "Applies an tied-weight autoencoder to the incoming data.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html#init__",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html#init__",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "__init__()",
+    "text": "__init__()\n\nCreate an autoencoder.\n\n\nUsage\nSource\n\n\n__init__(in_features, h_features, activation=F.relu)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html#decode",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html#decode",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "decode()",
+    "text": "decode()\n\nReturn decoded data.\n\n\nUsage\nSource\n\n\ndecode(o)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html#encode",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html#encode",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "encode()",
+    "text": "encode()\n\nReturn encoded data.\n\n\nUsage\nSource\n\n\nencode(x)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html#forward",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html#forward",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "forward()",
+    "text": "forward()\n\nReturn result of encoding and decoding.\n\n\nUsage\nSource\n\n\nforward(x)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.autoencoder.TiedAutoEncoder.html#reset_parameters",
+    "href": "reference/anomaly.autoencoder.TiedAutoEncoder.html#reset_parameters",
+    "title": "anomaly.autoencoder.TiedAutoEncoder",
+    "section": "reset_parameters()",
+    "text": "reset_parameters()\n\nReset linear module parameters (from nn.Linear).\n\n\nUsage\nSource\n\n\nreset_parameters()",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.autoencoder.TiedAutoEncoder"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.dataset.ZizouDataset.html",
+    "href": "reference/anomaly.dataset.ZizouDataset.html",
+    "title": "anomaly.dataset.ZizouDataset",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.dataset.ZizouDataset(\n    store, features, target_transform=None, feature_transforms=None\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.dataset.ZizouDataset"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.evaluation.inject_faults.html",
+    "href": "reference/anomaly.evaluation.inject_faults.html",
+    "title": "anomaly.evaluation.inject_faults()",
+    "section": "",
+    "text": "Inject synthetic faults into a DataFrame for anomaly detection evaluation.\n\n\nUsage\nSource\n\n\nanomaly.evaluation.inject_faults(\n    df,\n    columns=None,\n    rate=0.06,\n    offset_range=\"hard\",\n    mode=\"independent\",\n    coupled_groups=None,\n    rng=None\n)\n\n\nParameters\n\n\ndf: pd.DataFrame\n\nInput time series DataFrame. Index should be a DatetimeIndex.\n\ncolumns: list of str = None\n\nColumns to target in independent mode. Defaults to all columns. Ignored in coupled mode (only columns in coupled_groups are affected).\n\nrate: float = 0.06\n\nPer-timestep fault probability (independent) or per-timestep probability that a coupled group fires (coupled).\n\noffset_range: str or tuple of float = \"hard\"\n\nOffset magnitude as a multiplier of each column’s diff std. \"hard\": (1, 2) — small, harder to detect. \"easy\": (4, 6) — large, easier to detect. Tuple (k1, k2): custom multiplier range.\n\nmode: str = \"independent\"\n\n\"independent\": per-column Bernoulli injection. \"coupled\": same fault timestamps injected across each group in coupled_groups, mimicking a multi-stream precursor.\n\ncoupled_groups: list of list of str = None\n\nGroups of columns for coupled injection. Required when mode=\"coupled\".\n\nrng: int, np.random.Generator, or None = None\n\nRandom seed or generator for reproducibility.\n\n\n\n\n\nReturns\n\n\ncorrupted_df: pd.DataFrame\n\nCopy of df with faults injected.\n\nmask_df: pd.DataFrame\n\nBoolean DataFrame of the same shape as df; True where a fault was injected.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.evaluation.inject_faults"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.evaluation.score_detector.html",
+    "href": "reference/anomaly.evaluation.score_detector.html",
+    "title": "anomaly.evaluation.score_detector()",
+    "section": "",
+    "text": "Score a detector against the fault-injection ground-truth mask.\n\n\nUsage\nSource\n\n\nanomaly.evaluation.score_detector(anomaly_index, mask, threshold)\n\n\nComputes the full ROC curve and AUC using pointwise classification (not eruption-window apportionment).\n\n\nParameters\n\n\nanomaly_index: array-like of float\n\nPer-timestep anomaly scores in [0, 1].\n\nmask: pd.DataFrame or array-like of bool\n\nGround-truth fault mask. If a DataFrame, any faulted column at a timestep counts as a positive label (logical OR across columns).\n\nthreshold: float\n\nOperating threshold for computing binary alarm bits (TP/FP/TN/FN).\n\n\n\n\n\nReturns\n\n\n dict with keys:\n\nfpr, tpr, thresholds — full ROC curve arrays. auc — area under the ROC curve. tp, fp, tn, fn — confusion matrix counts at threshold.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.evaluation.score_detector"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.matrix_profile.MatrixProfile.html",
+    "href": "reference/anomaly.matrix_profile.MatrixProfile.html",
+    "title": "anomaly.matrix_profile.MatrixProfile",
+    "section": "",
+    "text": "Score how unlike its own past each subsequence of a time series is.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.matrix_profile.MatrixProfile"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.matrix_profile.MatrixProfile.html#compute_anomaly_index",
+    "href": "reference/anomaly.matrix_profile.MatrixProfile.html#compute_anomaly_index",
+    "title": "anomaly.matrix_profile.MatrixProfile",
+    "section": "compute_anomaly_index()",
+    "text": "compute_anomaly_index()\n\nCompute the anomaly index for the scored part of a series.\n\n\nUsage\nSource\n\n\ncompute_anomaly_index(series, score_start)\n\n\nParameters\n\n\nseries: pd.Series\n\nRegularly sampled values with a sorted index (history followed by the period to score). NaNs are allowed.\n\nscore_start: index label\n\nFirst index label to score. Everything before it is history.\n\n\n\n\n\nReturns\n\n\n pd.Series\n\nAnomaly index on series.index, labelled by the last sample of each subsequence. Values are in [0, 1] from score_start onward and NaN before it; subsequences containing NaN are NaN.",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.matrix_profile.MatrixProfile"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.pca.PCA.html#infer",
+    "href": "reference/anomaly.pca.PCA.html#infer",
+    "title": "anomaly.pca.PCA",
+    "section": "infer()",
+    "text": "infer()\n\n:param fq: Object to request features.\n\n\nUsage\nSource\n\n\ninfer(fq, savedir=None, overwrite=False)\n\n\n:type fq: :class:FeatureRequest :param savedir: :param overwrite: :return:",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.pca.PCA"
+    ]
+  },
+  {
+    "objectID": "reference/anomaly.pca.runPcaCore.html",
+    "href": "reference/anomaly.pca.runPcaCore.html",
+    "title": "anomaly.pca.runPcaCore()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nanomaly.pca.runPcaCore(\n    config_file,\n    metadata_file,\n    out_dir,\n    end_time=UTCDateTime.now(),\n    start_time=None,\n    overwrite=False\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.anomaly",
+      "anomaly.pca.runPcaCore"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Centroid.html",
+    "href": "reference/features.cpxtrace.Centroid.html",
+    "title": "features.cpxtrace.Centroid",
+    "section": "",
+    "text": "Computes the centroid time of the given data which can be windowed or",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Centroid"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Centroid.html#compute",
+    "href": "reference/features.cpxtrace.Centroid.html#compute",
+    "title": "features.cpxtrace.Centroid",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Centroid"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Inst_Freq.html",
+    "href": "reference/features.cpxtrace.Inst_Freq.html",
+    "title": "features.cpxtrace.Inst_Freq",
+    "section": "",
+    "text": "Computes the instantaneous frequency of the given data which can be",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Inst_Freq"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.Inst_Freq.html#compute",
+    "href": "reference/features.cpxtrace.Inst_Freq.html#compute",
+    "title": "features.cpxtrace.Inst_Freq",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.Inst_Freq"
+    ]
+  },
+  {
+    "objectID": "reference/features.cpxtrace.WindowCentroid.html",
+    "href": "reference/features.cpxtrace.WindowCentroid.html",
+    "title": "features.cpxtrace.WindowCentroid",
+    "section": "",
+    "text": "Computes the centroid of a given time window,\n\n\nUsage\nSource\n\n\nfeatures.cpxtrace.WindowCentroid(interval=600.0, configfile=None)\n\n\ndefined between 0 and 1. Deltas at t_start, t_end and t_midpoint give values of 0, 1 and 0.5 respectively. A flat signal has a centroid = 0.57.\n:param interval: Length of the time interval to compute feature. :type interval: int, optional",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.cpxtrace.WindowCentroid"
+    ]
+  },
+  {
+    "objectID": "reference/features.feature_base.FeatureBaseClass.html",
+    "href": "reference/features.feature_base.FeatureBaseClass.html",
+    "title": "features.feature_base.FeatureBaseClass",
+    "section": "",
+    "text": "Usage\nSource\n\n\nfeatures.feature_base.FeatureBaseClass()",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.feature_base.FeatureBaseClass"
+    ]
+  },
+  {
+    "objectID": "reference/features.rsam.RSAM.html",
+    "href": "reference/features.rsam.RSAM.html",
+    "title": "features.rsam.RSAM",
+    "section": "",
+    "text": "Compute RSAM as the mean of the absolute value of a signal filtered",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.rsam.RSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.rsam.RSAM.html#compute",
+    "href": "reference/features.rsam.RSAM.html#compute",
+    "title": "features.rsam.RSAM",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.rsam.RSAM"
+    ]
+  },
+  {
+    "objectID": "reference/features.spectral_features.SpectralFeatures.html#bandwidth",
+    "href": "reference/features.spectral_features.SpectralFeatures.html#bandwidth",
+    "title": "features.spectral_features.SpectralFeatures",
+    "section": "bandwidth()",
+    "text": "bandwidth()\n\nThe Vanmarcke (1970) bandwidth parameter, q where\n\n\nUsage\nSource\n\n\nbandwidth(psd, freq)\n\n\n0 &lt;= q &lt;= 1. Calculated using the spectral moments of the acceleration power spectral density function. 0 is a Dirac delta PSDF (sine wave), 1 is a flat PSDF (white signal).",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.spectral_features.SpectralFeatures"
+    ]
+  },
+  {
+    "objectID": "reference/features.spectral_features.SpectralFeatures.html#centralfrequency",
+    "href": "reference/features.spectral_features.SpectralFeatures.html#centralfrequency",
+    "title": "features.spectral_features.SpectralFeatures",
+    "section": "centralFrequency()",
+    "text": "centralFrequency()\n\nThe ‘central’ frequency of the acceleration power\n\n\nUsage\nSource\n\n\ncentralFrequency(psd, freq)\n\n\nspectral density function (Hz). Defined as the square root of the ratio between the second and zero-th spectral moments. The spectral moments are calculated with log-spaced frequencies.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.spectral_features.SpectralFeatures"
+    ]
+  },
+  {
+    "objectID": "reference/features.spectral_features.SpectralFeatures.html#compute",
+    "href": "reference/features.spectral_features.SpectralFeatures.html#compute",
+    "title": "features.spectral_features.SpectralFeatures",
+    "section": "compute()",
+    "text": "compute()\n\n:param trace: The seismic waveform data\n\n\nUsage\nSource\n\n\ncompute(trace)\n\n\n:type trace: :class:obspy.Trace :return: DataFrame containing - central frequency (acceleration) in Hz - bandwidth parameter (acceleration) - predominant frequency (acceleration) in Hz - eight cepstral coefficients",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.spectral_features.SpectralFeatures"
+    ]
+  },
+  {
+    "objectID": "reference/features.spectral_features.SpectralFeatures.html#predominantfrequency",
+    "href": "reference/features.spectral_features.SpectralFeatures.html#predominantfrequency",
+    "title": "features.spectral_features.SpectralFeatures",
+    "section": "predominantFrequency()",
+    "text": "predominantFrequency()\n\nThe peak frequency of the acceleration power spectral\n\n\nUsage\nSource\n\n\npredominantFrequency(psd, freq)\n\n\ndensity function, in Hz.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.spectral_features.SpectralFeatures"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.apply_freq_filter.html",
+    "href": "reference/features.util.apply_freq_filter.html",
+    "title": "features.util.apply_freq_filter()",
+    "section": "",
+    "text": "Apply frequency filter to seismic data.\n\n\nUsage\nSource\n\n\nfeatures.util.apply_freq_filter(\n    data, filtertype, filterfreq, corners=4, zerophase=False, **options\n)\n\n\nFilter parameters are taken from instance attributes filtertype and filterfreq.\n:param data: The seismic data to be filtered. :type data: :class:obspy.core.trace.Trace or :class:`obspy.core.stream.Stream :param corners: Filter corners / order, defaults to 4. :type corners: int :param zerophase: If True, apply filter once forwards and once backwards. Defaults to False. :type zerophase: bool :param options: Passed to underlying obspy filter methods.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.apply_freq_filter"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.demean.html",
+    "href": "reference/features.util.demean.html",
+    "title": "features.util.demean()",
+    "section": "",
+    "text": "Return x minus the mean(x).\n\n\nUsage\nSource\n\n\nfeatures.util.demean(x, axis=None)\n\n\n:param x: array or sequence containing the data can have any dimensionality :type x: :class:~numpy.ndarray :param axis: The axis along which to take the mean. See numpy.mean for a description of this argument. :type axis: int :return: input minus the arithmetic mean along the specified axis. :rtype: :class:~numpy.ndarray",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.demean"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.stack_feature.html",
+    "href": "reference/features.util.stack_feature.html",
+    "title": "features.util.stack_feature()",
+    "section": "",
+    "text": "Stack features in a dataarray.\n\n\nUsage\nSource\n\n\nfeatures.util.stack_feature(xrdata, stack_length, interval=\"10min\")\n\n\nParameters\n\n\nxrdata: xarray.DataArray\n\nThe data array to stack.\n\nstack_length: str\n\nThe length of the stack.\n\ninterval: str = \"10min\"\n\nThe interval between stacks, by default “10min”.",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.stack_feature"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.trace_window_data.html",
+    "href": "reference/features.util.trace_window_data.html",
+    "title": "features.util.trace_window_data()",
+    "section": "",
+    "text": "Subdivide an obspy.core.trace.Trace into windows of interval\n\n\nUsage\nSource\n\n\nfeatures.util.trace_window_data(trace, window_len, min_len=0.8)\n\n\nlength and iterate over windows.\n:param trace: The data to be windowed. :type trace: :class:obspy.core.trace.Trace :param window_len: The window length in seconds. :type window_len: float :param min_len: Windows with length &lt; min_length * window_len are skipped, defaults to 0.8 :type min_len: float, optional :yield: A trace data windowNone :rtype: obspy.core.trace.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.trace_window_data"
+    ]
+  },
+  {
+    "objectID": "reference/features.util.window_array.html",
+    "href": "reference/features.util.window_array.html",
+    "title": "features.util.window_array()",
+    "section": "",
+    "text": "Take a 1-D numpy array and devide it into (overlapping)\n\n\nUsage\nSource\n\n\nfeatures.util.window_array(\n    x,\n    nwin,\n    noverlap,\n    remove_mean=True,\n    taper=True,\n    padval=0,\n    return_window=True\n)\n\n\nwindows.\n:param x: 1D array containing the data. :type x: :class:~numpy.ndarray :param n: The number of data points in each window. If this is not a power of 2, the length of each window will be the nearest power of 2. :type n: int :param noverlap: The number of overlapping points between adjacent windows. :type noverlap: int :param remove_mean: Remove the individual mean from each window. :type remove_mean: bool :param taper: Apply a hanning taper to each window. :type taper: bool :param return_window: If taper is ‘True’, return the values of the hanning taper. :type return_window: bool :param padval: If this is not ‘None’, padval will be used to pad the input array such that its length is a multiple of the window length. :type padval: float, class:numpy.nan, or None :return: Array with the windowed data in columns. :rtype: :class:~numpy.ndarray",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.util.window_array"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.multi_feature_plot.html",
+    "href": "reference/features.visualise.multi_feature_plot.html",
+    "title": "features.visualise.multi_feature_plot()",
+    "section": "",
+    "text": "Return a combined time-series plot of two features.\n\n\nUsage\nSource\n\n\nfeatures.visualise.multi_feature_plot(\n    feature1,\n    feature2,\n    equal_yrange=False,\n    rangeslider=False,\n    log=False,\n    kws_ssam=None\n)\n\n\n:param feature1: First feature to plot with y-scale on the left. :type feature1: str :param feature2: Second feature to plot with y-scale on the right. :type feature2: str :param equal_yrange: If True align yscales. :type equal_yrange: bool :param rangeslider: If True show secondary panel for zooming. :type rangeslider: bool :param kws_ssam: Keywords to be passed to :class:aitana.features.visualise.plot_ssam_plotly :type kws_ssam: dict :returns: plotly figure that can be displayed in a Jupyter notebook or in a dash app. :rtype: :class:plotly.graph_objs.Figure",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.multi_feature_plot"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.plot_ssam_mpl.html",
+    "href": "reference/features.visualise.plot_ssam_mpl.html",
+    "title": "features.visualise.plot_ssam_mpl()",
+    "section": "",
+    "text": "Plot spectrogram data using matplotlib.\n\n\nUsage\nSource\n\n\nfeatures.visualise.plot_ssam_mpl(\n    xdf, axes=None, cmap=cm.viridis, figsize=(12, 6), **kwargs\n)\n\n\n:param xdf: An xarray dataset as returned by :class:aitana.features.ssam.SSAM :type xdf: :class:xarray.Dataset :param log: Logarithmic frequency axis if True, linear frequency axis otherwise. :type log: bool :param axes: Plot into given axes. :type axes: :class:matplotlib.axes.Axes :param dbscale: If True 10 * log10 of color values is taken, if False the sqrt is taken. :type dbscale: bool :param cmap: Specify a custom colormap instance. :type cmap: :class:matplotlib.colors.Colormap :param clip: adjust colormap to clip at lower and/or upper end. The given percentages of the amplitude range (linear or logarithmic depending on option dbscale) are clipped. :type clip: [float, float] :param figsize: Horizontal and vertical dimension of :class:matplotlib.figure.Figure :type figsize: [float, float]\n&gt;&gt;&gt; import numpy as np\n&gt;&gt;&gt; from aitana.features.ssam import SSAM\n&gt;&gt;&gt; from aitana.testing import synthetic_trace\n&gt;&gt;&gt; from aitana.features.visualise import plot_ssam_mpl\n&gt;&gt;&gt; ft = SSAM(interval=60, per_lap=.9, smooth=10,                   frequencies=np.arange(0., 25.1, .1),                   timestamp='start')\n&gt;&gt;&gt; _ = ft.compute(synthetic_trace())\n&gt;&gt;&gt; fig = plot_ssam_mpl(ft.feature[\"ssam\"])",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.plot_ssam_mpl"
+    ]
+  },
+  {
+    "objectID": "reference/features.visualise.spectrogram_preprocessing.html",
+    "href": "reference/features.visualise.spectrogram_preprocessing.html",
+    "title": "features.visualise.spectrogram_preprocessing()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nfeatures.visualise.spectrogram_preprocessing(\n    xdf,\n    freq_dim=None,\n    log=False,\n    dbscale=False,\n    clip=[0.0, 1.0],\n    canvas_dim=(400, 400)\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.features",
+      "features.visualise.spectrogram_preprocessing"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.PipelineBackend.html",
+    "href": "reference/pipelines.cli.PipelineBackend.html",
+    "title": "pipelines.cli.PipelineBackend",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.cli.PipelineBackend()",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.PipelineBackend"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.SnakemakeBackend.html",
+    "href": "reference/pipelines.cli.SnakemakeBackend.html",
+    "title": "pipelines.cli.SnakemakeBackend",
+    "section": "",
+    "text": "Usage\nSource\n\n\npipelines.cli.SnakemakeBackend(workflowdir, outdir, default_args=())",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.SnakemakeBackend"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.clean.html",
+    "href": "reference/pipelines.cli.clean.html",
+    "title": "pipelines.cli.clean()",
+    "section": "",
+    "text": "Delete the outputs of a volcano’s workflow, chosen with --workflow if it has several.\n\n\nUsage\nSource\n\n\npipelines.cli.clean(volcano, outdir, workflow=None)",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.clean"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.cli.list_workflows.html",
+    "href": "reference/pipelines.cli.list_workflows.html",
+    "title": "pipelines.cli.list_workflows()",
+    "section": "",
+    "text": "List all registered workflows.\n\n\nUsage\nSource\n\n\npipelines.cli.list_workflows()",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.cli.list_workflows"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.get_data.html",
+    "href": "reference/pipelines.get_data.html",
+    "title": "pipelines.get_data()",
+    "section": "",
+    "text": "Get path to bundled data in the aitana.pipelines package (workflow files, etc.).\n\n\nUsage\nSource\n\n\npipelines.get_data(filename=None)",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.get_data"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.scoring.evaluate_threshold.html",
+    "href": "reference/pipelines.scoring.evaluate_threshold.html",
+    "title": "pipelines.scoring.evaluate_threshold()",
+    "section": "",
+    "text": "Evaluate the number of true positives, false positives, true negatives and false negatives for a given threshold.\n\n\nUsage\nSource\n\n\npipelines.scoring.evaluate_threshold(\n    thresh, model, debug=False, pew=90, return_windows=False\n)\n\n\nArguments:\nthresh: float\n    The threshold value.\nmodel: pandas.DataFrame\n    The forecasted probabilities.\ndebug: bool, optional\n    Whether to print debug information.\npew: int, optional\n    The pre-eruption window size.\nreturn_windows: bool, optional\n    Whether to return the positive and negative windows.\n\n\nReturns:\ndict: The evaluation results.\nlist: A list of dictionaries for the tp, fp, tn, fn windows.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.scoring.evaluate_threshold"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.scoring.get_roc_curve.html",
+    "href": "reference/pipelines.scoring.get_roc_curve.html",
+    "title": "pipelines.scoring.get_roc_curve()",
+    "section": "",
+    "text": "Compute the ROC curve for a given model and thresholds.\n\n\nUsage\nSource\n\n\npipelines.scoring.get_roc_curve(model, thresholds, func, debug=False)\n\n\nArguments:\nmodel: pandas.DataFrame\n    The model probabilities.\nthresholds: list\n    The thresholds to evaluate.\nfunc: function\n    The evaluation function.\ndebug: bool, optional\n    Whether to print debug information.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.scoring.get_roc_curve"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.visualise.scoring_plot.html",
+    "href": "reference/pipelines.visualise.scoring_plot.html",
+    "title": "pipelines.visualise.scoring_plot()",
+    "section": "",
+    "text": "Plot the forecast probabilities and the evaluation windows.\n\n\nUsage\nSource\n\n\npipelines.visualise.scoring_plot(\n    forecast, threshold, scoring_function, debug=False, ax=None\n)\n\n\nArguments:\nforecast: pandas.Series\n    The forecast probabilities.\nthreshold: float\n    The threshold value.\nscoring_function: Callable\n    Function that returns (stats, time_windows) given (threshold, trace).\ndebug: bool, optional\n    Whether to print debug information.\nax: matplotlib Axes, optional\n    The axes to plot on. If None, a new figure and axes are created.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.visualise.scoring_plot"
+    ]
+  },
+  {
+    "objectID": "reference/pipelines.visualise.trellis_plot.html",
+    "href": "reference/pipelines.visualise.trellis_plot.html",
+    "title": "pipelines.visualise.trellis_plot()",
+    "section": "",
+    "text": "Create a trellis plot for the given models and data.\n\n\nUsage\nSource\n\n\npipelines.visualise.trellis_plot(\n    models,\n    data,\n    plot_uncertainty=False,\n    groups=[\"b\", \"c\", \"d\", \"e\"],\n    q_min=0.15,\n    q_max=0.85\n)\n\n\nParameters\n\n\nmodels: dict\n\nA dictionary containing the models to plot. Each key should be a model name, and each value should be a dictionary with keys ‘model’, ‘color’, and optionally ‘colorscale’ for ensemble models. The ‘model’ key should contain a xarray DataArray.\n\ndata: pd.DataFrame\n\nA pandas DataFrame containing the data to plot. It should have a datetime index and a ‘group’ column indicating the group (b, c, d, e) for each time point.\n\nplot_uncertainty: bool = False\n\nWhether to plot uncertainty for the models. Default is False.\n\nq_min: float = 0.15\n\nThe minimum quantile to use for plotting uncertainty. Default is 0.15.\n\nq_max: float = 0.85\n\nThe maximum quantile to use for plotting uncertainty. Default is 0.85.\n\n\n\n\n\nReturns\n\n\nfig: matplotlib.figure.Figure\n\nA Matplotlib figure object containing the trellis plot.",
+    "crumbs": [
+      "Reference",
+      "aitana.pipelines",
+      "pipelines.visualise.trellis_plot"
+    ]
+  },
+  {
+    "objectID": "reference/storage.api.parse_path.html",
+    "href": "reference/storage.api.parse_path.html",
+    "title": "storage.api.parse_path()",
+    "section": "",
+    "text": "Split a comma-separated path string into (group, subdir_list).\n\n\nUsage\nSource\n\n\nstorage.api.parse_path(path)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.api.parse_path"
+    ]
+  },
+  {
+    "objectID": "reference/storage.grafana_annotations.is_label.html",
+    "href": "reference/storage.grafana_annotations.is_label.html",
+    "title": "storage.grafana_annotations.is_label()",
+    "section": "",
+    "text": "Whether tags mark an annotation as a label: label.\n\n\nUsage\nSource\n\n\nstorage.grafana_annotations.is_label(tags)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.grafana_annotations.is_label"
+    ]
+  },
+  {
+    "objectID": "reference/storage.ingest.IngestWorker.html",
+    "href": "reference/storage.ingest.IngestWorker.html",
+    "title": "storage.ingest.IngestWorker",
+    "section": "",
+    "text": "Usage\nSource\n\n\nstorage.ingest.IngestWorker(queue_path, poll_interval=10.0, target_prefix=None)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.ingest.IngestWorker"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.AitanaDataset.html",
+    "href": "reference/storage.storage.AitanaDataset.html",
+    "title": "storage.storage.AitanaDataset",
+    "section": "",
+    "text": "PyTorch Dataset wrapper for Aitana Storage.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.AitanaDataset"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.AitanaDataset.html#getitem__",
+    "href": "reference/storage.storage.AitanaDataset.html#getitem__",
+    "title": "storage.storage.AitanaDataset",
+    "section": "__getitem__()",
+    "text": "__getitem__()\n\nGet a sample from the dataset.\n\n\nUsage\nSource\n\n\n__getitem__(idx)\n\n\n:param idx: Index of the sample :return: 2D PyTorch tensor with shape [window_size, num_features] where features are in the order provided to init",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.AitanaDataset"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.AitanaDataset.html#init__",
+    "href": "reference/storage.storage.AitanaDataset.html#init__",
+    "title": "storage.storage.AitanaDataset",
+    "section": "__init__()",
+    "text": "__init__()\n\nInitialize the dataset.\n\n\nUsage\nSource\n\n\n__init__(storage, features, window_size=1, stride=1)\n\n\n:param storage: Storage instance with starttime and endtime set :param features: List of feature names to load :param window_size: Number of consecutive time steps per sample :param stride: Step size between consecutive windows (default: 1)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.AitanaDataset"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.AitanaDataset.html#len__",
+    "href": "reference/storage.storage.AitanaDataset.html#len__",
+    "title": "storage.storage.AitanaDataset",
+    "section": "__len__()",
+    "text": "__len__()\n\nReturn the number of samples in the dataset.\n\n\nUsage\nSource\n\n\n__len__()",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.AitanaDataset"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Storage.html",
+    "href": "reference/storage.storage.Storage.html",
+    "title": "storage.storage.Storage",
+    "section": "",
+    "text": "Query computed features",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Storage"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Storage.html#from_directory",
+    "href": "reference/storage.storage.Storage.html#from_directory",
+    "title": "storage.storage.Storage",
+    "section": "from_directory()",
+    "text": "from_directory()\n\nConstruct the storage group from the root directory\n\n\nUsage\nSource\n\n\nfrom_directory()",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Storage"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Storage.html#to_dict",
+    "href": "reference/storage.storage.Storage.html#to_dict",
+    "title": "storage.storage.Storage",
+    "section": "to_dict()",
+    "text": "to_dict()\n\nConvert the storage group to json\n\n\nUsage\nSource\n\n\nto_dict()",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Storage"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Storage.html#to_dict_with_info",
+    "href": "reference/storage.storage.Storage.html#to_dict_with_info",
+    "title": "storage.storage.Storage",
+    "section": "to_dict_with_info()",
+    "text": "to_dict_with_info()\n\nConvert the storage group to a dict with feature metadata.\n\n\nUsage\nSource\n\n\nto_dict_with_info(base_url=None)\n\n\n:param base_url: Base URL of the API (e.g. ‘http://localhost:8000/’). When provided, each feature dict includes a ready-to-use url field that points to the /feature endpoint. :type base_url: str, optional :return: Nested dict mirroring the directory tree with feature info dicts at the leaves. :rtype: dict",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Storage"
+    ]
+  },
+  {
+    "objectID": "reference/storage.storage.Storage.html#to_pytorch",
+    "href": "reference/storage.storage.Storage.html#to_pytorch",
+    "title": "storage.storage.Storage",
+    "section": "to_pytorch()",
+    "text": "to_pytorch()\n\nCreate a PyTorch Dataset from the Storage that can be used with DataLoader.\n\n\nUsage\nSource\n\n\nto_pytorch(features, window_size=1, stride=1)\n\n\n:param features: List of feature names to include in the dataset :type features: list of str :param window_size: Number of consecutive time steps to include in each sample (default: 1) :type window_size: int :param stride: Step size between consecutive windows (default: 1) :type stride: int :return: PyTorch Dataset instance :rtype: AitanaDataset\n&gt;&gt;&gt; import datetime\n&gt;&gt;&gt; from torch.utils.data import DataLoader\n&gt;&gt;&gt; g = Storage('Whakaari', '/tmp')\n&gt;&gt;&gt; g.starttime = datetime.datetime(2012,1,1,0,0,0)\n&gt;&gt;&gt; g.endtime = datetime.datetime(2012,1,2,23,59,59)\n&gt;&gt;&gt; dataset = g.to_pytorch(['rsam', 'dsar'])\n&gt;&gt;&gt; dataloader = DataLoader(dataset, batch_size=32, shuffle=True)\n&gt;&gt;&gt; for batch in dataloader:\n...     # batch is a 2D tensor with shape [batch_size, num_features]\n...     pass",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.storage.Storage"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.floor_datetime.html",
+    "href": "reference/storage.utils.floor_datetime.html",
+    "title": "storage.utils.floor_datetime()",
+    "section": "",
+    "text": "Floor a datetime to the latest multiple of a given interval.\n\n\nUsage\nSource\n\n\nstorage.utils.floor_datetime(dt, interval)\n\n\nAssumes dt represents a UTC time (naive or tz-aware is fine) and aligns against the Unix epoch 1970-01-01T00:00:00Z. The interval is in seconds (int/float) or a timedelta. Returns a datetime with the same “naive vs aware” form as dt.\n\n\nExamples\n&gt;&gt;&gt; from datetime import datetime\n&gt;&gt;&gt; floor_datetime(datetime.fromisoformat('2025-11-27T10:12:43'), 600)\ndatetime.datetime(2025, 11, 27, 10, 10)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.floor_datetime"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.get_dt.html",
+    "href": "reference/storage.utils.get_dt.html",
+    "title": "storage.utils.get_dt()",
+    "section": "",
+    "text": "Infer the sampling of the time dimension.\n\n\nUsage\nSource\n\n\nstorage.utils.get_dt(times)",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.get_dt"
+    ]
+  },
+  {
+    "objectID": "reference/storage.utils.round_datetime.html",
+    "href": "reference/storage.utils.round_datetime.html",
+    "title": "storage.utils.round_datetime()",
+    "section": "",
+    "text": "Find closest multiple of interval to given time.\n\n\nUsage\nSource\n\n\nstorage.utils.round_datetime(dt, interval)\n\n\nParameters:\ndt : datetime The datetime to round. interval : Union[int, float, timedelta] The interval to which to round the datetime.\n\n\nReturns:\ndatetime The rounded datetime.",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.utils.round_datetime"
+    ]
+  },
+  {
+    "objectID": "reference/storage.xarray2zarr.PathNotFoundError.html",
+    "href": "reference/storage.xarray2zarr.PathNotFoundError.html",
+    "title": "storage.xarray2zarr.PathNotFoundError",
+    "section": "",
+    "text": "Usage\nSource\n\n\nstorage.xarray2zarr.PathNotFoundError()",
+    "crumbs": [
+      "Reference",
+      "aitana.storage",
+      "storage.xarray2zarr.PathNotFoundError"
+    ]
+  },
+  {
+    "objectID": "reference/testing.synthetic.synthetic_trace.html",
+    "href": "reference/testing.synthetic.synthetic_trace.html",
+    "title": "testing.synthetic.synthetic_trace()",
+    "section": "",
+    "text": "Produce a test signal for which we know where the peaks\n\n\nUsage\nSource\n\n\ntesting.synthetic.synthetic_trace(\n    nsec=3600,\n    sampling_rate=100.0,\n    frequencies=[0.1, 3.0, 10.0],\n    amplitudes=[0.1, 1.0, 0.7],\n    phases=[0.0, np.pi * 0.25, np.pi],\n    offsets=[0.0, 0.0, 0.0],\n    starttime=UTCDateTime(1970, 1, 1),\n    gaps=False,\n    noise=True,\n    noise_std=0.5,\n    sinusoid=True,\n    addchirp=True,\n    network=\"NZ\",\n    station=\"BLUB\",\n    location=\"\",\n    channel=\"HHZ\"\n)\n\n\nare in the spectrogram.\n:param nsec: Length of the trace in seconds. :type nsec: int :param sampling_rate: Sampling rate of the signal in Hz. :type sampling_rate: float :param starttime: Starttime of the trace. :type starttime: :class:~obspy.UTCDateTime :param gaps: If ‘True’ add gaps to the test signal. :type gaps: boolean :param noise_std: Standard deviation of the noise. :type noise_std: float :param sinusoid: Add a signal with a sinusoidal frequency change. :type sinusoid: bool :param station: Station name of the returned trace. :type station: str :param location: Location of the returned trace. :type location: str :return: Time series of test data :rtype: :class:~obspy.Trace",
+    "crumbs": [
+      "Reference",
+      "aitana.testing",
+      "testing.synthetic.synthetic_trace"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.assimilate.SO2FusionModel.html",
+    "href": "reference/volcanoes.assimilate.SO2FusionModel.html",
+    "title": "volcanoes.assimilate.SO2FusionModel",
+    "section": "",
+    "text": "Usage\nSource\n\n\nvolcanoes.assimilate.SO2FusionModel(\n    measurements,\n    initial_state=0,\n    initial_cov=1,\n    k_states=2,\n    k_posdef=2,\n    obs_cov=None\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.assimilate.SO2FusionModel"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.get_data.html",
+    "href": "reference/volcanoes.get_data.html",
+    "title": "volcanoes.get_data()",
+    "section": "",
+    "text": "Get path to bundled data in the aitana.volcanoes package.\n\n\nUsage\nSource\n\n\nvolcanoes.get_data(filename=None)\n\n\nParameters\n\n\nfilename: str = None\n\nRelative path within the data directory. If None, returns the data directory root.\n\n\n\n\n\nReturns\n\n\n str\n\nAbsolute path to the requested file or directory.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.get_data"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.Gas.html",
+    "href": "reference/volcanoes.ruapehu.Gas.html",
+    "title": "volcanoes.ruapehu.Gas",
+    "section": "",
+    "text": "Usage\nSource\n\n\nvolcanoes.ruapehu.Gas(start_date, end_date)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.Gas"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.eruptions.html",
+    "href": "reference/volcanoes.ruapehu.eruptions.html",
+    "title": "volcanoes.ruapehu.eruptions()",
+    "section": "",
+    "text": "This function loads the eruption catalogue for Mt. Ruapehu and declusters\n\n\nUsage\nSource\n\n\nvolcanoes.ruapehu.eruptions(min_size=0, dec_interval=None)\n\n\nit if required. The catalogue is based on Brad Scott’s GNS Science Report. Declustering is turned on if dec_interval is greater than zero. This will also exclude magmatic eruption episodes between 9 January 1944 and 8 January 1946 as well as 6 January 1995 to 12 January 1997 as these aren’t independent events.\n\n\nParameters:\nmin_size : int\n    The minimum eruption size to include in the catalogue.\ndec_interval : str\n    The declustering interval in pandas complient time delta format.\n\n\nReturns:\npandas.DataFrame\n    A dataframe with the (declustered) eruption catalogue.",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.eruptions"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.ruapehu.load_all.html",
+    "href": "reference/volcanoes.ruapehu.load_all.html",
+    "title": "volcanoes.ruapehu.load_all()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nvolcanoes.ruapehu.load_all(\n    fill_method=\"interpolate\",\n    end_date=datetime.now(timezone.utc),\n    update_rsam=False\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.ruapehu.load_all"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.whakaari.Seismicity.html#rsam",
+    "href": "reference/volcanoes.whakaari.Seismicity.html#rsam",
+    "title": "volcanoes.whakaari.Seismicity",
+    "section": "rsam()",
+    "text": "rsam()\n\nLoad RSAM values NZ.WIZ.10.HHZ.The first time you call\n\n\nUsage\nSource\n\n\nrsam()\n\n\nthis it will download the data from Zenodo and store it locally.\n\n\nReturns:\n:param df: Dataframe with RSAM values.\n:type df: :class:`pandas.DataFrame`",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.whakaari.Seismicity"
+    ]
+  },
+  {
+    "objectID": "reference/volcanoes.whakaari.load_all.html",
+    "href": "reference/volcanoes.whakaari.load_all.html",
+    "title": "volcanoes.whakaari.load_all()",
+    "section": "",
+    "text": "Usage\nSource\n\n\nvolcanoes.whakaari.load_all(\n    fill_method=\"interpolate\",\n    start_date=datetime(2005, 1, 1, tzinfo=(timezone.utc)),\n    end_date=datetime.now(timezone.utc),\n    ignore_data=(),\n    fuse_so2=False\n)",
+    "crumbs": [
+      "Reference",
+      "aitana.volcanoes",
+      "volcanoes.whakaari.load_all"
+    ]
+  },
+  {
+    "objectID": "user-guide/evaluating-detectors.html",
+    "href": "user-guide/evaluating-detectors.html",
+    "title": "Evaluating anomaly detectors",
+    "section": "",
+    "text": "Why synthetic evaluation?\nGenuine, labelled volcanic anomalies are rare, so aitana.anomaly.evaluation takes a different approach: inject known synthetic faults or regime shifts into otherwise normal data, then check whether a detector’s anomaly score recovers the injected ground truth. This notebook walks through each tool in that module on a synthetic 3-feature dataset (think: RSAM, SO_2, earthquake rate) and shows the kind of plot each one is meant to produce.\n\n\nCode\nimport numpy as np\nimport pandas as pd\nimport plotly.graph_objects as go\nfrom plotly.subplots import make_subplots\n\nfrom aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass\nfrom aitana.anomaly.evaluation import (\n    inject_change_points,\n    inject_faults,\n    score_detector,\n    simulate_regime_series,\n)\n\nrng = np.random.default_rng(0)\nn = 720  # 30 days of hourly data\nindex = pd.date_range(\"2024-01-01\", periods=n, freq=\"h\")\n\ndf = pd.DataFrame(\n    {\n        \"rsam\": 50 + rng.normal(0, 3, n).cumsum() * 0.05 + rng.normal(0, 2, n),\n        \"so2\": 20 + rng.normal(0, 1, n).cumsum() * 0.02 + rng.normal(0, 1, n),\n        \"eq_rate\": rng.poisson(3, n).astype(float),\n    },\n    index=index,\n)\n\nFEATURE_COLORS = {\"rsam\": \"#4C78A8\", \"so2\": \"#F58518\", \"eq_rate\": \"#54A24B\"}\ndf.head()\n\n\n\n\n\n  \n    \n      \n      rsam\n      so2\n      eq_rate\n    \n  \n  \n    \n      2024-01-01 00:00:00\n      50.900273\n      20.310864\n      3.0\n    \n    \n      2024-01-01 01:00:00\n      50.684075\n      19.543732\n      3.0\n    \n    \n      2024-01-01 02:00:00\n      51.043001\n      19.007313\n      4.0\n    \n    \n      2024-01-01 03:00:00\n      49.576225\n      21.727882\n      1.0\n    \n    \n      2024-01-01 04:00:00\n      52.407148\n      19.817685\n      2.0\n    \n  \n\n\n\n\n\n\ninject_faults: independent point faults\nEach column gets its own Bernoulli draw of fault timesteps, offset by a random multiple of that column’s diff-std. offset_range=\"hard\" produces small, easy-to-miss deviations; \"easy\" produces large, obvious ones. Use the buttons to compare.\n\n\nCode\ncorrupted_hard, mask_hard = inject_faults(\n    df, rate=0.04, offset_range=\"hard\", mode=\"independent\", rng=1\n)\ncorrupted_easy, mask_easy = inject_faults(\n    df, rate=0.04, offset_range=\"easy\", mode=\"independent\", rng=1\n)\n\nfig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))\n\nfor i, col in enumerate(df.columns, start=1):\n    fig.add_trace(\n        go.Scatter(x=df.index, y=df[col], name=f\"{col} (clean)\",\n                    line=dict(color=FEATURE_COLORS[col], width=1),\n                    legendgroup=col, showlegend=(i == 1)),\n        row=i, col=1,\n    )\n    for label, corrupted, mask, visible in [\n        (\"hard\", corrupted_hard, mask_hard, True),\n        (\"easy\", corrupted_easy, mask_easy, False),\n    ]:\n        flagged = corrupted.loc[mask[col], col]\n        fig.add_trace(\n            go.Scatter(\n                x=flagged.index, y=flagged.values, mode=\"markers\",\n                marker=dict(color=\"crimson\", size=7, symbol=\"x\"),\n                name=f\"injected fault ({label})\", legendgroup=f\"fault-{label}\",\n                showlegend=(i == 1), visible=visible,\n            ),\n            row=i, col=1,\n        )\n\nfig.update_layout(\n    height=600,\n    updatemenus=[dict(\n        type=\"buttons\", direction=\"right\", x=0.5, y=1.12, xanchor=\"center\",\n        buttons=[\n            dict(label=\"hard\", method=\"update\",\n                 args=[{\"visible\": [True, True, False] * 3}]),\n            dict(label=\"easy\", method=\"update\",\n                 args=[{\"visible\": [True, False, True] * 3}]),\n        ],\n    )],\n    margin=dict(t=80),\n)\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 1: Independent fault injection at ‘hard’ and ‘easy’ difficulty.\n\n\n\n\n\n\ninject_faults: coupled faults\nIn mode=\"coupled\", the same fault timestamps are injected across every column in a group — a synthetic stand-in for a multi-sensor precursor, where several instruments should light up together. Here rsam and so2 are coupled while eq_rate is left untouched.\n\n\nCode\ncorrupted_coupled, mask_coupled = inject_faults(\n    df, mode=\"coupled\", coupled_groups=[[\"rsam\", \"so2\"]],\n    rate=0.03, offset_range=\"easy\", rng=2,\n)\n\nfig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))\nfor i, col in enumerate(df.columns, start=1):\n    fig.add_trace(\n        go.Scatter(x=df.index, y=df[col], name=col,\n                    line=dict(color=FEATURE_COLORS[col], width=1), showlegend=False),\n        row=i, col=1,\n    )\n    flagged = corrupted_coupled.loc[mask_coupled[col], col]\n    fig.add_trace(\n        go.Scatter(x=flagged.index, y=flagged.values, mode=\"markers\",\n                    marker=dict(color=\"crimson\", size=7, symbol=\"x\"),\n                    name=\"injected fault\", showlegend=(i == 1)),\n        row=i, col=1,\n    )\nfig.update_layout(height=600, margin=dict(t=40))\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 2: Coupled fault injection: rsam and so2 fire at identical timestamps.\n\n\n\n\n\n\ninject_change_points: persistent regime shifts\nUnlike a point fault, a change point offsets the signal from its onset onward, mimicking a genuine regime change rather than a sensor glitch. The mask marks only the onset timestep — the shift itself persists in the data.\n\n\nCode\ncorrupted_cp, change_points = inject_change_points(\n    df, columns=[\"rsam\"], n_changes=3, offset_range=\"easy\", mode=\"independent\", rng=3\n)\n\nfig = go.Figure()\nfig.add_trace(go.Scatter(x=df.index, y=df[\"rsam\"], name=\"clean\",\n                          line=dict(color=\"lightgray\", width=1)))\nfig.add_trace(go.Scatter(x=corrupted_cp.index, y=corrupted_cp[\"rsam\"], name=\"with regime shift\",\n                          line=dict(color=FEATURE_COLORS[\"rsam\"], width=1.5)))\nonsets = change_points.index[change_points[\"rsam\"]]\nfig.add_trace(go.Scatter(x=onsets, y=corrupted_cp.loc[onsets, \"rsam\"], mode=\"markers\",\n                          marker=dict(color=\"crimson\", size=10, symbol=\"diamond\"),\n                          name=\"change-point onset\"))\nfig.update_layout(height=350, margin=dict(t=30))\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 3: Persistent regime shift injected into rsam; markers show onsets only.\n\n\n\n\n\n\nsimulate_regime_series: known-state synthetic data\nFor state/change-point detectors (e.g. CLaP, ClaSP) it’s useful to generate data from discrete regimes rather than perturb existing data, so both the regime labels and the change points are exact ground truth. Repeated labels (\"A\" appears twice below) share the same mean — a recurring regime a state detector should recognise as the same state.\n\n\nCode\nseries, cp_idx, labels = simulate_regime_series(\n    [\"A\", \"B\", \"A\", \"C\"], segment_length=120, n_features=3,\n    state_noise_std={\"A\": 0.6, \"B\": 0.6, \"C\": 0.6}, rng=4,\n)\nseries.columns = [\"rsam\", \"so2\", \"eq_rate\"]\n\nfig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(series.columns))\npalette = {\"A\": \"#4C78A8\", \"B\": \"#F58518\", \"C\": \"#54A24B\"}\nfor i, col in enumerate(series.columns, start=1):\n    for state in labels.unique():\n        seg = series[col].where(labels == state)\n        fig.add_trace(\n            go.Scatter(x=series.index, y=seg, name=f\"state {state}\",\n                        line=dict(color=palette[state]), legendgroup=state,\n                        showlegend=(i == 1), connectgaps=False),\n            row=i, col=1,\n        )\n    for cp in cp_idx:\n        fig.add_vline(x=cp, line=dict(color=\"black\", dash=\"dot\", width=1), row=i, col=1)\nfig.update_layout(height=600, margin=dict(t=40))\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 4: Synthetic 3-feature series stitched from regimes A, B, A, C.\n\n\n\n\n\n\nscore_detector: ROC/AUC against the injected ground truth\nOnce faults are injected, any candidate anomaly score can be checked against the mask. Here a trivial detector — absolute deviation from each feature’s mean, averaged across features and min-max scaled to [0, 1] — is scored against both the \"hard\" and \"easy\" fault sets from earlier, showing how injection difficulty changes detectability.\n\n\nCode\ndef trivial_anomaly_index(corrupted, clean):\n    raw = (corrupted - clean).abs().mean(axis=1)\n    return (raw / raw.max()).to_numpy()\n\nresults = {}\nfor label, corrupted, mask in [(\"hard\", corrupted_hard, mask_hard), (\"easy\", corrupted_easy, mask_easy)]:\n    scores = trivial_anomaly_index(corrupted, df)\n    results[label] = score_detector(scores, mask, threshold=0.5)\n\nfig = go.Figure()\nfor label, color in [(\"hard\", \"#B279A2\"), (\"easy\", \"#54A24B\")]:\n    r = results[label]\n    fig.add_trace(go.Scatter(\n        x=r[\"fpr\"], y=r[\"tpr\"], mode=\"lines\",\n        name=f\"{label} (AUC={r['auc']:.3f})\", line=dict(color=color, width=2),\n    ))\nfig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode=\"lines\",\n                          line=dict(color=\"gray\", dash=\"dash\"), name=\"chance\", showlegend=True))\nfig.update_layout(\n    xaxis_title=\"False positive rate\", yaxis_title=\"True positive rate\",\n    height=450, width=550, margin=dict(t=30),\n)\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 5: ROC curves for a trivial mean-deviation detector, hard vs easy faults.\n\n\n\n\nThe confusion-matrix counts at a chosen operating threshold are also part of the result. Slide through thresholds to see the TP/FP/TN/FN trade-off for the \"hard\" fault set:\n\n\nCode\nscores_hard = trivial_anomaly_index(corrupted_hard, df)\nthresholds = np.linspace(0.05, 0.95, 19)\ncounts = pd.DataFrame(\n    [score_detector(scores_hard, mask_hard, threshold=t) for t in thresholds]\n)[[\"tp\", \"fp\", \"tn\", \"fn\"]]\ncounts.index = thresholds\n\nfig = go.Figure()\nbar_colors = {\"tp\": \"#54A24B\", \"fp\": \"#E45756\", \"tn\": \"#4C78A8\", \"fn\": \"#F58518\"}\nframes = []\nfor t in thresholds:\n    frames.append(go.Frame(\n        name=f\"{t:.2f}\",\n        data=[go.Bar(x=list(counts.columns), y=counts.loc[t].values,\n                      marker_color=[bar_colors[c] for c in counts.columns])],\n    ))\nfig.add_trace(go.Bar(x=list(counts.columns), y=counts.loc[thresholds[0]].values,\n                      marker_color=[bar_colors[c] for c in counts.columns]))\nfig.frames = frames\nfig.update_layout(\n    height=400, width=500, margin=dict(t=30),\n    yaxis=dict(range=[0, int(counts.values.max() * 1.1)]),\n    sliders=[dict(\n        steps=[dict(method=\"animate\", label=f\"{t:.2f}\",\n                     args=[[f\"{t:.2f}\"], {\"mode\": \"immediate\", \"frame\": {\"duration\": 0}}])\n               for t in thresholds],\n        currentvalue=dict(prefix=\"threshold = \"),\n    )],\n)\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 6: Confusion-matrix counts across thresholds for the hard fault set.\n\n\n\n\n\n\nnormalize_score: ECDF percentile ranking\nRaw anomaly scores from different detectors live on different scales. normalize_score (on AnomalyDetectionBaseClass) percentile-ranks a score against a reference distribution — typically drawn from a known-quiet period — so 1.0 means “more anomalous than every reference observation.”\n\n\nCode\nquiet_scores = trivial_anomaly_index(df, df.rolling(24, min_periods=1).mean())\nnormalized = AnomalyDetectionBaseClass.normalize_score(scores_hard, quiet_scores)\n\nfig = make_subplots(rows=2, cols=1, shared_xaxes=True,\n                     subplot_titles=(\"raw anomaly index\", \"ECDF-normalized\"))\nfig.add_trace(go.Scatter(x=df.index, y=scores_hard, line=dict(color=\"#4C78A8\"), showlegend=False), row=1, col=1)\nfig.add_trace(go.Scatter(x=df.index, y=normalized, line=dict(color=\"#54A24B\"), showlegend=False), row=2, col=1)\nfig.update_layout(height=500, margin=dict(t=40))\nfig.show()\n\n\n\n\n                            \n                                            \n\n\nFigure 7: Raw hard-fault scores percentile-ranked against a quiet-period reference.\n\n\n\n\n\n\nSummary\n\n\n\n\n\n\n\n\nTool\nPurpose\nGround truth produced\n\n\n\n\ninject_faults\nPoint-wise sensor-glitch faults, independent or coupled across streams\nBoolean mask per timestep/column\n\n\ninject_change_points\nPersistent regime shifts, for change-point detectors\nBoolean mask at onset timesteps only\n\n\nsimulate_regime_series\nFully synthetic multi-regime series\nChange-point indices + per-timestep state labels\n\n\nscore_detector\nROC/AUC and confusion matrix vs. a fault/change-point mask\n—\n\n\nnormalize_score\nECDF percentile rank against a reference distribution\n—",
+    "crumbs": [
+      "User Guide",
+      "Evaluating anomaly detectors"
+    ]
+  }
+]

@@ -1,0 +1,646 @@
+{
+  "build_time": "2026-10-28T04:24:34Z",
+  "total_seconds": 176.918,
+  "pages": [
+    {
+      "page": "user-guide/running-workflows.qmd",
+      "seconds": 34.132,
+      "frozen": false
+    },
+    {
+      "page": "developer/architecture.qmd",
+      "seconds": 4.935,
+      "frozen": false
+    },
+    {
+      "page": "index.qmd",
+      "seconds": 2.036,
+      "frozen": false
+    },
+    {
+      "page": "user-guide/evaluating-detectors.qmd",
+      "seconds": 1.827,
+      "frozen": true
+    },
+    {
+      "page": "reference/index.qmd",
+      "seconds": 1.803,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.scoring.make_strictly_increasing.qmd",
+      "seconds": 1.61,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.api.AitanaAPI.qmd",
+      "seconds": 1.363,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.CraterLake.qmd",
+      "seconds": 1.355,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.dataset.ZizouDataset.qmd",
+      "seconds": 1.336,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.dataset.SliceBatchSampler.qmd",
+      "seconds": 1.304,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.pca.runPcaCore.qmd",
+      "seconds": 1.298,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.pca.ModelException.qmd",
+      "seconds": 1.292,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.ssam.SSAM.qmd",
+      "seconds": 1.273,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.apply_freq_filter.qmd",
+      "seconds": 1.27,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.demean.qmd",
+      "seconds": 1.267,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.cpxtrace.Inst_Band.qmd",
+      "seconds": 1.237,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.assimilate.SO2FusionModel.qmd",
+      "seconds": 1.235,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.WaveformBaseclass.qmd",
+      "seconds": 1.229,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.autoencoder.TiedAutoEncoder.qmd",
+      "seconds": 1.226,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.SeismicData.qmd",
+      "seconds": 1.217,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.cache_dataframe.qmd",
+      "seconds": 1.204,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.matrix_profile.MatrixProfile.qmd",
+      "seconds": 1.194,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.evaluation.simulate_regime_series.qmd",
+      "seconds": 1.191,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.spectral_features.SpectralFeatures.qmd",
+      "seconds": 1.191,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.get_data.qmd",
+      "seconds": 1.191,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.MockSDSWaveforms.qmd",
+      "seconds": 1.188,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.evaluation.quiet_series.qmd",
+      "seconds": 1.187,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.anomaly_base.AnomalyDetectionBaseClass.qmd",
+      "seconds": 1.18,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.multi_feature_plot.qmd",
+      "seconds": 1.18,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.evaluation.inject_faults.qmd",
+      "seconds": 1.178,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.Seismicity.qmd",
+      "seconds": 1.138,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.evaluation.inject_change_points.qmd",
+      "seconds": 1.136,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.rsam.rsam_wideband_energy_ratio.qmd",
+      "seconds": 1.136,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.ingest.enqueue_dataset.qmd",
+      "seconds": 1.133,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.cpxtrace.Norm_Env.qmd",
+      "seconds": 1.131,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.S3Waveforms.qmd",
+      "seconds": 1.117,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.run.qmd",
+      "seconds": 1.114,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.apply_hanning.qmd",
+      "seconds": 1.112,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.plot_ssam_plotly.qmd",
+      "seconds": 1.107,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.multi_feature_plot_mpl.qmd",
+      "seconds": 1.105,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.dsar.DSAR.qmd",
+      "seconds": 1.099,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.get_data.qmd",
+      "seconds": 1.093,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.stride_windows.qmd",
+      "seconds": 1.092,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.spectrogram_preprocessing.qmd",
+      "seconds": 1.09,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.storage.AitanaDataset.qmd",
+      "seconds": 1.089,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.assimilate.LocalLinearTrend.qmd",
+      "seconds": 1.089,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.FDSNWaveforms.qmd",
+      "seconds": 1.082,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.round_time.qmd",
+      "seconds": 1.082,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.evaluation.score_detector.qmd",
+      "seconds": 1.081,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.plot_ssam_mpl.qmd",
+      "seconds": 1.081,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.grafana_annotations.is_label.qmd",
+      "seconds": 1.077,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.cpxtrace.WindowCentroid.qmd",
+      "seconds": 1.075,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.trace_window_times.qmd",
+      "seconds": 1.073,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.wfs.wfs_request.qmd",
+      "seconds": 1.072,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.feature_base.FeatureBaseClass.qmd",
+      "seconds": 1.071,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.trace_window_data.qmd",
+      "seconds": 1.067,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.whakaari.Gas.qmd",
+      "seconds": 1.066,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.cpxtrace.Centroid.qmd",
+      "seconds": 1.064,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.logging_config.get_logger.qmd",
+      "seconds": 1.062,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.window_array.qmd",
+      "seconds": 1.061,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.storage.Path.qmd",
+      "seconds": 1.061,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.grafana_annotations.sync_labels.qmd",
+      "seconds": 1.059,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.util.stack_feature.qmd",
+      "seconds": 1.054,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.storage.Storage.qmd",
+      "seconds": 1.054,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.xarray2zarr.xarray2zarr.qmd",
+      "seconds": 1.05,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.xarray2netcdf.xarray2netcdf.qmd",
+      "seconds": 1.049,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.visualise.trellis_plot.qmd",
+      "seconds": 1.044,
+      "frozen": false
+    },
+    {
+      "page": "reference/testing.synthetic.synthetic_trace.qmd",
+      "seconds": 1.039,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.xarray2zarr.PathNotFoundError.qmd",
+      "seconds": 1.037,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.generate_test_data.qmd",
+      "seconds": 1.034,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.assimilate.SemiLinearTrend.qmd",
+      "seconds": 1.034,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.logging_config.setup_logging.qmd",
+      "seconds": 1.032,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.gradient.qmd",
+      "seconds": 1.032,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.snet.SNet.qmd",
+      "seconds": 1.03,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.load_all.qmd",
+      "seconds": 1.026,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.eqRate.qmd",
+      "seconds": 1.024,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.pca.runPca.qmd",
+      "seconds": 1.024,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.SnakemakeBackend.qmd",
+      "seconds": 1.024,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.pca.PCA.qmd",
+      "seconds": 1.022,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.hex_to_rgb.qmd",
+      "seconds": 1.021,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.rsam.RSAM.qmd",
+      "seconds": 1.021,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.PostProcess.qmd",
+      "seconds": 1.02,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.scoring.compute_rates.qmd",
+      "seconds": 1.02,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.get_dt.qmd",
+      "seconds": 1.019,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.autoencoder.AutoEncoder.qmd",
+      "seconds": 1.017,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.get_data.qmd",
+      "seconds": 1.017,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.floor_datetime.qmd",
+      "seconds": 1.017,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.eruptions.qmd",
+      "seconds": 1.016,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.lake_height_scaling.qmd",
+      "seconds": 1.016,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.reindex.qmd",
+      "seconds": 1.014,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.SDSWaveforms.qmd",
+      "seconds": 1.011,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.whakaari.load_all.qmd",
+      "seconds": 1.011,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.get_instrument_response.qmd",
+      "seconds": 1.009,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.anomaly_base.min_max_scale_netcdf.qmd",
+      "seconds": 1.006,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.rgb_to_hex.qmd",
+      "seconds": 1.005,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.PipelineBackend.qmd",
+      "seconds": 1.005,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.visualise.scoring_plot.qmd",
+      "seconds": 1.001,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.visualise.set_style.qmd",
+      "seconds": 1.001,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.list_workflows.qmd",
+      "seconds": 1.0,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.ingest.IngestWorker.qmd",
+      "seconds": 1.0,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.fill_time_gaps.qmd",
+      "seconds": 0.999,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.round_datetime.qmd",
+      "seconds": 0.997,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.cpxtrace.Inst_Freq.qmd",
+      "seconds": 0.996,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.get_data.qmd",
+      "seconds": 0.995,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.tilde.tilde_request.qmd",
+      "seconds": 0.994,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.whakaari.eruptions.qmd",
+      "seconds": 0.994,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.get_color.qmd",
+      "seconds": 0.992,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.discover_workflows.qmd",
+      "seconds": 0.991,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.ruapehu.Gas.qmd",
+      "seconds": 0.991,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.WorkflowDescriptor.qmd",
+      "seconds": 0.989,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.utils.merge_arrays.qmd",
+      "seconds": 0.989,
+      "frozen": false
+    },
+    {
+      "page": "reference/anomaly.autoencoder.FuzzyCluster.qmd",
+      "seconds": 0.988,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.clean.qmd",
+      "seconds": 0.982,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.seismic.PostProcessException.qmd",
+      "seconds": 0.981,
+      "frozen": false
+    },
+    {
+      "page": "reference/volcanoes.whakaari.Seismicity.qmd",
+      "seconds": 0.981,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.generate_cache_key.qmd",
+      "seconds": 0.979,
+      "frozen": false
+    },
+    {
+      "page": "reference/access.util.get_defaults_with_names.qmd",
+      "seconds": 0.975,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.scoring.get_roc_curve.qmd",
+      "seconds": 0.973,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.scoring.evaluate_threshold.qmd",
+      "seconds": 0.971,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.scoring.get_evaluation_windows.qmd",
+      "seconds": 0.969,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.api.StorageAPI.qmd",
+      "seconds": 0.969,
+      "frozen": false
+    },
+    {
+      "page": "reference/features.visualise.get_trace.qmd",
+      "seconds": 0.962,
+      "frozen": false
+    },
+    {
+      "page": "reference/storage.api.parse_path.qmd",
+      "seconds": 0.962,
+      "frozen": false
+    },
+    {
+      "page": "reference/pipelines.cli.PipelineError.qmd",
+      "seconds": 0.959,
+      "frozen": false
+    },
+    {
+      "page": "skills.qmd",
+      "seconds": 0.903,
+      "frozen": false
+    },
+    {
+      "page": "developer/implementation-status.qmd",
+      "seconds": 0.87,
+      "frozen": false
+    },
+    {
+      "page": "developer/roadmap.qmd",
+      "seconds": 0.856,
+      "frozen": false
+    },
+    {
+      "page": "developer/development.qmd",
+      "seconds": 0.811,
+      "frozen": false
+    }
+  ]
+}

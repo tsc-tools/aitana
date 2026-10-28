@@ -1,0 +1,32 @@
+# Roadmap
+
+
+# The expert panel (`aitana-anomaly`)
+
+The research goal is to treat the volcano as a dynamical system with a hidden state vector, detect recurring state regimes, and answer two operational questions directly: *"is this normal?"* and *"when did it last look like this?"*. Rather than crowning a single best method, four algorithms of increasing complexity run as an **expert panel**, and their agreement is itself the signal:
+
+| Algorithm | Rung |
+|----|----|
+| PCA + Hidden Markov Model | Baseline: orthogonal feature space with state propagation |
+| 1D-convolutional autoencoder | Temporal dynamics over a sliding window |
+| Scattering network + novelty detector | Waveform-level representation |
+| ClaSP / CLaP state detection | Recurring-regime segmentation with transition structure |
+
+Agreement is layered: per-algorithm alarm bits summed into a **vote count**, rolling rank correlation as **consensus strength**, and inferred **state labels** as context against the eruption chronology. Validation runs on two tracks -- synthetic fault injection (as a per-fault-type sensitivity diagnostic, not a leaderboard) and real eruption catalogues (Whakaari 2018-2020 quantitatively; Ruapehu's H1 2022 unrest as a qualitative case study).
+
+
+# The duty-officer companion (`aitana-bot`)
+
+Two capabilities, deliberately different architectures, both Ruapehu-first:
+
+- **Volcanic Activity Bulletins** -- a linear pipeline (fetch → digest to statistics → one structured LLM call → provenance check) that drafts a daily report. Three rules are enforced structurally, not by prompt: the agent never infers the Volcanic Alert Level (it transcribes it from meeting notes), raw time series never reach the LLM, and everything produced is a draft with no auto-publish path.
+- **Eruption confirmation** -- an on-demand agentic tool loop (webcam imagery, seismic and infrasound data, anomaly baselines) that produces a hedged, evidence-cited *assessment*. The output schema has no boolean verdict field; the full tool-call transcript is logged as an audit trail.
+
+
+# Cross-cutting
+
+- A `camera` module in `aitana-access` for GeoNet webcam imagery (same S3 bucket as waveforms).
+- Cadence alignment: resampling all streams onto a shared 10-minute grid in `aitana-access` and `aitana-features`.
+- Temporal cross-validation schemes and proper scoring rules (log-likelihood, CRPS, reliability diagrams).
+- Semantic versioning of datasets and evaluation protocols.
+- Integration with community tools (SeisBench, WOVOdat formats).

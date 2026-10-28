@@ -1,0 +1,507 @@
+----------------------------------------------------------------------
+This is the API documentation for the aitana library.
+----------------------------------------------------------------------
+
+
+## aitana.access
+
+Pure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).
+
+
+
+## aitana.volcanoes
+
+Per-volcano domain aggregates for Ruapehu, Whakaari, and Taupo.
+
+
+
+## aitana.features
+
+Algorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM).
+
+
+
+## aitana.anomaly
+
+Anomaly detection in time-series data.
+
+
+
+## aitana.storage
+
+Store time series data as HDF5 (netCDF) or Zarr files and access them through an API.
+
+
+
+## aitana.pipelines
+
+Reproducible workflows that run and evaluate aitana components for volcano monitoring.
+
+
+
+## aitana.testing
+
+Synthetic seismic waveforms with known spectral content for testing aitana packages.
+
+
+
+----------------------------------------------------------------------
+This is the User Guide documentation for the package.
+----------------------------------------------------------------------
+
+### Running workflows
+
+The `aitana-pipelines` command drives Snakemake workflows bundled with Aitana or
+registered by third-party packages via the `aitana.pipelines.workflows` entry-point group.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `aitana-pipelines list` | List all registered workflows (name, volcano, description). |
+| `aitana-pipelines run <volcano> <outdir>` | Run the workflow registered for a volcano. |
+| `aitana-pipelines clean <volcano> <outdir>` | Delete all outputs produced by the workflow. |
+
+Where a volcano has several workflows, choose one with `--workflow <name>`; each needs its own
+`<outdir>`, since a run copies the workflow's `Snakefile` and `config.yaml` into it.
+
+`aitana-pipelines run` accepts `--cores N` (default `1`) to control Snakemake parallelism.
+With `--cron "<crontab expression>"` it keeps running and repeats on that schedule (UTC),
+skipping a run that is due while the previous one is still going.
+Any further arguments are passed to Snakemake, e.g. `--config end=2022-03-20T00:00` or `-n`
+for a dry run.
+
+## Examples
+
+```bash
+# See what workflows are available
+aitana-pipelines list
+
+# Run the Whakaari Bayesian-network benchmark, writing results to ./results
+aitana-pipelines run whakaari ./results
+
+# Run with 4 parallel cores
+aitana-pipelines run whakaari ./results --cores 4
+
+# Remove all outputs
+aitana-pipelines clean whakaari ./results
+```
+
+## Bundled workflows
+
+| Name | Volcano | Description |
+|---|---|---|
+| `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
+| `ruapehu_mp` | ruapehu | Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana |
+| `ruapehu_snet` | ruapehu | Scattering-network coefficients of three-component Ruapehu seismic data, stored for detectors |
+
+## The Ruapehu RSAM alert, end to end
+
+`ruapehu_mp` fetches `NZ.FWVZ.10.HHZ` waveforms (GeoNet's S3 archive, falling back to the
+near-real-time FDSN service for the last day or two), computes 10-min RSAM per UTC day,
+scores the last 24 h against the preceding 28 days with `MatrixProfile`, and stores RSAM
+(`rsam`), the anomaly index (`rsam_mp_index`), the raw left matrix profile it is the percentile
+of (`rsam_mp_profile`: each 6-h window's z-normalized distance to its nearest earlier window,
+0 to 12), its alarm series (`rsam_mp_alarm`: 1 where
+the index reaches `threshold`, 0 below, NaN where there is no index) and the threshold in force
+when each sample was scored (`rsam_mp_threshold`, so retunes stay traceable and Grafana can draw
+it on the index panel) in `aitana-storage` under `<outdir>/storage`. Each run also writes
+`results/<end>/index.csv` with RSAM, index, matrix profile and alarm.
+Completed days are reused across runs. Its rules run in the active environment, so run it from
+the uv workspace (`uv sync`).
+With `--config start=2022-01-01`, the first run also builds the archive: it scores every
+complete UTC day since `start` exactly as a run ending at the next midnight would, and writes
+`results/archive_<start>.csv` instead. Later runs find that file and only score the last 24 h;
+delete it to rebuild the archive, e.g. after a retune or an outage of more than a day.
+
+```bash
+# Replay a past day (first run downloads ~29 days of waveforms, ~250 MB)
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 4 --config end=2022-03-20T00:00
+
+# Archive since 2022-01-01 (streams ~14 GB of waveforms; keeps ~10 MB of RSAM)
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 8 --config start=2022-01-01
+
+# Keep scoring every 10 min and serve the stored series for Grafana
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cron "2-59/10 * * * *" &
+aitana-api --rootdir ~/rsam_mp/storage --port 8003
+```
+
+Grafana reads the series from `aitana-api` with the Infinity data source (CSV, **Backend**
+parser, which alerting requires), e.g.
+`/feature?path=ruapehu,FWVZ,10,HHZ&name=rsam_mp_alarm&starttime=${__from:date:iso}&endtime=${__to:date:iso}`.
+An alert rule on the maximum of `rsam_mp_alarm` posts to Slack, and a No Data rule on
+`rsam_mp_index` catches a stalled pipeline (or a station data gap).
+
+On the default branch, [.gitlab-ci.yml](https://github.com/tsc-tools/aitana/blob/main/.gitlab-ci.yml) deploys these two commands as the
+`aitana-ruapehu-mp` and `aitana-ruapehu-api` containers, plus `aitana-label-sync`, which syncs
+the labels drawn in Grafana with `labels.json` every 10 minutes (see
+[aitana-storage](https://github.com/tsc-tools/aitana/blob/main/aitana-storage/README.md)). All three share the data directory
+`DATA_VOLUME`.
+
+The z-normalized matrix profile responds to changes in RSAM *shape*, not level; an amplitude
+threshold is a separate alert. Over Jan–Jun 2022 it alarmed on 1–3 days per month in quiet
+months and on about 20 % of days during the March–May 2022 unrest. It did not flag the abrupt
+2022-03-13 onset itself (a step looks like any other step once z-normalized); the first alarm
+after it was 2022-03-19 17:30 UTC, on an unusually steady stretch of tremor.
+
+## Scattering coefficients of Ruapehu
+
+`ruapehu_snet` fetches `NZ.FWVZ.10.HH?` (Z, N, E) the same way, resamples it to 25 Hz with an
+anti-alias filter and computes first- and second-order scattering coefficients with `SNet`
+(20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC
+day under `snet/` and stores `snet_order1` (datetime, channel, frequency) and `snet_order2`
+(datetime, channel, frequency, order2 frequency) under `ruapehu/FWVZ/10/HH` in
+`<outdir>/storage`; channel 0 is Z. Each run plots the vertical first-order coefficients to
+`results/<end>/order1.png`. A run covers the last 24 h, or every day since `start`. A day takes
+about 2.5 CPU-minutes and ~27 MB of waveforms. No detector consumes the coefficients yet.
+
+```bash
+# Replay the 2022-03-13 onset
+aitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 4 --config end=2022-03-14T05:30
+
+# Backfill since 2022-01-01
+aitana-pipelines run ruapehu ~/snet --workflow ruapehu_snet --cores 8 --config start=2022-01-01
+```
+
+## Running the EGU 2026 workflow with Docker
+
+`scripts/run_egu2026.sh` is a convenience wrapper that builds the project's Docker image,
+installs Aitana from source inside the container, and runs the bundled `egu2026` workflow —
+no local Python environment needed.
+
+**Prerequisites:** Docker must be installed and running.
+
+```bash
+# Run with defaults (output → ./egu_2026_output, all available cores)
+./scripts/run_egu2026.sh
+
+# Custom output directory and core count
+./scripts/run_egu2026.sh -o /data/results -c 8
+
+# Show help
+./scripts/run_egu2026.sh -h
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-o OUTDIR` | `./egu_2026_output` | Directory for workflow outputs |
+| `-c CORES` | all logical CPUs | Snakemake parallelism |
+
+The Docker image (`aitana-workflow`) is built from `docker/Dockerfile` on first run and
+cached by Docker. Conda environments for individual workflow rules are cached in a named
+Docker volume (`aitana-conda-envs`) and reused across runs, so subsequent invocations are
+significantly faster.
+
+The poster-generation step uses Apptainer inside Docker (to run an Inkscape container),
+which requires elevated capabilities (`SYS_ADMIN`, `/dev/fuse`). These are passed
+automatically by the script.
+
+## Registering your own workflow
+
+Any Python package can register a workflow by exposing a `WorkflowDescriptor` instance
+under the `aitana.pipelines.workflows` entry-point group:
+
+```toml
+# pyproject.toml
+[project.entry-points."aitana.pipelines.workflows"]
+my_workflow = "my_package.workflows:my_workflow"
+```
+
+```python
+# my_package/workflows.py
+from pathlib import Path
+from aitana.pipelines.cli import WorkflowDescriptor
+
+my_workflow = WorkflowDescriptor(
+    name="my_workflow",
+    volcano="ruapehu",
+    description="My custom eruption forecast model",
+    workflowdir=Path(__file__).parent / "snakemake",
+    outputs={
+        "forecast": "results/forecasts.nc",
+    },
+)
+```
+
+The workflow directory must contain a `Snakefile`. Aitana copies it into `outdir` before
+execution, so the original is never modified.
+
+
+## Why synthetic evaluation?
+
+Genuine, labelled volcanic anomalies are rare, so `aitana.anomaly.evaluation` takes a different approach: inject *known* synthetic faults or regime shifts into otherwise normal data, then check whether a detector's anomaly score recovers the injected ground truth. This notebook walks through each tool in that module on a synthetic 3-feature dataset (think: RSAM, SO$_2$, earthquake rate) and shows the kind of plot each one is meant to produce.
+
+```{python}
+#| label: setup
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
+from aitana.anomaly.evaluation import (
+    inject_change_points,
+    inject_faults,
+    score_detector,
+    simulate_regime_series,
+)
+
+rng = np.random.default_rng(0)
+n = 720  # 30 days of hourly data
+index = pd.date_range("2024-01-01", periods=n, freq="h")
+
+df = pd.DataFrame(
+    {
+        "rsam": 50 + rng.normal(0, 3, n).cumsum() * 0.05 + rng.normal(0, 2, n),
+        "so2": 20 + rng.normal(0, 1, n).cumsum() * 0.02 + rng.normal(0, 1, n),
+        "eq_rate": rng.poisson(3, n).astype(float),
+    },
+    index=index,
+)
+
+FEATURE_COLORS = {"rsam": "#4C78A8", "so2": "#F58518", "eq_rate": "#54A24B"}
+df.head()
+```
+
+## `inject_faults`: independent point faults
+
+Each column gets its own Bernoulli draw of fault timesteps, offset by a random multiple of that column's diff-std. `offset_range="hard"` produces small, easy-to-miss deviations; `"easy"` produces large, obvious ones. Use the buttons to compare.
+
+```{python}
+#| label: fig-independent-faults
+#| fig-cap: "Independent fault injection at 'hard' and 'easy' difficulty."
+
+corrupted_hard, mask_hard = inject_faults(
+    df, rate=0.04, offset_range="hard", mode="independent", rng=1
+)
+corrupted_easy, mask_easy = inject_faults(
+    df, rate=0.04, offset_range="easy", mode="independent", rng=1
+)
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))
+
+for i, col in enumerate(df.columns, start=1):
+    fig.add_trace(
+        go.Scatter(x=df.index, y=df[col], name=f"{col} (clean)",
+                    line=dict(color=FEATURE_COLORS[col], width=1),
+                    legendgroup=col, showlegend=(i == 1)),
+        row=i, col=1,
+    )
+    for label, corrupted, mask, visible in [
+        ("hard", corrupted_hard, mask_hard, True),
+        ("easy", corrupted_easy, mask_easy, False),
+    ]:
+        flagged = corrupted.loc[mask[col], col]
+        fig.add_trace(
+            go.Scatter(
+                x=flagged.index, y=flagged.values, mode="markers",
+                marker=dict(color="crimson", size=7, symbol="x"),
+                name=f"injected fault ({label})", legendgroup=f"fault-{label}",
+                showlegend=(i == 1), visible=visible,
+            ),
+            row=i, col=1,
+        )
+
+fig.update_layout(
+    height=600,
+    updatemenus=[dict(
+        type="buttons", direction="right", x=0.5, y=1.12, xanchor="center",
+        buttons=[
+            dict(label="hard", method="update",
+                 args=[{"visible": [True, True, False] * 3}]),
+            dict(label="easy", method="update",
+                 args=[{"visible": [True, False, True] * 3}]),
+        ],
+    )],
+    margin=dict(t=80),
+)
+fig.show()
+```
+
+## `inject_faults`: coupled faults
+
+In `mode="coupled"`, the *same* fault timestamps are injected across every column in a group — a synthetic stand-in for a multi-sensor precursor, where several instruments should light up together. Here `rsam` and `so2` are coupled while `eq_rate` is left untouched.
+
+```{python}
+#| label: fig-coupled-faults
+#| fig-cap: "Coupled fault injection: rsam and so2 fire at identical timestamps."
+
+corrupted_coupled, mask_coupled = inject_faults(
+    df, mode="coupled", coupled_groups=[["rsam", "so2"]],
+    rate=0.03, offset_range="easy", rng=2,
+)
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(df.columns))
+for i, col in enumerate(df.columns, start=1):
+    fig.add_trace(
+        go.Scatter(x=df.index, y=df[col], name=col,
+                    line=dict(color=FEATURE_COLORS[col], width=1), showlegend=False),
+        row=i, col=1,
+    )
+    flagged = corrupted_coupled.loc[mask_coupled[col], col]
+    fig.add_trace(
+        go.Scatter(x=flagged.index, y=flagged.values, mode="markers",
+                    marker=dict(color="crimson", size=7, symbol="x"),
+                    name="injected fault", showlegend=(i == 1)),
+        row=i, col=1,
+    )
+fig.update_layout(height=600, margin=dict(t=40))
+fig.show()
+```
+
+## `inject_change_points`: persistent regime shifts
+
+Unlike a point fault, a change point offsets the signal from its onset **onward**, mimicking a genuine regime change rather than a sensor glitch. The mask marks only the onset timestep — the shift itself persists in the data.
+
+```{python}
+#| label: fig-change-points
+#| fig-cap: "Persistent regime shift injected into rsam; markers show onsets only."
+
+corrupted_cp, change_points = inject_change_points(
+    df, columns=["rsam"], n_changes=3, offset_range="easy", mode="independent", rng=3
+)
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df.index, y=df["rsam"], name="clean",
+                          line=dict(color="lightgray", width=1)))
+fig.add_trace(go.Scatter(x=corrupted_cp.index, y=corrupted_cp["rsam"], name="with regime shift",
+                          line=dict(color=FEATURE_COLORS["rsam"], width=1.5)))
+onsets = change_points.index[change_points["rsam"]]
+fig.add_trace(go.Scatter(x=onsets, y=corrupted_cp.loc[onsets, "rsam"], mode="markers",
+                          marker=dict(color="crimson", size=10, symbol="diamond"),
+                          name="change-point onset"))
+fig.update_layout(height=350, margin=dict(t=30))
+fig.show()
+```
+
+## `simulate_regime_series`: known-state synthetic data
+
+For state/change-point detectors (e.g. CLaP, ClaSP) it's useful to generate data *from* discrete regimes rather than perturb existing data, so both the regime labels and the change points are exact ground truth. Repeated labels (`"A"` appears twice below) share the same mean — a recurring regime a state detector should recognise as the same state.
+
+```{python}
+#| label: fig-regime-series
+#| fig-cap: "Synthetic 3-feature series stitched from regimes A, B, A, C."
+
+series, cp_idx, labels = simulate_regime_series(
+    ["A", "B", "A", "C"], segment_length=120, n_features=3,
+    state_noise_std={"A": 0.6, "B": 0.6, "C": 0.6}, rng=4,
+)
+series.columns = ["rsam", "so2", "eq_rate"]
+
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=list(series.columns))
+palette = {"A": "#4C78A8", "B": "#F58518", "C": "#54A24B"}
+for i, col in enumerate(series.columns, start=1):
+    for state in labels.unique():
+        seg = series[col].where(labels == state)
+        fig.add_trace(
+            go.Scatter(x=series.index, y=seg, name=f"state {state}",
+                        line=dict(color=palette[state]), legendgroup=state,
+                        showlegend=(i == 1), connectgaps=False),
+            row=i, col=1,
+        )
+    for cp in cp_idx:
+        fig.add_vline(x=cp, line=dict(color="black", dash="dot", width=1), row=i, col=1)
+fig.update_layout(height=600, margin=dict(t=40))
+fig.show()
+```
+
+## `score_detector`: ROC/AUC against the injected ground truth
+
+Once faults are injected, any candidate anomaly score can be checked against the mask. Here a trivial detector — absolute deviation from each feature's mean, averaged across features and min-max scaled to `[0, 1]` — is scored against both the `"hard"` and `"easy"` fault sets from earlier, showing how injection difficulty changes detectability.
+
+```{python}
+#| label: fig-roc
+#| fig-cap: "ROC curves for a trivial mean-deviation detector, hard vs easy faults."
+
+def trivial_anomaly_index(corrupted, clean):
+    raw = (corrupted - clean).abs().mean(axis=1)
+    return (raw / raw.max()).to_numpy()
+
+results = {}
+for label, corrupted, mask in [("hard", corrupted_hard, mask_hard), ("easy", corrupted_easy, mask_easy)]:
+    scores = trivial_anomaly_index(corrupted, df)
+    results[label] = score_detector(scores, mask, threshold=0.5)
+
+fig = go.Figure()
+for label, color in [("hard", "#B279A2"), ("easy", "#54A24B")]:
+    r = results[label]
+    fig.add_trace(go.Scatter(
+        x=r["fpr"], y=r["tpr"], mode="lines",
+        name=f"{label} (AUC={r['auc']:.3f})", line=dict(color=color, width=2),
+    ))
+fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines",
+                          line=dict(color="gray", dash="dash"), name="chance", showlegend=True))
+fig.update_layout(
+    xaxis_title="False positive rate", yaxis_title="True positive rate",
+    height=450, width=550, margin=dict(t=30),
+)
+fig.show()
+```
+
+The confusion-matrix counts at a chosen operating threshold are also part of the result. Slide through thresholds to see the TP/FP/TN/FN trade-off for the `"hard"` fault set:
+
+```{python}
+#| label: fig-threshold-slider
+#| fig-cap: "Confusion-matrix counts across thresholds for the hard fault set."
+
+scores_hard = trivial_anomaly_index(corrupted_hard, df)
+thresholds = np.linspace(0.05, 0.95, 19)
+counts = pd.DataFrame(
+    [score_detector(scores_hard, mask_hard, threshold=t) for t in thresholds]
+)[["tp", "fp", "tn", "fn"]]
+counts.index = thresholds
+
+fig = go.Figure()
+bar_colors = {"tp": "#54A24B", "fp": "#E45756", "tn": "#4C78A8", "fn": "#F58518"}
+frames = []
+for t in thresholds:
+    frames.append(go.Frame(
+        name=f"{t:.2f}",
+        data=[go.Bar(x=list(counts.columns), y=counts.loc[t].values,
+                      marker_color=[bar_colors[c] for c in counts.columns])],
+    ))
+fig.add_trace(go.Bar(x=list(counts.columns), y=counts.loc[thresholds[0]].values,
+                      marker_color=[bar_colors[c] for c in counts.columns]))
+fig.frames = frames
+fig.update_layout(
+    height=400, width=500, margin=dict(t=30),
+    yaxis=dict(range=[0, int(counts.values.max() * 1.1)]),
+    sliders=[dict(
+        steps=[dict(method="animate", label=f"{t:.2f}",
+                     args=[[f"{t:.2f}"], {"mode": "immediate", "frame": {"duration": 0}}])
+               for t in thresholds],
+        currentvalue=dict(prefix="threshold = "),
+    )],
+)
+fig.show()
+```
+
+## `normalize_score`: ECDF percentile ranking
+
+Raw anomaly scores from different detectors live on different scales. `normalize_score` (on `AnomalyDetectionBaseClass`) percentile-ranks a score against a reference distribution — typically drawn from a known-quiet period — so 1.0 means "more anomalous than every reference observation."
+
+```{python}
+#| label: fig-normalize-score
+#| fig-cap: "Raw hard-fault scores percentile-ranked against a quiet-period reference."
+
+quiet_scores = trivial_anomaly_index(df, df.rolling(24, min_periods=1).mean())
+normalized = AnomalyDetectionBaseClass.normalize_score(scores_hard, quiet_scores)
+
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                     subplot_titles=("raw anomaly index", "ECDF-normalized"))
+fig.add_trace(go.Scatter(x=df.index, y=scores_hard, line=dict(color="#4C78A8"), showlegend=False), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=normalized, line=dict(color="#54A24B"), showlegend=False), row=2, col=1)
+fig.update_layout(height=500, margin=dict(t=40))
+fig.show()
+```
+
+## Summary
+
+| Tool | Purpose | Ground truth produced |
+|------------------------|------------------------|------------------------|
+| `inject_faults` | Point-wise sensor-glitch faults, independent or coupled across streams | Boolean mask per timestep/column |
+| `inject_change_points` | Persistent regime shifts, for change-point detectors | Boolean mask at onset timesteps only |
+| `simulate_regime_series` | Fully synthetic multi-regime series | Change-point indices + per-timestep state labels |
+| `score_detector` | ROC/AUC and confusion matrix vs. a fault/change-point mask | — |
+| `normalize_score` | ECDF percentile rank against a reference distribution | — |
