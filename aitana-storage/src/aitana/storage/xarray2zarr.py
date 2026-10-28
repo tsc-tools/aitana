@@ -108,16 +108,18 @@ def _fill_time_gaps_between_datasets(xds_existing: xr.DataArray, xds_new: xr.Dat
     gap_start = existing_endpoint + interval
     gap_end = xds_new[timedim].values[0] - interval
 
-    # Prepare shape for gap filling
+    # Prepare shape for gap filling; the time axis can be anywhere, e.g.
+    # (frequency, datetime) for spectra, (datetime, channel, frequency) for
+    # scattering coefficients
     shape_list = list(xds_new.shape)
-    dims_list = list(xds_new.dims)
-    shape_list.pop(dims_list.index(timedim))
+    time_axis = list(xds_new.dims).index(timedim)
 
     if gap_start <= gap_end:
         gap_times = pd.date_range(start=gap_start, end=gap_end, freq=interval)
 
         # Create NaN array with same shape as variable but for gap times
-        gap_shape = tuple(shape_list) + (len(gap_times),)
+        gap_shape = list(shape_list)
+        gap_shape[time_axis] = len(gap_times)
         gap_values = np.full(gap_shape, np.nan, dtype=xds_new.dtype)
 
         # Create coordinates for gap dataset
@@ -144,7 +146,8 @@ def _fill_time_gaps_between_datasets(xds_existing: xr.DataArray, xds_new: xr.Dat
     if need > 0:
         start = combined[timedim].values[-1] + interval
         pad_times = pd.date_range(start=start, periods=need, freq=interval)
-        pad_shape = tuple(shape_list) + (len(pad_times),)
+        pad_shape = list(shape_list)
+        pad_shape[time_axis] = len(pad_times)
         pad_vals = np.full(pad_shape, np.nan, dtype=xds_new.dtype)
         pad_coords = {timedim: pad_times}
         for coord_name, coord in xds_new.coords.items():

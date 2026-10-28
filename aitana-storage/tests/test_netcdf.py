@@ -172,6 +172,28 @@ def test_xarray2netcdf_zeros(tmp_path_factory):
     assert c('alarm').loc[:'2022-03-19T15:50'].isnull().all()
 
 
+def test_xarray2netcdf_time_axis_first(tmp_path_factory):
+    """
+    Features with the time axis first and several other axes, like scattering
+    coefficients (datetime, channel, frequency), are written along their time axis.
+    """
+    temp_dir = tmp_path_factory.mktemp('test_xarray2netcdf')
+    dates = pd.date_range('2022-03-13', periods=12, freq='10min')
+    coords = {'datetime': dates, 'channel': np.arange(3), 'frequency': [4., 2., 1., .5]}
+    values = np.random.default_rng(0).normal(size=(12, 3, 4))
+    xda = xr.DataArray(values, coords=coords, dims=list(coords), name='order1')
+    g = Storage('test_experiment', rootdir=temp_dir, starttime=dates[0],
+                endtime=dates[-1], backend='netcdf',
+                archive_starttime=datetime(2022, 3, 12))
+    c = g.get_substore('FWVZ', '10', 'HH')
+    c.save(xda[:6].to_dataset())
+    c.save(xda[6:].to_dataset())
+
+    stored = c('order1').transpose(*xda.dims)
+    np.testing.assert_array_equal(stored.values, values)
+    np.testing.assert_array_equal(stored['frequency'].values, coords['frequency'])
+
+
 def test_xarray2netcdf_long_axis(tmp_path_factory):
     """
     An axis pre-allocated from 2000 stays small on disk, out-of-order writes

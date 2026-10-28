@@ -95,10 +95,11 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
                 rootGrp.resize_dimension(timedim, newsize)
                 times[oldsize:] = t0 + np.arange(oldsize, newsize) * resolution
             data = rootGrp[featureName]
-            if len(data.shape) > 1:
-                data[:, indices] = xArray[featureName].values
-            else:
-                data[indices] = xArray[featureName].values
+            # the time axis can be anywhere, e.g. (frequency, datetime) for
+            # spectra, (datetime, channel, frequency) for scattering coefficients
+            key = [slice(None)] * len(data.dimensions)
+            key[data.dimensions.index(timedim)] = indices
+            data[tuple(key)] = xArray[featureName].transpose(*data.dimensions).values
             now_time = date2num(now, units=metaGrp['update_log'].attrs['units'],
                                 calendar=metaGrp['update_log'].attrs['calendar'])
             ulog = metaGrp['update_log']

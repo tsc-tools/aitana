@@ -271,6 +271,30 @@ def test_xarray2zarr_high_dimensionality(setup_multi_dimensional):
     assert xds_test.sizes['datetime'] == 432
 
 
+def test_xarray2zarr_time_axis_first(tmp_path_factory):
+    """
+    Features with the time axis first, like scattering coefficients
+    (datetime, channel, frequency), can be appended, also after a gap.
+    """
+    tempdir = tmp_path_factory.mktemp('test_xarray2zarr')
+    dates = pd.date_range('2022-03-13', periods=12, freq='10min')
+    coords = {'datetime': dates, 'channel': np.arange(3), 'frequency': [4., 2., 1., .5]}
+    values = np.random.default_rng(0).normal(size=(12, 3, 4))
+    xda = xr.DataArray(values, coords=coords, dims=list(coords), name='order1')
+    g = Storage('test_experiment', rootdir=tempdir, starttime=dates[0],
+                endtime=dates[-1], backend='zarr',
+                archive_starttime=datetime(2022, 3, 12))
+    c = g.get_substore('FWVZ', '10', 'HH')
+    c.save(xda[:4].to_dataset())
+    c.save(xda[4:7].to_dataset())
+    c.save(xda[9:].to_dataset())  # after a gap
+
+    stored = c('order1').transpose(*xda.dims)
+    expected = values.copy()
+    expected[7:9] = np.nan
+    np.testing.assert_array_equal(stored.sel(datetime=dates).values, expected)
+
+
 def test_xarray2zarr_metadata(tmp_path_factory):
     temp_dir = tmp_path_factory.mktemp('test_xarray2zarr')
     start = datetime(2022, 7, 18, 8, 0, 0)
