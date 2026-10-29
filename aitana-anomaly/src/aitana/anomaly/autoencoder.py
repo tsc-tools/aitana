@@ -20,9 +20,9 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, random_split
 
-from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
-from aitana.anomaly.dataset import SliceBatchSampler, ZizouDataset
+from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass, MinMaxScale
 from aitana.storage import Storage
+from aitana.storage.storage import AitanaDataset, SliceBatchSampler
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +210,11 @@ class AutoEncoder(AnomalyDetectionBaseClass):
         logger.info(f"Using {self.device_} device")
         self.cluster_ = FuzzyCluster(n_clusters=n_clusters)
         self.classifications = None
-        self.dataset = ZizouDataset(
-            store, self.features, target_transform=torch.from_numpy
+        self.scale_ = MinMaxScale(store, self.features)
+        self.dataset = AitanaDataset(
+            store, self.features, transform=self.scale_, lazy=True
         )
-        autoencoder_ = TiedAutoEncoder(self.dataset.nfeatures, self.layers_)
+        autoencoder_ = TiedAutoEncoder(self.dataset.n_features, self.layers_)
         self.model_ = autoencoder_.to(self.device_)
         logger.info(self.model_)
 
@@ -233,12 +234,13 @@ class AutoEncoder(AnomalyDetectionBaseClass):
     def train(self, dataloader, optimizer):
         size = len(dataloader.dataset)
         self.model_.train()
-        for batch, (X, y) in enumerate(dataloader):
-            X, y = X.to(self.device_), y.to(self.device_)
+        for batch, X in enumerate(dataloader):
+            # Samples are single time steps; the model's weights are float64
+            X = X[:, 0].to(self.device_, torch.float64)
 
             # Compute prediction error
             pred = self.model_(X)
-            loss = self.model_.loss(pred, y).sum(axis=1).mean()
+            loss = self.model_.loss(pred, X).sum(axis=1).mean()
 
             # Backpropagation
             loss.backward()
@@ -254,10 +256,10 @@ class AutoEncoder(AnomalyDetectionBaseClass):
         self.model_.eval()
         test_loss = 0
         with torch.no_grad():
-            for X, y in dataloader:
-                X, y = X.to(self.device_), y.to(self.device_)
+            for X in dataloader:
+                X = X[:, 0].to(self.device_, torch.float64)
                 pred = self.model_(X)
-                test_loss += loss_fn(pred, y).sum(axis=1).mean()
+                test_loss += loss_fn(pred, X).sum(axis=1).mean()
         test_loss /= num_batches
         self.loss_ = test_loss
         logger.info(f"Test loss: {test_loss:>8f} \n")
@@ -308,20 +310,20 @@ class AutoEncoder(AnomalyDetectionBaseClass):
         logger.info("Starting transform process.")
         self.store.starttime = starttime
         self.store.endtime = endtime
-        zd = ZizouDataset(self.store, self.features, target_transform=torch.from_numpy)
+        zd = AitanaDataset(self.store, self.features, transform=self.scale_, lazy=True)
         sampler = SliceBatchSampler(range(len(zd)), self.batch_size_, False)
         dataloader = DataLoader(zd, batch_sampler=sampler)
         logger.info("Transforming data.")
         with torch.no_grad():
-            for X, y in dataloader:
-                X = X.to(self.device_)
+            for batch, X in zip(sampler, dataloader):
+                X = X[:, 0].to(self.device_, torch.float64)
                 encoded_data = self.model_.encode(X)
                 X_hat = self.model_.decode(encoded_data)
 
                 encoded_data = encoded_data.cpu().numpy()
 
                 output = {}
-                dates = zd.dates
+                dates = zd.datetimes[batch]
                 logger.info("Calculating loss between input and decoded output.")
                 loss = self.model_.loss(X, X_hat).sum(axis=1)
                 output["autoencoder_loss"] = xr.DataArray(

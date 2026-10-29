@@ -6,6 +6,8 @@ from datetime import datetime
 import pytest
 
 from aitana.features import get_data
+
+pytest.importorskip("torch")
 from aitana.anomaly.autoencoder import AutoEncoder
 
 logger = logging.getLogger(__name__)
@@ -35,9 +37,10 @@ def test_transform(setup_ac):
     ae = store1("autoencoder_embedding")
     acl = store1("autoencoder_cluster")
     acloss = store1("autoencoder_loss")
-    assert ae.shape == (6, 144)
-    assert acl.shape == (5, 144)
-    assert acloss.shape == (144,)
+    # endtime is inclusive: 2023-01-08 00:00 to 2023-01-09 00:00
+    assert ae.shape == (6, 145)
+    assert acl.shape == (5, 145)
+    assert acloss.shape == (145,)
 
 
 @pytest.mark.slow
@@ -55,9 +58,10 @@ def test_early_stopping(setup_ac):
     ae = store1("autoencoder_embedding")
     acl = store1("autoencoder_cluster")
     acloss = store1("autoencoder_loss")
-    assert ae.shape == (6, 144)
-    assert acl.shape == (5, 144)
-    assert acloss.shape == (144,)
+    # endtime is inclusive: 2023-01-08 00:00 to 2023-01-09 00:00
+    assert ae.shape == (6, 145)
+    assert acl.shape == (5, 145)
+    assert acloss.shape == (145,)
 
 
 @pytest.mark.slow
