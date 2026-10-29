@@ -30,6 +30,62 @@ def min_max_scale_netcdf(
     return scaling_params
 
 
+class MinMaxScale:
+    """
+    Fill gaps with the median and scale each feature column to [0, 1].
+
+    A ``transform`` for ``aitana.storage.storage.AitanaDataset``. Minimum,
+    maximum and median of each feature come from its whole archive, computed
+    once with `min_max_scale_netcdf` and cached as
+    ``scaling_params_<feature>.json`` in the store.
+
+    Parameters
+    ----------
+    store : aitana.storage.Path
+        Store holding the features, in NetCDF format.
+    features : list of str
+        Feature names, in the order given to the dataset.
+    """
+
+    def __init__(self, store, features):
+        params = [
+            min_max_scale_netcdf(
+                store.feature_path(feature),
+                feature,
+                os.path.join(store.path, f"scaling_params_{feature}.json"),
+            )
+            for feature in features
+        ]
+
+        def columns(key):
+            # One value per column; 2D features have one per row of their archive
+            return np.concatenate([np.atleast_1d(p[key]) for p in params]).astype(
+                np.float32
+            )
+
+        self.min = columns("min")
+        self.max = columns("max")
+        self.median = columns("median")
+
+    def __call__(self, block):
+        """
+        Scale a block of time steps.
+
+        Parameters
+        ----------
+        block : np.ndarray
+            Array of shape ``[n_timesteps, n_features]``, with columns in the
+            dataset's order.
+
+        Returns
+        -------
+        np.ndarray
+            The scaled block; NaN are replaced by the median before scaling.
+        """
+        block = np.where(np.isnan(block), self.median, block)
+        return (block - self.min) / (self.max - self.min)
+
+
 class AnomalyDetectionBaseClass(object):
     def __init__(self, features, stacks=None, transforms=None):
         self.features = features
