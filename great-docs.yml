@@ -22,6 +22,13 @@ sections:
   - title: Developers
     dir: developer
 
+# Hand-written skill. Listing it under `skills` (rather than relying on discovery of
+# skills/aitana/) also publishes any companion files in its directory to .well-known/.
+skill:
+  skills:
+    - name: aitana
+      file: skills/aitana/SKILL.md
+
 reference:
   - title: aitana.access
     desc: Pure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).
@@ -113,8 +120,7 @@ reference:
       - anomaly.autoencoder.AutoEncoder
       - anomaly.autoencoder.TiedAutoEncoder
       - anomaly.autoencoder.FuzzyCluster
-      - anomaly.dataset.ZizouDataset
-      - anomaly.dataset.SliceBatchSampler
+      - anomaly.anomaly_base.MinMaxScale
       - anomaly.evaluation.inject_faults
       - anomaly.evaluation.inject_change_points
       - anomaly.evaluation.simulate_regime_series
@@ -127,6 +133,7 @@ reference:
       - storage.storage.Storage
       - storage.storage.Path
       - storage.storage.AitanaDataset
+      - storage.storage.SliceBatchSampler
       - storage.ingest.IngestWorker
       - storage.ingest.enqueue_dataset
       - storage.api.StorageAPI
@@ -140,6 +147,7 @@ reference:
       - storage.utils.round_datetime
       - storage.utils.floor_datetime
       - storage.utils.get_dt
+      - storage.utils.snap_to_grid
       - storage.utils.fill_time_gaps
       - storage.utils.merge_arrays
       - storage.get_data
