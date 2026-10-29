@@ -4,9 +4,13 @@ title: "Implementation status"
 
 ## `aitana-storage`
 - `Storage` — hierarchical feature archives (site/sensor/channel) backed by NetCDF or Zarr,
-  with gap filling, incremental merging and time-range queries.
+  with gap filling, incremental merging and time-range queries. Time stamps are snapped to
+  each archive's grid on write and read, so jittered input and NetCDF's float-hour times
+  come back exact.
 - `AitanaDataset` — PyTorch dataset yielding `[window_size, n_features]` windows with
-  configurable stride.
+  configurable stride; 2D features become one column per frequency, features must share
+  time stamps, and an optional transform preprocesses the data. With `lazy=True` it reads
+  from disk per batch; `SliceBatchSampler` makes each batch one contiguous read.
 - `aitana-api` — FastAPI service exposing `/feature` and `/inventory`.
 - `grafana_annotations` — sync the labels drawn on any Grafana dashboard with one label
   file; restores them to a freshly deployed Grafana.
@@ -52,10 +56,11 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `AnomalyDetectionBaseClass` — the shared contract every detector implements, including
   `normalize_score()`, the ECDF/percentile-rank normaliser that makes different algorithms'
   raw statistics comparable against a quiet reference period.
-- `ZizouDataset` — feature loading and scaling for model input.
+- `MinMaxScale` — `AitanaDataset` transform that fills gaps with the median and scales each
+  feature column to [0, 1] for model input.
 - `AutoEncoder` / `TiedAutoEncoder` — working per-timestep autoencoder with training,
-  checkpointing and inference; `FuzzyCluster` for cluster assignment. This and
-  `ZizouDataset` need the `pytorch` extra (`aitana-anomaly[pytorch]`).
+  checkpointing and inference on a lazy `AitanaDataset`; `FuzzyCluster` for cluster
+  assignment. It needs the `pytorch` extra (`aitana-anomaly[pytorch]`).
 - `SNet` — scattering-network feature extraction (via `scatseisnet`): `preprocess()` puts
   three components on a common 25 Hz grid with an anti-alias filter, `compute()` gives first-
   and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a

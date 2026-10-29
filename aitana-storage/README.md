@@ -40,8 +40,20 @@ rsam = c('rsam')  # -> xarray.DataArray indexed by datetime
 ```python
 from torch.utils.data import DataLoader
 
-dataset = g.to_pytorch(['rsam', 'dsar'])
+dataset = c.to_pytorch(['rsam', 'dsar'])
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+```
+
+`to_pytorch(..., lazy=True)` reads from disk per batch instead of loading
+everything up front; iterate it with `SliceBatchSampler` so each batch is one
+contiguous read:
+
+```python
+from aitana.storage.storage import SliceBatchSampler
+
+dataset = c.to_pytorch(['rsam', 'dsar'], window_size=36, lazy=True)
+sampler = SliceBatchSampler(range(len(dataset)), 64)
+dataloader = DataLoader(dataset, batch_sampler=sampler)
 ```
 
 ### FastAPI service

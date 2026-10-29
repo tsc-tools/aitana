@@ -186,7 +186,30 @@ distributions. Each distribution is its own PyPI project, uploaded independently
 
 - **Naming convention:** distribution `aitana-access` (hyphen) ships import package
   `aitana.access` (dot). Mirrors `azure-storage-blob` → `azure.storage.blob`.
-- **No parent project** for `aitana` itself.
+- **No parent project** for `aitana` itself (see the decision below).
+
+### Decision: no parent `aitana` distribution (for now)
+
+Neither a parent package that owns `aitana/` nor a code-less meta-package that installs every
+distribution.
+
+- **A parent package breaks the namespace.** Any distribution that ships `aitana/__init__.py`
+  shadows the others (§8). This rules out a parent *package* for good.
+- **A meta-package dumps the full dependency set on users**, the thing §7 keeps in the dev
+  environment. Users install the distributions they need instead.
+- **It adds a release step.** It has to be published after every member (wrinkle 3 below) and
+  re-released whenever a member is added or a member's minimum version must rise.
+- **Precedent:** the `azure` and `google-cloud` meta-packages were both deprecated, largely
+  because their pins conflicted with independently released sub-packages.
+
+The PyPI name `aitana` still holds the pre-split release (0.2.0: data files and workflow
+scripts only, no dependency on any `aitana-*` distribution), so `pip install aitana` does not
+install the namespace packages.
+
+Revisit if a one-line install of everything is wanted. A meta-package does not stop anyone
+installing single distributions, provided it ships no files under `aitana/`, uses lower bounds
+(`aitana-access>=0.1.3`) rather than pins, and every member is on PyPI first. It could be the
+workspace root's `[project]`, which would also replace the root `setup.cfg` that great-docs reads.
 
 ### Local flow (per distribution)
 
