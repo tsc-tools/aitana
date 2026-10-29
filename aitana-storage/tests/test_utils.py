@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta, timezone
 import numpy as np
+import pandas as pd
 import pytest
 
 from aitana.storage.utils import (generate_test_data,
                          round_datetime,
-                         floor_datetime)
+                         floor_datetime,
+                         get_dt,
+                         snap_to_grid)
 
 
 def test_generate_test_data():
@@ -81,3 +84,44 @@ def test_round_datetime_basic_10min():
     dt = datetime.fromisoformat("2025-11-27T10:17:00")
     out = round_datetime(dt, 600)
     assert out == datetime(2025, 11, 27, 10, 20)
+
+
+# Millisecond offsets, like traces that start a few milliseconds late
+JITTER = np.array([4, -3, 2, 5, -5, 1, 0, -2, 3, -4]).astype('timedelta64[ms]')
+
+
+def test_get_dt():
+    grid = pd.date_range('2023-01-01', periods=10, freq='10min').values
+    assert get_dt(grid) == pd.Timedelta('10min')
+    assert get_dt(grid + JITTER) == pd.Timedelta('10min')
+    # float hours decode up to a microsecond off
+    assert get_dt(grid + np.timedelta64(-256, 'ns')) == pd.Timedelta('10min')
+    fast = pd.date_range('2023-01-01', periods=10, freq='250ms').values
+    assert get_dt(fast) == pd.Timedelta('250ms')
+    with pytest.raises(ValueError, match="two time stamps"):
+        get_dt(grid[:1])
+
+
+def test_snap_to_grid():
+    # the grid keeps the phase of the data, here window centres at :05
+    grid = pd.date_range('2023-01-01 00:05', periods=10, freq='10min').values
+    np.testing.assert_array_equal(snap_to_grid(grid + JITTER, pd.Timedelta('10min')), grid)
+    # an explicit origin is any point of the grid
+    origin = np.datetime64('2000-01-01T00:05')
+    np.testing.assert_array_equal(
+        snap_to_grid(grid + JITTER, pd.Timedelta('10min'), origin), grid)
+    assert snap_to_grid(grid, pd.Timedelta('10min')).dtype == np.dtype('datetime64[ns]')
+
+
+def test_snap_to_grid_check():
+    grid = pd.date_range('2023-01-01', periods=10, freq='10s').values
+    # jitter is fine
+    snap_to_grid(grid + JITTER, pd.Timedelta('10s'), check=True)
+    # a different phase is not: window centres at :05 on a grid at :00
+    with pytest.raises(ValueError, match="off the grid"):
+        snap_to_grid(grid + np.timedelta64(5, 's'), pd.Timedelta('10s'),
+                     origin=np.datetime64('2000-01-01'), check=True)
+    # nor are time stamps that mix phases
+    mixed = np.concatenate([grid[:5], grid[5:] + np.timedelta64(3, 's')])
+    with pytest.raises(ValueError, match="off the grid"):
+        snap_to_grid(mixed, pd.Timedelta('10s'), check=True)

@@ -197,19 +197,94 @@ def floor_datetime(dt: datetime, interval: Union[int, float, timedelta]) -> date
     return rounded
 
 
+def _precision(spacing):
+    """
+    Unit that time stamps on a grid with this spacing are rounded to.
+
+    Parameters
+    ----------
+    spacing : pd.Timedelta
+        Grid spacing.
+
+    Returns
+    -------
+    str
+        'ms' for spacings below a second, otherwise 's'.
+    """
+    return 's' if pd.Timedelta(spacing) >= pd.Timedelta(1, 's') else 'ms'
+
+
 def get_dt(times):
     """
-    Infer the sampling of the time dimension.
+    Infer the sampling interval of a time axis.
+
+    The median spacing, rounded to whole seconds (whole milliseconds below a
+    second), so that time stamps slightly off the grid don't change the
+    interval: times stored as float hours decode up to a microsecond off,
+    and traces can start a few milliseconds late.
+
+    Parameters
+    ----------
+    times : array-like of datetime64
+        At least two sorted time stamps.
+
+    Returns
+    -------
+    pd.Timedelta
+        The sampling interval.
     """
-    pd_times = pd.to_datetime(times)
-    dt = pd.infer_freq(pd_times)
-    if dt is None:
-        dt = pd_times.diff().median()
-    try:
-        dt = pd.Timedelta(dt)
-    except ValueError:
-        dt = pd.Timedelta(f"1{dt}")
-    return dt
+    values = np.asarray(times, dtype='datetime64[ns]')
+    if len(values) < 2:
+        raise ValueError(
+            "Need at least two time stamps to infer the sampling interval.")
+    spacing = pd.to_timedelta(np.diff(values)).median()
+    return spacing.round(_precision(spacing))
+
+
+def snap_to_grid(times, interval, origin=None, check=False):
+    """
+    Round time stamps to the nearest point of a regular grid.
+
+    Parameters
+    ----------
+    times : array-like of datetime64
+        Time stamps to snap.
+    interval : pd.Timedelta
+        Grid spacing.
+    origin : datetime64-like, optional
+        A point of the grid. By default the first time stamp, rounded to whole
+        seconds (whole milliseconds for spacings below a second), so that the
+        grid keeps the phase of the data, e.g. time stamps at window centres.
+    check : bool, optional
+        Raise a ValueError if a time stamp is further from its grid point than
+        jitter explains: 1% of the interval, at most a second.
+
+    Returns
+    -------
+    np.ndarray
+        datetime64[ns] time stamps ``origin + k * interval``; halfway cases
+        round up.
+    """
+    values = np.asarray(times, dtype='datetime64[ns]')
+    step = pd.Timedelta(interval).value
+    if origin is None:
+        origin = pd.Timestamp(values[0]).round(_precision(interval))
+    origin = np.datetime64(pd.Timestamp(origin).to_datetime64(), 'ns')
+    # integer nanoseconds, so that the grid points are exact
+    offset = (values - origin).astype(np.int64)
+    k = (offset + step // 2) // step
+    snapped = origin + (k * step).astype('timedelta64[ns]')
+    if check:
+        tolerance = min(pd.Timedelta(interval) / 100, pd.Timedelta(1, 's'))
+        off = np.abs((values - snapped).astype(np.int64)).max()
+        if off > tolerance.value:
+            raise ValueError(
+                f"Time stamps are up to {pd.Timedelta(off, 'ns')} off the grid "
+                f"{pd.Timestamp(origin)} + k * {pd.Timedelta(interval)}, more than "
+                f"the {tolerance} allowed for jitter. Data with a different phase "
+                "(e.g. stamped at window centres instead of starts) can't share "
+                "an archive.")
+    return snapped
 
 
 def fill_time_gaps(xds: xr.Dataset, timedim: str = 'datetime') -> xr.Dataset:

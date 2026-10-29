@@ -5,10 +5,11 @@ from warnings import filterwarnings
 
 import h5netcdf
 import numpy as np
+import pandas as pd
 import xarray as xr
 from cftime import date2num, num2date
 
-from .utils import merge_arrays
+from .utils import get_dt, merge_arrays, snap_to_grid
 
 
 def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
@@ -28,21 +29,26 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
     timedim : str
         Name of time dimension.
     archive_starttime : datetime
-        Start time of archive. If the start time of the data is before this
-        time, the data start time is used.
+        Start time of archive. A new archive's grid runs through the data's
+        first time stamp and starts at its first point at or after this time;
+        if the data start earlier, the archive starts with them.
     resolution : float
         Time resolution of the data in hours. If None, the resolution is
-        determined from the data.
+        determined from the data, and time stamps further off the archive's
+        grid than jitter raise a ValueError. If given, data go to the nearest
+        grid point.
     """
     filterwarnings(action='ignore', category=DeprecationWarning,
                    message='`np.bool` is a deprecated alias')
 
     data_starttime = xArray[timedim].values[0].astype(
         'datetime64[us]').astype(datetime)
-    starttime = min(data_starttime, archive_starttime)
     now = datetime.now(tz=timezone.utc)
+    check_grid = resolution is None
     if resolution is None:
-        resolution = (np.diff(xArray[timedim])/np.timedelta64(1, 'h'))[0]
+        resolution = get_dt(xArray[timedim]) / np.timedelta64(1, 'h')
+    interval = pd.Timedelta(hours=resolution).round('ms')
+    starttime = _archive_start(xArray[timedim].values, interval, archive_starttime)
 
     for featureName in list(xArray.data_vars.keys()):
         h5file = os.path.join(fdir, featureName + '.nc')
@@ -85,6 +91,12 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
                 t0 = date2num(starttime,
                               units=rootGrp[timedim].attrs['units'],
                               calendar=rootGrp[timedim].attrs['calendar'])
+            if check_grid:
+                origin = num2date(t0, units=rootGrp[timedim].attrs['units'],
+                                  calendar=rootGrp[timedim].attrs['calendar'],
+                                  only_use_cftime_datetimes=False,
+                                  only_use_python_datetimes=True)
+                snap_to_grid(xArray[timedim].values, interval, origin, check=True)
 
             indices = np.rint((new_time - t0)/resolution).astype(int)
             if not np.all(indices >= 0):
@@ -112,6 +124,34 @@ def xarray2netcdf(xArray, fdir, group="original", timedim="datetime",
             if abs(old_resolution - resolution) > 1e-5:
                 raise ValueError(f"Resolution mismatch for {featureName}: "
                                  f"{old_resolution} != {resolution}")
+
+
+def _archive_start(times, interval, archive_starttime):
+    """
+    Start of a new archive on the grid through the data's first time stamp.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        datetime64 time stamps of the data.
+    interval : pd.Timedelta
+        Grid spacing.
+    archive_starttime : datetime
+        Requested start of the archive.
+
+    Returns
+    -------
+    datetime
+        The first grid point at or after `archive_starttime`, or the data's
+        first time stamp (rounded to the grid's precision) if that's earlier.
+    """
+    anchor = snap_to_grid(times[:1], interval)[0]
+    start = np.datetime64(archive_starttime, 'ns')
+    if anchor > start:
+        step = interval.value
+        lead = (anchor - start).astype(np.int64)
+        anchor = anchor - np.timedelta64(lead // step * step, 'ns')
+    return pd.Timestamp(anchor).to_pydatetime()
 
 
 def _create_root_group(defaultGroupName, featureName, h5f, xArray, starttime, timedim):

@@ -302,3 +302,74 @@ def test_ingest_worker_with_data(tmp_path_factory):
     xdf_test = substore('rsam')
     np.testing.assert_array_equal(xdf_test.loc[{'datetime': data2.datetime}].values,
                                   data2['rsam'].values)
+
+
+@pytest.mark.parametrize("backend", ["netcdf", "zarr"])
+def test_off_grid_times(tmp_path_factory, backend):
+    """Time stamps a few milliseconds off the grid are kept and read back on it."""
+    rootdir = tmp_path_factory.mktemp('data')
+    g = Storage('volcanoes', rootdir=rootdir, backend=backend)
+    c = g.get_substore('WIZ', '00', 'HHZ')
+    tstart = datetime(2023, 1, 1)
+    xdf = generate_test_data(dim=1, ndays=1, tstart=tstart, feature_names=['rsam'],
+                             add_nans=False)
+    grid = xdf.datetime.values
+    jitter = np.random.default_rng(0).integers(-5000, 5000, len(grid))
+    c.save(xdf.assign_coords(datetime=grid + jitter.astype('timedelta64[us]')))
+
+    g.starttime = tstart
+    g.endtime = datetime(2023, 1, 1, 23, 50)
+    rsam = c('rsam')
+    np.testing.assert_array_equal(rsam.datetime.values, grid)
+    np.testing.assert_array_equal(rsam.values, xdf['rsam'].values)
+
+    # what a query returns can be saved again without losing samples
+    c.save(rsam.to_dataset(name='rsam_copy'))
+    np.testing.assert_array_equal(c('rsam_copy').values, xdf['rsam'].values)
+
+
+def test_drifted_archive(tmp_path_factory):
+    """An archive whose stored resolution is slightly off reads back on the grid."""
+    from aitana.storage.storage import AitanaDataset
+
+    rootdir = tmp_path_factory.mktemp('data')
+    g = Storage('volcanoes', rootdir=rootdir, backend='netcdf')
+    c = g.get_substore('WIZ', '00', 'HHZ')
+    tstart = datetime(2023, 1, 1)
+    xdf = generate_test_data(dim=1, ndays=1, tstart=tstart, feature_names=['rsam'],
+                             add_nans=False)
+    # A resolution inferred from float-decoded times, as stored before it was
+    # rounded; over the 23 years since the archive start, the axis drifts by 0.7 s
+    c.save(xdf, resolution=10 / 60 * (1 - 1e-9))
+
+    g.starttime = tstart
+    g.endtime = datetime(2023, 1, 1, 23, 50)
+    np.testing.assert_array_equal(c('rsam').datetime.values, xdf.datetime.values)
+    assert c.get_feature_info('rsam')['earliestRecord'] == '2023-01-01T00:00:00'
+    assert AitanaDataset(c, ['rsam']).datetimes[0] == np.datetime64('2023-01-01')
+
+
+@pytest.mark.parametrize("backend", ["netcdf", "zarr"])
+def test_phase(tmp_path_factory, backend):
+    """An archive's grid follows the data's phase; data with another phase raise."""
+    rootdir = tmp_path_factory.mktemp('data')
+    # a 10 s grid from the default archive start in 2000 would have 72M slots
+    g = Storage('volcanoes', rootdir=rootdir, backend=backend,
+                archive_starttime=datetime(2023, 1, 1))
+    c = g.get_substore('WIZ', '00', 'HHZ')
+    # stamped at the centres of 10 s windows, half a step off midnight
+    centres = pd.date_range('2023-01-01 00:00:05', periods=12, freq='10s')
+    c.save(xr.Dataset({'ssam': ('datetime', np.arange(12.0))},
+                      coords={'datetime': centres}))
+
+    g.starttime = datetime(2023, 1, 1)
+    g.endtime = datetime(2023, 1, 1, 0, 3)
+    ssam = c('ssam').dropna('datetime')
+    np.testing.assert_array_equal(ssam.datetime.values, centres.values)
+    np.testing.assert_array_equal(ssam.values, np.arange(12.0))
+
+    starts = centres - pd.Timedelta(5, 's')
+    with pytest.raises(ValueError, match="off the grid"):
+        c.save(xr.Dataset({'ssam': ('datetime', np.zeros(12))},
+                          coords={'datetime': starts}))
+    np.testing.assert_array_equal(c('ssam').dropna('datetime').values, np.arange(12.0))
