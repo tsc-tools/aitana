@@ -3,9 +3,10 @@ from datetime import datetime
 import numpy as np
 
 from aitana.storage import Storage, generate_test_data
+from aitana.storage.storage import SliceBatchSampler
 
 torch = pytest.importorskip("torch")
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
 
 
 def test_basic(tmp_path_factory):
@@ -271,3 +272,93 @@ def test_stride(tmp_path_factory):
     total_timesteps = len(rsam_data.datetime)
     expected_length = (total_timesteps - window_size) // stride + 1
     assert len(dataset) == expected_length
+
+
+def save_rsam_and_ssam(rootdir, startdate):
+    """Save 1D rsam and 2D ssam, whose frequency rows differ, in a substore."""
+    g = Storage('volcanoes', rootdir=rootdir)
+    store = g.get_substore('WIZ', '00', 'HHZ')
+    store.save(generate_test_data(dim=1, ndays=1, tstart=startdate, feature_names=['rsam']))
+    ssam = generate_test_data(dim=2, ndays=1, tstart=startdate, nfreqs=3,
+                              feature_names=['ssam'], freq_names=['frequency'])
+    ssam['ssam'] = ssam['ssam'] * (1 + ssam['frequency'])
+    store.save(ssam)
+    g.starttime = startdate
+    g.endtime = datetime(2023, 1, 1, 12)
+    return g, store
+
+
+def test_feature_with_frequencies(tmp_path_factory):
+    """A 2D feature contributes one column per frequency, in stored order."""
+    g, store = save_rsam_and_ssam(tmp_path_factory.mktemp('data'), datetime(2023, 1, 1))
+
+    dataset = store.to_pytorch(['rsam', 'ssam'])
+
+    assert dataset.n_features == 4
+    sample = dataset[5]
+    assert sample.shape == (1, 4)
+    np.testing.assert_allclose(sample[0, 0].numpy(), store('rsam').isel(datetime=5), rtol=1e-6)
+    np.testing.assert_allclose(sample[0, 1:].numpy(), store('ssam').isel(datetime=5), rtol=1e-6)
+
+
+def test_different_resolutions(tmp_path_factory):
+    """Features at different resolutions raise instead of being misaligned."""
+    rootdir = tmp_path_factory.mktemp('data')
+    g = Storage('volcanoes', rootdir=rootdir)
+    startdate = datetime(2023, 1, 1)
+    g.save(generate_test_data(dim=1, ndays=1, tstart=startdate, feature_names=['rsam']))
+    g.save(generate_test_data(dim=1, ndays=1, tstart=startdate, freq='1h', feature_names=['dsar']))
+    g.starttime = startdate
+    g.endtime = datetime(2023, 1, 1, 12)
+
+    with pytest.raises(ValueError, match="different time stamps"):
+        g.to_pytorch(['rsam', 'dsar'])
+
+
+def test_transform_and_datetimes(tmp_path_factory):
+    """The transform applies to every sample, and datetimes holds the time steps."""
+    g, store = save_rsam_and_ssam(tmp_path_factory.mktemp('data'), datetime(2023, 1, 1))
+
+    plain = store.to_pytorch(['rsam', 'ssam'], window_size=3, stride=2)
+    doubled = store.to_pytorch(['rsam', 'ssam'], window_size=3, stride=2,
+                               transform=lambda block: 2 * block)
+
+    np.testing.assert_allclose(doubled[4].numpy(), 2 * plain[4].numpy())
+    np.testing.assert_array_equal(plain.datetimes, store('rsam').datetime.values)
+
+
+def test_lazy_matches_eager(tmp_path_factory):
+    """Lazy reads give the same samples as loading everything, however they are requested."""
+    startdate = datetime(2023, 1, 1)
+    g, store = save_rsam_and_ssam(tmp_path_factory.mktemp('data'), startdate)
+    options = dict(window_size=3, stride=2, transform=lambda block: 2 * block)
+    eager = store.to_pytorch(['rsam', 'ssam'], **options)
+    lazy = store.to_pytorch(['rsam', 'ssam'], lazy=True, **options)
+
+    expected = torch.stack([eager[i] for i in range(len(eager))])
+    assert len(lazy) == len(eager)
+    for dataset in (eager, lazy):
+        sampler = SliceBatchSampler(range(len(dataset)), 4)
+        by_index = torch.stack([dataset[i] for i in range(len(dataset))])
+        by_slice = torch.cat(list(DataLoader(dataset, batch_sampler=sampler)))
+        by_list = torch.cat(list(DataLoader(dataset, batch_size=4)))
+        for actual in (by_index, by_slice, by_list):
+            np.testing.assert_array_equal(actual.numpy(), expected.numpy())
+    # Reading doesn't move the caller's time range
+    assert store.starttime == startdate and g.endtime == datetime(2023, 1, 1, 12)
+
+
+def test_slice_batch_sampler():
+    """SliceBatchSampler covers a range in consecutive slices and rejects anything else."""
+    assert list(SliceBatchSampler(range(10), 4)) == [slice(0, 4), slice(4, 8), slice(8, 10)]
+    assert list(SliceBatchSampler(range(5, 10), 4)) == [slice(5, 9), slice(9, 10)]
+    assert list(SliceBatchSampler(range(10), 4, drop_last=True)) == [slice(0, 4), slice(4, 8)]
+    assert list(SliceBatchSampler(range(0), 4)) == []
+    assert len(SliceBatchSampler(range(10), 4)) == 3
+    assert len(SliceBatchSampler(range(10), 4, drop_last=True)) == 2
+    with pytest.raises(TypeError):
+        SliceBatchSampler(RandomSampler(range(10)), 4)
+    with pytest.raises(TypeError):
+        SliceBatchSampler([2, 9, 5], 4)
+    with pytest.raises(ValueError):
+        SliceBatchSampler(range(0, 10, 2), 4)

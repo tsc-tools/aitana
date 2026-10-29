@@ -6,6 +6,7 @@ import threading
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 try:
@@ -14,11 +15,36 @@ except ImportError:
     torch = None
 
 from .ingest import IngestWorker, enqueue_dataset
+from .utils import get_dt, snap_to_grid
 from .xarray2netcdf import xarray2netcdf
 from .xarray2zarr import xarray2zarr
 
 
 logger = logging.getLogger(__name__)
+
+
+def _snap_time_axis(times):
+    """
+    Snap the time axis of an archive to its grid.
+
+    Archive axes are evenly spaced, but NetCDF keeps times as float hours,
+    which decode up to a microsecond off the grid, and archives whose
+    resolution was inferred from such times drift by a fraction of a second
+    over the years since the archive start.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        datetime64 time axis of an archive, in stored order.
+
+    Returns
+    -------
+    np.ndarray
+        The time axis on its grid, anchored at its first time stamp.
+    """
+    if len(times) < 2:
+        return times
+    return snap_to_grid(times, get_dt(times))
 
 
 @lru_cache(maxsize=4096)
@@ -53,7 +79,7 @@ def _record_info(feature_path, mtime_ns, feature, engine):
         other_dims = [dim for dim in has_data.dims if dim != 'datetime']
         if other_dims:
             has_data = has_data.any(dim=other_dims)
-        times = has_data['datetime'].values[has_data.values]
+        times = _snap_time_axis(has_data['datetime'].values)[has_data.values]
     if times.size == 0:
         return 0, None, None
     return (int(times.size), np.datetime_as_string(times[0], unit='s'),
@@ -128,6 +154,8 @@ class Path(object):
 
         xd_index = dict(datetime=slice(self.starttime, self.endtime))
         with xr.open_dataset(filename, group=group, engine=self.engine) as ds:
+            # Snap before selecting, so that the selection uses the grid
+            ds = ds.assign_coords(datetime=_snap_time_axis(ds['datetime'].values))
             rq = ds[feature].loc[xd_index].load()
             rq.attrs = ds.attrs
 
@@ -194,6 +222,44 @@ class Path(object):
             'earliestRecord': earliest,
             'latestRecord': latest,
         }
+
+    def to_pytorch(self, features, window_size=1, stride=1, transform=None,
+                   lazy=False):
+        """
+        Create a PyTorch Dataset from the store that can be used with DataLoader.
+
+        :param features: List of feature names to include in the dataset
+        :type features: list of str
+        :param window_size: Number of consecutive time steps to include in each sample (default: 1)
+        :type window_size: int
+        :param stride: Step size between consecutive windows (default: 1)
+        :type stride: int
+        :param transform: Applied to blocks of time steps before they are cut
+            into samples; see :class:`AitanaDataset`
+        :type transform: callable, optional
+        :param lazy: Read from disk on every request instead of loading all
+            data up front; see :class:`AitanaDataset`
+        :type lazy: bool
+        :return: PyTorch Dataset instance
+        :rtype: AitanaDataset
+
+        >>> import datetime
+        >>> from torch.utils.data import DataLoader
+        >>> g = Storage('Whakaari', '/tmp')
+        >>> g.starttime = datetime.datetime(2012,1,1,0,0,0)
+        >>> g.endtime = datetime.datetime(2012,1,2,23,59,59)
+        >>> dataset = g.to_pytorch(['rsam', 'dsar'])
+        >>> dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+        >>> for batch in dataloader:
+        ...     # batch is a 3D tensor with shape [batch_size, window_size, num_features]
+        ...     pass
+        """
+        if torch is None:
+            raise ImportError(
+                "PyTorch is required for to_pytorch(). "
+                "Install it with: pip install aitana-storage[pytorch]")
+        return AitanaDataset(self, features, window_size, stride,
+                             transform=transform, lazy=lazy)
 
 
 class Storage(Path):
@@ -440,77 +506,98 @@ class Storage(Path):
         self._ingest_thread = None
         self._ingest_stop_event = None
 
-    def to_pytorch(self, features, window_size=1, stride=1):
-        """
-        Create a PyTorch Dataset from the Storage that can be used with DataLoader.
-
-        :param features: List of feature names to include in the dataset
-        :type features: list of str
-        :param window_size: Number of consecutive time steps to include in each sample (default: 1)
-        :type window_size: int
-        :param stride: Step size between consecutive windows (default: 1)
-        :type stride: int
-        :return: PyTorch Dataset instance
-        :rtype: AitanaDataset
-
-        >>> import datetime
-        >>> from torch.utils.data import DataLoader
-        >>> g = Storage('Whakaari', '/tmp')
-        >>> g.starttime = datetime.datetime(2012,1,1,0,0,0)
-        >>> g.endtime = datetime.datetime(2012,1,2,23,59,59)
-        >>> dataset = g.to_pytorch(['rsam', 'dsar'])
-        >>> dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-        >>> for batch in dataloader:
-        ...     # batch is a 2D tensor with shape [batch_size, num_features]
-        ...     pass
-        """
-        if torch is None:
-            raise ImportError(
-                "PyTorch is required for to_pytorch(). "
-                "Install it with: pip install aitana-storage[pytorch]")
-        return AitanaDataset(self, features, window_size, stride)
-
 
 class AitanaDataset:
     """
-    PyTorch Dataset wrapper for Aitana Storage.
+    PyTorch Dataset of features from a store.
 
-    This dataset loads time series data from Storage and returns it as PyTorch tensors.
-    Each sample is a 2D tensor with shape [window_size, num_features] where features
-    are ordered as provided to __init__.
+    Each sample is a float32 tensor of shape ``[window_size, n_features]``.
+    Features are combined in the order given. A feature with dimensions
+    besides ``datetime`` (e.g. the frequencies of SSAM) contributes one column
+    per value of those dimensions, in stored order. Sample ``i`` covers
+    ``datetimes[i * stride : i * stride + window_size]``.
+
+    All features must have the same time stamps between the store's
+    ``starttime`` and ``endtime`` (both inclusive); features at different
+    resolutions raise a ValueError instead of being combined. The time range
+    is read once, so later changes to the store's times don't affect the
+    dataset.
+
+    Parameters
+    ----------
+    storage : Path
+        Store or substore holding the features, with ``starttime`` and
+        ``endtime`` set.
+    features : str or list of str
+        Feature names.
+    window_size : int, optional
+        Number of consecutive time steps per sample.
+    stride : int, optional
+        Time steps between the starts of consecutive samples.
+    transform : callable, optional
+        Applied to blocks of consecutive time steps, float32 arrays of shape
+        ``[n_timesteps, n_features]``, before they are cut into samples. It
+        must return an array of the same shape and treat each time step on its
+        own (e.g. scale it), since the length of the blocks varies.
+    lazy : bool, optional
+        Read from disk on every request instead of loading all data when the
+        dataset is created. Iterate a lazy dataset with `SliceBatchSampler`,
+        which makes each batch one read per feature; any other access reads
+        one sample at a time.
+
+    Attributes
+    ----------
+    n_features : int
+        Number of columns of each sample.
+    datetimes : np.ndarray
+        Time stamps of all time steps in the dataset.
     """
 
-    def __init__(self, storage, features, window_size=1, stride=1):
-        """
-        Initialize the dataset.
-
-        :param storage: Storage instance with starttime and endtime set
-        :param features: List of feature names to load
-        :param window_size: Number of consecutive time steps per sample
-        :param stride: Step size between consecutive windows (default: 1)
-        """
-        if storage.starttime is None or storage.endtime is None:
+    def __init__(self, storage, features, window_size=1, stride=1,
+                 transform=None, lazy=False):
+        starttime = getattr(storage, 'starttime', None)
+        endtime = getattr(storage, 'endtime', None)
+        if starttime is None or endtime is None:
             raise ValueError("Storage must have starttime and endtime set")
 
         self.storage = storage
         self.features = features if isinstance(features, list) else [features]
         self.window_size = window_size
         self.stride = stride
+        self.transform = transform
+        self.lazy = lazy
 
-        # Load all features once to determine the data structure
-        self.data = {}
+        # File and position of the first time step in the time range, per feature
+        self._sources = []
+        times = {}
+        self.n_features = 0
         for feature in self.features:
             try:
-                self.data[feature] = self.storage(feature)
+                path = storage.feature_path(feature)
             except FileNotFoundError:
                 raise FileNotFoundError(
                     f"Feature '{feature}' not found in storage")
+            with xr.open_dataset(path, group='original', engine=storage.engine) as ds:
+                index = pd.DatetimeIndex(_snap_time_axis(ds['datetime'].values))
+                first = index.searchsorted(starttime, side='left')
+                last = index.searchsorted(endtime, side='right')
+                times[feature] = index[first:last].values
+                sizes = ds[feature].sizes
+            self.n_features += int(np.prod(
+                [size for dim, size in sizes.items() if dim != 'datetime']))
+            self._sources.append((feature, path, first))
 
-        # Get the length from the first feature
-        first_feature = self.features[0]
-        total_timesteps = len(self.data[first_feature].datetime)
+        self.datetimes = times[self.features[0]]
+        for feature in self.features[1:]:
+            if not np.array_equal(times[feature], self.datetimes):
+                raise ValueError(
+                    f"Features '{self.features[0]}' and '{feature}' have different "
+                    f"time stamps between {starttime} and {endtime} "
+                    f"({len(self.datetimes)} and {len(times[feature])} time steps), "
+                    "e.g. because their resolutions differ, so they cannot be "
+                    "combined in one dataset.")
 
-        # Calculate number of windows with given stride
+        total_timesteps = len(self.datetimes)
         # Number of windows = (total_timesteps - window_size) // stride + 1
         if total_timesteps < window_size:
             self.length = 0
@@ -523,6 +610,54 @@ class AitanaDataset:
                 f"Available data points: {total_timesteps}"
             )
 
+        if not lazy:
+            self._block = self._read(0, total_timesteps)
+
+    def _read(self, start, stop):
+        """
+        Read a block of consecutive time steps of all features.
+
+        Parameters
+        ----------
+        start, stop : int
+            Positions in `datetimes` of the first and one past the last time
+            step.
+
+        Returns
+        -------
+        np.ndarray
+            float32 array of shape ``[stop - start, n_features]``, with
+            `transform` applied.
+        """
+        columns = []
+        for feature, path, first in self._sources:
+            with xr.open_dataset(path, group='original', engine=self.storage.engine) as ds:
+                values = ds[feature].isel(datetime=slice(first + start, first + stop))
+                values = values.transpose('datetime', ...).values
+            columns.append(values.reshape(len(values), -1))
+        block = np.concatenate(columns, axis=1).astype(np.float32)
+        if self.transform is not None:
+            block = np.asarray(self.transform(block), dtype=np.float32)
+        return block
+
+    def _windows(self, block, starts):
+        """
+        Cut samples from a block of time steps.
+
+        Parameters
+        ----------
+        block : np.ndarray
+            Array of shape ``[n_timesteps, n_features]``.
+        starts : np.ndarray
+            Position in `block` of the first time step of each sample.
+
+        Returns
+        -------
+        np.ndarray
+            Array of shape ``[len(starts), window_size, n_features]``.
+        """
+        return block[starts[:, np.newaxis] + np.arange(self.window_size)]
+
     def __len__(self):
         """Return the number of samples in the dataset."""
         return self.length
@@ -531,42 +666,106 @@ class AitanaDataset:
         """
         Get a sample from the dataset.
 
-        :param idx: Index of the sample
-        :return: 2D PyTorch tensor with shape [window_size, num_features]
-                 where features are in the order provided to __init__
+        Parameters
+        ----------
+        idx : int
+            Index of the sample.
+
+        Returns
+        -------
+        torch.Tensor
+            Tensor of shape ``[window_size, n_features]``.
         """
-        if idx >= len(self):
+        if not 0 <= idx < len(self):
             raise IndexError(
                 f"Index {idx} out of range for dataset of length {len(self)}")
+        start = idx * self.stride
+        if self.lazy:
+            window = self._read(start, start + self.window_size)
+        else:
+            window = self._block[start:start + self.window_size]
+        return torch.from_numpy(np.array(window))
 
-        # Calculate the actual starting index based on stride
-        start_idx = idx * self.stride
+    def __getitems__(self, indices):
+        """
+        Get the samples of a batch; DataLoader calls this for every batch.
 
-        # Collect values for all features in order
-        feature_values = []
-        for feature in self.features:
-            data = self.data[feature]
+        Parameters
+        ----------
+        indices : slice or sequence of int
+            Indices of the samples, e.g. from `SliceBatchSampler`. In lazy
+            mode, a slice of consecutive indices is read in one go per feature.
 
-            # Extract window of data
-            if self.window_size == 1:
-                values = data.isel(datetime=start_idx).values
-            else:
-                values = data.isel(datetime=slice(
-                    start_idx, start_idx + self.window_size)).values
+        Returns
+        -------
+        list of torch.Tensor
+            One tensor of shape ``[window_size, n_features]`` per sample.
+        """
+        if isinstance(indices, slice):
+            indices = range(len(self))[indices]
+        else:
+            for idx in indices:
+                if not 0 <= idx < len(self):
+                    raise IndexError(
+                        f"Index {idx} out of range for dataset of length {len(self)}")
+        if len(indices) == 0:
+            return []
 
-            # Handle NaN values by converting to numpy array first
-            values = np.array(values, dtype=np.float32)
+        starts = np.asarray(indices) * self.stride
+        if not self.lazy:
+            windows = self._windows(self._block, starts)
+        elif isinstance(indices, range) and indices.step == 1:
+            block = self._read(starts[0], starts[-1] + self.window_size)
+            windows = self._windows(block, starts - starts[0])
+        else:
+            windows = np.stack(
+                [self._read(start, start + self.window_size) for start in starts])
+        return list(torch.from_numpy(windows))
 
-            # Ensure values is 1D
-            if values.ndim == 0:
-                values = values.reshape(1)
 
-            feature_values.append(values)
+class SliceBatchSampler:
+    """
+    Batch sampler that yields slices of consecutive sample indices.
 
-        # Stack features along axis 1 to create [window_size, num_features] tensor
-        # If window_size=1, each feature_values[i] has shape (1,)
-        # Stack them to get shape [1, num_features], then we have [window_size, num_features]
-        # Shape: [window_size, num_features]
-        stacked = np.stack(feature_values, axis=-1)
+    With `AitanaDataset`, each batch is then one contiguous read, which is
+    what makes a lazy dataset fast to iterate. Batches come in order.
 
-        return torch.from_numpy(stacked)
+    Parameters
+    ----------
+    indices : range
+        Consecutive sample indices to cover, e.g. ``range(len(dataset))``.
+    batch_size : int
+        Number of samples per batch.
+    drop_last : bool, optional
+        Drop the last batch if it is smaller than `batch_size`.
+
+    Examples
+    --------
+    >>> list(SliceBatchSampler(range(10), 4))
+    [slice(0, 4, None), slice(4, 8, None), slice(8, 10, None)]
+    >>> loader = DataLoader(dataset, batch_sampler=SliceBatchSampler(range(len(dataset)), 64))
+    """
+
+    def __init__(self, indices, batch_size, drop_last=False):
+        if not isinstance(indices, range):
+            raise TypeError(
+                "SliceBatchSampler needs a range of indices, e.g. "
+                f"range(len(dataset)), not {type(indices).__name__}.")
+        if indices.step != 1:
+            raise ValueError(
+                "SliceBatchSampler needs consecutive indices, a range with step 1.")
+        self.indices = indices
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+
+    def __iter__(self):
+        stop = self.indices.stop
+        for start in range(self.indices.start, stop, self.batch_size):
+            if self.drop_last and start + self.batch_size > stop:
+                return
+            yield slice(start, min(start + self.batch_size, stop))
+
+    def __len__(self):
+        if self.drop_last:
+            return len(self.indices) // self.batch_size
+        return (len(self.indices) + self.batch_size - 1) // self.batch_size
