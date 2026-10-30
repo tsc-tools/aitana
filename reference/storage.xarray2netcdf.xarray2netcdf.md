@@ -35,7 +35,7 @@ Hdf5 group name.
 Name of time dimension.
 
 `archive_starttime: datetime = datetime(2000, 1, 1)`  
-Start time of archive. If the start time of the data is before this time, the data start time is used.
+Start time of archive. A new archive's grid runs through the data's first time stamp and starts at its first point at or after this time; if the data start earlier, the archive starts with them.
 
 `resolution: float = None`  
-Time resolution of the data in hours. If None, the resolution is determined from the data.
+Time resolution of the data in hours. If None, the resolution is determined from the data, and time stamps further off the archive's grid than jitter raise a ValueError. If given, data go to the nearest grid point.

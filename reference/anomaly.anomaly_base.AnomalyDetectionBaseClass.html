@@ -702,14 +702,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.ZizouDataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.ZizouDataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.SliceBatchSampler</span></a>
+  <a href="../reference/anomaly.anomaly_base.MinMaxScale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">anomaly.anomaly_base.MinMaxScale</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -766,6 +760,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.storage.AitanaDataset.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.storage.AitanaDataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.storage.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.storage.SliceBatchSampler</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -844,6 +844,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.utils.get_dt.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.utils.get_dt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.utils.snap_to_grid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.utils.snap_to_grid</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -1040,7 +1046,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L33-L105" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L89-L161" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.CLASS">
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">anomaly</span><span class="op">.</span><span class="va">anomaly_base</span><span class="op">.</span><span class="va">AnomalyDetectionBaseClass</span>(</span>
@@ -1127,7 +1133,7 @@ Write principal components or
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L78-L84" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L134-L140" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>compute_anomaly_index()</span></code></pre></div>
@@ -1144,7 +1150,7 @@ Write principal components or
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L39-L44" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L95-L100" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fit(starttime, endtime)</span></code></pre></div>
@@ -1158,7 +1164,7 @@ Write principal components or
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L46-L51" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L102-L107" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>infer(starttime, endtime)</span></code></pre></div>
@@ -1172,7 +1178,7 @@ Write principal components or
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L86-L105" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L142-L161" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>normalize_score(raw_scores, reference_scores)</span></code></pre></div>
@@ -1212,7 +1218,7 @@ Values in [0, 1]; 1.0 means the score exceeds all reference scores.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L61-L67" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L117-L123" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>read_model_parameters()</span></code></pre></div>
@@ -1229,7 +1235,7 @@ Values in [0, 1]; 1.0 means the score exceeds all reference scores.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L69-L76" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L125-L132" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>write_hyperparameters()</span></code></pre></div>
@@ -1246,7 +1252,7 @@ Values in [0, 1]; 1.0 means the score exceeds all reference scores.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L53-L59" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/anomaly_base.py#L109-L115" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>write_model_parameters()</span></code></pre></div>

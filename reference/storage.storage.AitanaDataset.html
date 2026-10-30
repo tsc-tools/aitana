@@ -118,7 +118,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
   <link rel="alternate" type="text/markdown" href="storage.storage.AitanaDataset.md">
   <link rel="canonical" href="https://tsc-tools.github.io/aitana/reference/storage.storage.AitanaDataset.html">
-  <meta name="description" content="PyTorch Dataset wrapper for Aitana Storage.">
+  <meta name="description" content="PyTorch Dataset of features from a store.">
   <script type="application/ld+json">
 [
   {
@@ -147,12 +147,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="storage.storage.AitanaDataset – Aitana | Aitana">
-  <meta property="og:description" content="PyTorch Dataset wrapper for Aitana Storage.">
+  <meta property="og:description" content="PyTorch Dataset of features from a store.">
   <meta property="og:url" content="https://tsc-tools.github.io/aitana/reference/storage.storage.AitanaDataset.html">
   <meta property="og:site_name" content="Aitana">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="storage.storage.AitanaDataset – Aitana | Aitana">
-  <meta name="twitter:description" content="PyTorch Dataset wrapper for Aitana Storage.">
+  <meta name="twitter:description" content="PyTorch Dataset of features from a store.">
 </head>
 
 <body class="gd-ref-sidebar nav-sidebar floating nav-fixed doc-api-page quarto-light">
@@ -702,14 +702,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.ZizouDataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.ZizouDataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.SliceBatchSampler</span></a>
+  <a href="../reference/anomaly.anomaly_base.MinMaxScale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">anomaly.anomaly_base.MinMaxScale</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -766,6 +760,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.storage.AitanaDataset.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">storage.storage.AitanaDataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.storage.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.storage.SliceBatchSampler</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -844,6 +844,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.utils.get_dt.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.utils.get_dt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.utils.snap_to_grid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.utils.snap_to_grid</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -1000,10 +1006,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h3 id="toc-title">On this page</h3>
    
   <ul class="collapse">
-  <li><a href="#methods" id="toc-methods" class="nav-link active" data-scroll-target="#methods">Methods</a>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link active" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
   <li><a href="#getitem__" id="toc-getitem__" class="nav-link" data-scroll-target="#getitem__"><span class="doc-object-name doc-function doc-label doc-label-method">__getitem__()</span></a></li>
-  <li><a href="#init__" id="toc-init__" class="nav-link" data-scroll-target="#init__"><span class="doc-object-name doc-function doc-label doc-label-method">__init__()</span></a></li>
+  <li><a href="#getitems__" id="toc-getitems__" class="nav-link" data-scroll-target="#getitems__"><span class="doc-object-name doc-function doc-label doc-label-method">__getitems__()</span></a></li>
   <li><a href="#len__" id="toc-len__" class="nav-link" data-scroll-target="#len__"><span class="doc-object-name doc-function doc-label doc-label-method">__len__()</span></a></li>
   </ul></li>
   </ul>
@@ -1032,23 +1040,67 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <div class="doc-subject">
-<p>PyTorch Dataset wrapper for Aitana Storage.</p>
+<p>PyTorch Dataset of features from a store.</p>
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L474-L572" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L510-L723" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.CLASS">
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">storage</span><span class="op">.</span><span class="va">storage</span><span class="op">.</span><span class="va">AitanaDataset</span>(
-    <span class="va">storage</span>,
-    <span class="va">features</span>,
-    <span class="va">window_size</span><span class="op">=</span><span class="dv">1</span>,
-    <span class="va">stride</span><span class="op">=</span><span class="dv">1</span>,
-)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">storage</span><span class="op">.</span><span class="va">storage</span><span class="op">.</span><span class="va">AitanaDataset</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">storage</span>, <span class="va">features</span>, <span class="va">window_size</span><span class="op">=</span><span class="dv">1</span>, <span class="va">stride</span><span class="op">=</span><span class="dv">1</span>, <span class="va">transform</span><span class="op">=</span><span class="cn-none">None</span>, <span class="va">lazy</span><span class="op">=</span><span class="cn-bool">False</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div class="doc-text">
-<p>This dataset loads time series data from Storage and returns it as PyTorch tensors. Each sample is a 2D tensor with shape [window_size, num_features] where features are ordered as provided to <strong>init</strong>.</p>
+<p>Each sample is a float32 tensor of shape <code>[window_size, n_features]</code>. Features are combined in the order given. A feature with dimensions besides <code>datetime</code> (e.g.&nbsp;the frequencies of SSAM) contributes one column per value of those dimensions, in stored order. Sample <code>i</code> covers <code>datetimes[i * stride : i * stride + window_size]</code>.</p>
+<p>All features must have the same time stamps between the store’s <code>starttime</code> and <code>endtime</code> (both inclusive); features at different resolutions raise a ValueError instead of being combined. The time range is read once, so later changes to the store’s times don’t affect the dataset.</p>
 </div>
+<section id="parameters" class="level2 doc-parameters">
+<h2 class="doc-parameters">Parameters</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code><span class="doc-parameter-name">storage</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">Path</span></code></dt>
+<dd>
+<p>Store or substore holding the features, with <code>starttime</code> and <code>endtime</code> set.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">features</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">str or list of str</span></code></dt>
+<dd>
+<p>Feature names.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">window_size</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">int</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default"><span class="dv">1</span></span></code></dt>
+<dd>
+<p>Number of consecutive time steps per sample.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">stride</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">int</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default"><span class="dv">1</span></span></code></dt>
+<dd>
+<p>Time steps between the starts of consecutive samples.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">transform</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">callable</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default">None</span></code></dt>
+<dd>
+<p>Applied to blocks of consecutive time steps, float32 arrays of shape <code>[n_timesteps, n_features]</code>, before they are cut into samples. It must return an array of the same shape and treat each time step on its own (e.g.&nbsp;scale it), since the length of the blocks varies.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">lazy</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">bool</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default"><span class="va">False</span></span></code></dt>
+<dd>
+Read from disk on every request instead of loading all data when the dataset is created. Iterate a lazy dataset with <a href="storage.storage.SliceBatchSampler.html#aitana.storage.storage.SliceBatchSampler" class="gdls-link gdls-code">SliceBatchSampler</a>, which makes each batch one read per feature; any other access reads one sample at a time.
+</dd>
+</dl>
+</div>
+</section>
+<section id="attributes" class="level2 doc-attributes">
+<h2 class="doc-attributes">Attributes</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code><span class="doc-parameter-name">n_features</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">int</span></code></dt>
+<dd>
+<p>Number of columns of each sample.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">datetimes</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">np.ndarray</span></code></dt>
+<dd>
+Time stamps of all time steps in the dataset.
+</dd>
+</dl>
+</div>
+</section>
 <section id="methods" class="level2 doc-methods">
 <h2 class="doc-methods">Methods</h2>
 <table class="gd-summary-table">
@@ -1073,10 +1125,10 @@ Get a sample from the dataset.
 </tr>
 <tr>
 <td>
-<a href="#__init__" class="doc-function doc-label doc-label-method">__init__()</a>
+<a href="#__getitems__" class="doc-function doc-label doc-label-method">__getitems__()</a>
 </td>
 <td>
-Initialize the dataset.
+Get the samples of a batch; DataLoader calls this for every batch.
 </td>
 </tr>
 <tr>
@@ -1097,68 +1149,69 @@ Return the number of samples in the dataset.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L530-L572" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L665-L687" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">__getitem__</span>(idx)</span></code></pre></div>
 </div>
-<div class="doc-text">
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters">Parameters</h2>
+<section id="parameters-1" class="level4 doc-parameters">
+<h5 class="doc-parameters anchored" data-anchor-id="parameters-1">Parameters</h5>
+<div class="doc-definition-items">
 <dl>
-<dt><code><span class="parameter-name"><strong>idx</strong></span></code></dt>
+<dt><code><span class="doc-parameter-name">idx</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">int</span></code></dt>
 <dd>
-<p>Index of the sample</p>
+Index of the sample.
 </dd>
 </dl>
-</section>
-<section id="returns" class="level2 doc-section doc-section-returns">
-<h2 class="doc-section doc-section-returns">Returns</h2>
-<dl>
-<dt></dt>
-<dd>
-<p>2D PyTorch tensor with shape [window_size, num_features] where features are in the order provided to <strong>init</strong></p>
-</dd>
-</dl>
-</section>
 </div>
 </section>
+<section id="returns" class="level4 doc-returns">
+<h5 class="doc-returns anchored" data-anchor-id="returns">Returns</h5>
+<div class="doc-definition-items">
+<dl>
+<dt><code> <span class="doc-parameter-annotation">torch.Tensor</span></code></dt>
+<dd>
+Tensor of shape <code>[window_size, n_features]</code>.
+</dd>
+</dl>
+</div>
+</section>
+</section>
 <hr style="border: none; border-top: 2px dotted #b0b4ba; margin: 1.5rem 0 1rem 0;">
-<section id="init__" class="level3">
-<h4 class="anchored" data-anchor-id="init__"><span class="doc-object-name doc-function doc-label doc-label-method">__init__()</span></h4>
+<section id="getitems__" class="level3">
+<h4 class="anchored" data-anchor-id="getitems__"><span class="doc-object-name doc-function doc-label doc-label-method">__getitems__()</span></h4>
 <div class="doc-subject">
-<p>Initialize the dataset.</p>
+<p>Get the samples of a batch; DataLoader calls this for every batch.</p>
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L483-L524" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L689-L723" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">__init__</span>(storage, features, window_size<span class="op">=</span><span class="dv">1</span>, stride<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>__getitems__(indices)</span></code></pre></div>
 </div>
-<div class="doc-text">
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters">Parameters</h2>
+<section id="parameters-2" class="level4 doc-parameters">
+<h5 class="doc-parameters anchored" data-anchor-id="parameters-2">Parameters</h5>
+<div class="doc-definition-items">
 <dl>
-<dt><code><span class="parameter-name"><strong>storage</strong></span></code></dt>
+<dt><code><span class="doc-parameter-name">indices</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">slice or sequence of int</span></code></dt>
 <dd>
-<p>Storage instance with starttime and endtime set</p>
-</dd>
-<dt><code><span class="parameter-name"><strong>features</strong></span></code></dt>
-<dd>
-<p>List of feature names to load</p>
-</dd>
-<dt><code><span class="parameter-name"><strong>window_size</strong></span></code></dt>
-<dd>
-<p>Number of consecutive time steps per sample</p>
-</dd>
-<dt><code><span class="parameter-name"><strong>stride</strong></span></code></dt>
-<dd>
-<p>Step size between consecutive windows (default: 1)</p>
+Indices of the samples, e.g.&nbsp;from <a href="storage.storage.SliceBatchSampler.html#aitana.storage.storage.SliceBatchSampler" class="gdls-link gdls-code">SliceBatchSampler</a>. In lazy mode, a slice of consecutive indices is read in one go per feature.
 </dd>
 </dl>
-</section>
 </div>
+</section>
+<section id="returns-1" class="level4 doc-returns">
+<h5 class="doc-returns anchored" data-anchor-id="returns-1">Returns</h5>
+<div class="doc-definition-items">
+<dl>
+<dt><code> <span class="doc-parameter-annotation">list of torch.Tensor</span></code></dt>
+<dd>
+One tensor of shape <code>[window_size, n_features]</code> per sample.
+</dd>
+</dl>
+</div>
+</section>
 </section>
 <hr style="border: none; border-top: 2px dotted #b0b4ba; margin: 1.5rem 0 1rem 0;">
 <section id="len__" class="level3">
@@ -1168,7 +1221,7 @@ Return the number of samples in the dataset.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L526-L528" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L661-L663" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">__len__</span>()</span></code></pre></div>

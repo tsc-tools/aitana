@@ -702,14 +702,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.ZizouDataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.ZizouDataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.SliceBatchSampler</span></a>
+  <a href="../reference/anomaly.anomaly_base.MinMaxScale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">anomaly.anomaly_base.MinMaxScale</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -766,6 +760,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.storage.AitanaDataset.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.storage.AitanaDataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.storage.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.storage.SliceBatchSampler</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -844,6 +844,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.utils.get_dt.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.utils.get_dt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.utils.snap_to_grid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.utils.snap_to_grid</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -1005,7 +1011,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#from_directory" id="toc-from_directory" class="nav-link" data-scroll-target="#from_directory"><span class="doc-object-name doc-function doc-label doc-label-method">from_directory()</span></a></li>
   <li><a href="#to_dict" id="toc-to_dict" class="nav-link" data-scroll-target="#to_dict"><span class="doc-object-name doc-function doc-label doc-label-method">to_dict()</span></a></li>
   <li><a href="#to_dict_with_info" id="toc-to_dict_with_info" class="nav-link" data-scroll-target="#to_dict_with_info"><span class="doc-object-name doc-function doc-label doc-label-method">to_dict_with_info()</span></a></li>
-  <li><a href="#to_pytorch" id="toc-to_pytorch" class="nav-link" data-scroll-target="#to_pytorch"><span class="doc-object-name doc-function doc-label doc-label-method">to_pytorch()</span></a></li>
   </ul></li>
   </ul>
 </nav>
@@ -1037,7 +1042,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L199-L471" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L265-L507" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.CLASS">
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">storage</span><span class="op">.</span><span class="va">storage</span><span class="op">.</span><span class="va">Storage</span>(</span>
@@ -1116,14 +1121,6 @@ Convert the storage group to json
 Convert the storage group to a dict with feature metadata.
 </td>
 </tr>
-<tr>
-<td>
-<a href="#to_pytorch" class="doc-function doc-label doc-label-method">to_pytorch()</a>
-</td>
-<td>
-Create a PyTorch Dataset from the Storage that can be used with DataLoader.
-</td>
-</tr>
 </tbody>
 </table>
 <hr style="border: none; border-top: 2px solid #c5c8cd; margin: 1.5rem 0 1rem 0;">
@@ -1134,7 +1131,7 @@ Create a PyTorch Dataset from the Storage that can be used with DataLoader.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L259-L277" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L325-L343" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>from_directory()</span></code></pre></div>
@@ -1148,7 +1145,7 @@ Create a PyTorch Dataset from the Storage that can be used with DataLoader.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L355-L359" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L421-L425" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>to_dict()</span></code></pre></div>
@@ -1162,7 +1159,7 @@ Create a PyTorch Dataset from the Storage that can be used with DataLoader.
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L342-L353" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L408-L419" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>to_dict_with_info(base_url<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
@@ -1186,58 +1183,6 @@ Create a PyTorch Dataset from the Storage that can be used with DataLoader.
 </dd>
 </dl>
 </section>
-</div>
-</section>
-<hr style="border: none; border-top: 2px dotted #b0b4ba; margin: 1.5rem 0 1rem 0;">
-<section id="to_pytorch" class="level3">
-<h4 class="anchored" data-anchor-id="to_pytorch"><span class="doc-object-name doc-function doc-label doc-label-method">to_pytorch()</span></h4>
-<div class="doc-subject">
-<p>Create a PyTorch Dataset from the Storage that can be used with DataLoader.</p>
-</div>
-<div class="doc-usage-source">
-<p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/storage.py#L443-L471" target="_blank" rel="noopener">Source</a></p>
-</div>
-<div class="doc-signature doc-Kind.FUNCTION">
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>to_pytorch(features, window_size<span class="op">=</span><span class="dv">1</span>, stride<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
-</div>
-<div class="doc-text">
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters">Parameters</h2>
-<dl>
-<dt><code><span class="parameter-name"><strong>features</strong></span> <span class="parameter-annotation-sep">:</span> <span class="parameter-annotation">list of str</span></code></dt>
-<dd>
-<p>List of feature names to include in the dataset</p>
-</dd>
-<dt><code><span class="parameter-name"><strong>window_size</strong></span> <span class="parameter-annotation-sep">:</span> <span class="parameter-annotation">int</span></code></dt>
-<dd>
-<p>Number of consecutive time steps to include in each sample (default: 1)</p>
-</dd>
-<dt><code><span class="parameter-name"><strong>stride</strong></span> <span class="parameter-annotation-sep">:</span> <span class="parameter-annotation">int</span></code></dt>
-<dd>
-<p>Step size between consecutive windows (default: 1)</p>
-</dd>
-</dl>
-</section>
-<section id="returns" class="level2 doc-section doc-section-returns">
-<h2 class="doc-section doc-section-returns">Returns</h2>
-<dl>
-<dt><code><span class="parameter-name"></span> <span class="parameter-annotation-sep" style="margin-left: -8px;"></span> <span class="parameter-annotation">AitanaDataset</span></code></dt>
-<dd>
-<p>PyTorch Dataset instance</p>
-</dd>
-</dl>
-</section>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> <span class="im">import</span> datetime</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> <span class="im">from</span> torch.utils.data <span class="im">import</span> DataLoader</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> g <span class="op">=</span> Storage(<span class="st">'Whakaari'</span>, <span class="st">'/tmp'</span>)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> g.starttime <span class="op">=</span> datetime.datetime(<span class="dv">2012</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> g.endtime <span class="op">=</span> datetime.datetime(<span class="dv">2012</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">23</span>,<span class="dv">59</span>,<span class="dv">59</span>)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> dataset <span class="op">=</span> g.to_pytorch([<span class="st">'rsam'</span>, <span class="st">'dsar'</span>])</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> dataloader <span class="op">=</span> DataLoader(dataset, batch_size<span class="op">=</span><span class="dv">32</span>, shuffle<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> batch <span class="kw">in</span> dataloader:</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>...     <span class="co"># batch is a 2D tensor with shape [batch_size, num_features]</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>...     <span class="cf">pass</span></span></code></pre></div>
 </div>
 
 

@@ -1,177 +1,248 @@
 ---
 name: aitana
 description: >
-  Validation and benchmarking framework for AI/ML in volcano monitoring. Use when writing Python code that uses the aitana package.
+  Write Python code with Aitana, the `aitana.*` namespace packages for volcano monitoring:
+  GeoNet Tilde and WFS data, seismic waveforms from GeoNet's S3 archive and FDSN services,
+  RSAM, SSAM, DSAR and spectral features, NetCDF/Zarr feature storage, anomaly indices
+  (matrix profile), detector evaluation with synthetic faults, and Snakemake workflows run by
+  `aitana-pipelines`. Use this skill whenever code imports `aitana.` or the user mentions an
+  `aitana-*` package, and also when they want to fetch New Zealand volcano monitoring data from
+  GeoNet, compute seismic features such as RSAM from waveforms, store or query feature time
+  series, or score volcanic unrest, even if they don't name Aitana. Aitana also provides utilities to
+  generate graphs from raw data, feature time series, and anomaly scores.
 ---
 
 # Aitana
 
-Validation and benchmarking framework for AI/ML in volcano monitoring.
+Aitana is a set of small Python distributions that share one import namespace, `aitana.`.
+Each installs on its own with its own dependencies, and they are built to be combined: fetch
+data, compute features, store them, score them for anomalies, and run the chain as a
+reproducible workflow. This skill is for code that *uses* the packages. For changing the
+Aitana repository itself, follow its developer notes instead:
+https://tsc-tools.github.io/aitana/developer/architecture.html
 
-## Installation
+## Install the right distributions
 
-```bash
-pip install aitana
+There is no `aitana` distribution that installs everything. `pip install aitana` installs an
+unrelated pre-split release (0.2.0, data files only), so don't suggest it. Pick the
+distributions for the job; their own `aitana-*` dependencies come along automatically.
+
+| You need | Install | Import from |
+|---|---|---|
+| Tilde and WFS data, seismic waveforms | `aitana-access` | `aitana.access.tilde`, `.wfs`, `.seismic` |
+| RSAM, SSAM, DSAR, spectral features | `aitana-features` | `aitana.features` |
+| Store and query feature time series, HTTP API | `aitana-storage` | `aitana.storage` |
+| Ready-made Ruapehu/Whakaari datasets, eruption catalogues | `aitana-volcanoes` | `aitana.volcanoes.ruapehu`, `.whakaari` |
+| Synthetic test waveforms | `aitana-testing` | `aitana.testing` |
+| Anomaly detectors, evaluation harness | `aitana-anomaly` | `aitana.anomaly.<module>` |
+| `aitana-pipelines` CLI, scoring, workflows | `aitana-pipelines` | `aitana.pipelines.<module>` |
+
+
+- Extras: `aitana-anomaly[pytorch]` for `AutoEncoder`, and `aitana-storage[pytorch]` for
+  `to_pytorch()` on a store or substore.
+- `import aitana` gives an empty namespace; always import a sub-package. Only
+  `aitana.features` (`RSAM`, `SSAM`, `DSAR`, `SpectralFeatures`), `aitana.storage` (`Storage`,
+  `generate_test_data`) and `aitana.testing` (`synthetic_trace`) re-export names. Elsewhere,
+  import from the module, e.g. `from aitana.access.seismic import SeismicData`.
+
+## How the pieces fit
+
+```
+aitana.access     fetch    -> pandas DataFrames (Tilde, WFS), ObsPy Traces (waveforms)
+aitana.features   compute  -> xarray Datasets indexed by "datetime"
+aitana.storage    store    <- xarray Datasets with a "datetime" dimension
+aitana.anomaly    score    -> pandas Series in [0, 1]
+aitana.pipelines  run all of the above as Snakemake workflows
 ```
 
-## API overview
+Keep fetching and computing apart, as the packages do. Feature classes take an in-memory ObsPy
+`Trace` and never download anything, so fetch with `aitana.access` and pass the trace in. That
+also lets feature code be tested offline with `aitana.testing.synthetic_trace`.
 
-### aitana.access
+## Waveforms to features
 
-Pure I/O access layer for volcano monitoring data (GeoNet TILDE, WFS, seismic waveforms).
+```python
+from obspy import UTCDateTime
+from aitana.access.seismic import FDSNWaveforms, S3Waveforms, SeismicData
+from aitana.features import RSAM
 
-- `access.tilde.tilde_request`
-- `access.wfs.wfs_request`
-- `access.seismic.SeismicData`
-- `access.seismic.WaveformBaseclass`
-- `access.seismic.SDSWaveforms`
-- `access.seismic.FDSNWaveforms`
-- `access.seismic.S3Waveforms`
-- `access.seismic.MockSDSWaveforms`
-- `access.seismic.PostProcess`
-- `access.seismic.PostProcessException`
-- `access.seismic.get_instrument_response`
-- `access.api.AitanaAPI`
-- `access.util.get_defaults_with_names`
-- `access.util.generate_cache_key`
-- `access.util.cache_dataframe`
-- `access.util.gradient`
-- `access.util.eqRate`
-- `access.util.reindex`
-- `access.util.hex_to_rgb`
-- `access.util.rgb_to_hex`
-- `access.util.get_color`
-- `access.logging_config.setup_logging`
-- `access.logging_config.get_logger`
+# GeoNet's S3 archive lags about a day behind; the near-real-time FDSN service covers recent days.
+sd = SeismicData([S3Waveforms(), FDSNWaveforms("https://service-nrt.geonet.org.nz")])
+tr = next(sd.get_waveforms("NZ", "FWVZ", "10", "HHZ",
+                           UTCDateTime(2022, 3, 13), UTCDateTime(2022, 3, 14)))
+if len(tr) > 0:
+    rsam = RSAM(interval=600, max_gap_fraction=0.1).compute(tr)  # xarray Dataset
+```
 
-### aitana.volcanoes
+- Clients are tried in order and the first with data wins. Returned waveforms have the
+  instrument sensitivity removed, gaps filled with NaN, and are trimmed to the request.
+- `get_waveforms` is a generator. Without `chunk_size` it yields one `Trace` for the whole span,
+  hence `next(...)`; with `SeismicData(..., chunk_size=<seconds>)` it yields one per chunk. A
+  channel wildcard such as `HH?` yields a `Stream` with Z/N/E (or Z/1/2) instead.
+- Missing data gives an empty `Trace`, not an exception, so check `len(tr)`.
+- `get_waveforms(..., cache=True)` keeps raw day files in `~/aitana_cache/raw` (SDS layout)
+  for UTC days that ended more than two days ago.
+- `max_gap_fraction` sets windows with too much missing data to NaN instead of computing
+  across interpolated gaps.
 
-Per-volcano domain aggregates for Ruapehu, Whakaari, and Taupo.
+Every feature class has a `compute(trace)` method that returns an xarray `Dataset`:
 
-- `volcanoes.whakaari.Gas`
-- `volcanoes.whakaari.Seismicity`
-- `volcanoes.whakaari.eruptions`
-- `volcanoes.whakaari.load_all`
-- `volcanoes.ruapehu.CraterLake`
-- `volcanoes.ruapehu.Gas`
-- `volcanoes.ruapehu.Seismicity`
-- `volcanoes.ruapehu.eruptions`
-- `volcanoes.ruapehu.load_all`
-- `volcanoes.ruapehu.lake_height_scaling`
-- `volcanoes.assimilate.SemiLinearTrend`
-- `volcanoes.assimilate.LocalLinearTrend`
-- `volcanoes.assimilate.SO2FusionModel`
-- `volcanoes.get_data`
+| Class | Defaults | Data variables |
+|---|---|---|
+| `RSAM` | 600 s windows, 2–5 Hz | `rsam`, `rsam_energy_prob` |
+| `DSAR` | 600 s windows, 4.5–8 Hz over 8–16 Hz | `dsar` |
+| `SSAM` | **10 s** windows | `ssam` (frequency × datetime), `filterbank`, `sonogram` |
+| `SpectralFeatures` | 600 s windows, 0.5 Hz high-pass | `central_freq`, `bandwidth`, `predom_freq` |
 
-### aitana.features
+Pass `interval` explicitly for `SSAM`: its 10 s default differs from the others. The RSAM
+energy variable really is `rsam_energy_prob`, although `RSAM.features` lists
+`rsam_energy_prop`. Use `.to_series()` on a variable to get a pandas Series.
 
-Algorithms over in-memory waveforms for volcano monitoring (RSAM, DSAR, SSAM).
+## Storing and querying features
 
-- `features.feature_base.FeatureBaseClass`
-- `features.rsam.RSAM`
-- `features.rsam.rsam_wideband_energy_ratio`
-- `features.dsar.DSAR`
-- `features.ssam.SSAM`
-- `features.spectral_features.SpectralFeatures`
-- `features.cpxtrace.Inst_Band`
-- `features.cpxtrace.Inst_Freq`
-- `features.cpxtrace.Norm_Env`
-- `features.cpxtrace.Centroid`
-- `features.cpxtrace.WindowCentroid`
-- `features.util.stride_windows`
-- `features.util.demean`
-- `features.util.apply_hanning`
-- `features.util.window_array`
-- `features.util.trace_window_times`
-- `features.util.trace_window_data`
-- `features.util.apply_freq_filter`
-- `features.util.round_time`
-- `features.util.stack_feature`
-- `features.visualise.spectrogram_preprocessing`
-- `features.visualise.plot_ssam_mpl`
-- `features.visualise.multi_feature_plot_mpl`
-- `features.visualise.plot_ssam_plotly`
-- `features.visualise.get_trace`
-- `features.visualise.multi_feature_plot`
-- `features.get_data`
+```python
+from datetime import datetime
+from aitana.storage import Storage
 
-### aitana.anomaly
+root = Storage("ruapehu", "/data/aitana")          # NetCDF by default; backend="zarr" for Zarr
+store = root.get_substore("FWVZ", "10", "HHZ")     # e.g. site / location / channel
+store.save(rsam)                                   # Dataset with a "datetime" dimension
 
-Anomaly detection in time-series data.
+root.starttime = datetime(2022, 3, 1)
+root.endtime = datetime(2022, 3, 31)
+series = store("rsam")                             # DataArray sliced to the root's time range
+```
 
-- `anomaly.anomaly_base.AnomalyDetectionBaseClass`
-- `anomaly.anomaly_base.min_max_scale_netcdf`
-- `anomaly.pca.PCA`
-- `anomaly.pca.runPca`
-- `anomaly.pca.runPcaCore`
-- `anomaly.pca.ModelException`
-- `anomaly.matrix_profile.MatrixProfile`
-- `anomaly.snet.SNet`
-- `anomaly.autoencoder.AutoEncoder`
-- `anomaly.autoencoder.TiedAutoEncoder`
-- `anomaly.autoencoder.FuzzyCluster`
-- `anomaly.dataset.ZizouDataset`
-- `anomaly.dataset.SliceBatchSampler`
-- `anomaly.evaluation.inject_faults`
-- `anomaly.evaluation.inject_change_points`
-- `anomaly.evaluation.simulate_regime_series`
-- `anomaly.evaluation.quiet_series`
-- `anomaly.evaluation.score_detector`
+- Each data variable becomes its own feature archive, and saving again merges new data in.
+  Archives are padded with NaN back to `archive_starttime` (default 2000-01-01, set on the
+  `Storage`), so a query returns NaN wherever nothing was saved; drop them with
+  `series.dropna("datetime")` when that matters.
+- Set `starttime` and `endtime` on the `Storage` before querying. They apply to its
+  substores, including ones created earlier; without them a query raises `TypeError`.
+- Query by calling the substore with the feature name. `store.load("rsam")` currently returns
+  `None`.
+- To save a pandas Series, convert it first:
+  `s.rename_axis("datetime").to_xarray().to_dataset(name="my_feature")`.
+- `aitana-api --rootdir /data/aitana --port 8003` serves stored features over HTTP (`/feature`,
+  `/inventory`), e.g. for Grafana's Infinity data source.
 
-### aitana.storage
+## Tilde and WFS
 
-Store time series data as HDF5 (netCDF) or Zarr files and access them through an API.
+```python
+from datetime import datetime, timezone
+from aitana.access.tilde import tilde_request
+from aitana.access.wfs import wfs_request
 
-- `storage.storage.Storage`
-- `storage.storage.Path`
-- `storage.storage.AitanaDataset`
-- `storage.ingest.IngestWorker`
-- `storage.ingest.enqueue_dataset`
-- `storage.api.StorageAPI`
-- `storage.api.parse_path`
-- `storage.xarray2netcdf.xarray2netcdf`
-- `storage.xarray2zarr.xarray2zarr`
-- `storage.xarray2zarr.PathNotFoundError`
-- `storage.grafana_annotations.sync_labels`
-- `storage.grafana_annotations.is_label`
-- `storage.utils.generate_test_data`
-- `storage.utils.round_datetime`
-- `storage.utils.floor_datetime`
-- `storage.utils.get_dt`
-- `storage.utils.fill_time_gaps`
-- `storage.utils.merge_arrays`
-- `storage.get_data`
+start = datetime(2019, 1, 1, tzinfo=timezone.utc)
+end = datetime(2019, 12, 31, tzinfo=timezone.utc)
+so2 = tilde_request(start, end, domain="manualcollect", name="plume-SO2-gasflux",
+                    station="WI000", method="contouring", sensor="MC01")  # columns obs, err; index dt
 
-### aitana.pipelines
+quakes = wfs_request(start, end, radius=20000, center_point="177.186833+-37.523118", maxdepth=30)
+quakes = quakes.loc[:end]  # wfs_request does not apply end_date
+```
 
-Reproducible workflows that run and evaluate aitana components for volcano monitoring.
+- Pass timezone-aware UTC datetimes. Naive ones are read as local time, which in New Zealand
+  shifts the window by 12–13 hours.
+- Look up Tilde `domain`, `name`, `station`, `method` and `sensor` codes in the data discovery
+  tool: https://tilde.geonet.org.nz/ui/data-discovery/. A valid stream can come back empty
+  for the requested range; HTTP errors raise `ValueError`.
+- `wfs_request` returns every event from `start_date` to now, so slice the result. It raises
+  `ValueError` when nothing matches. `center_point` is `"lon+lat"`, `radius` is in metres,
+  `maxdepth` in km; `polygon="lon1+lat1,lon2+lat2,...,lon1+lat1"` is the alternative to a radius.
 
-- `pipelines.cli.WorkflowDescriptor`
-- `pipelines.cli.PipelineBackend`
-- `pipelines.cli.SnakemakeBackend`
-- `pipelines.cli.PipelineError`
-- `pipelines.cli.discover_workflows`
-- `pipelines.cli.run`
-- `pipelines.cli.clean`
-- `pipelines.cli.list_workflows`
-- `pipelines.scoring.get_evaluation_windows`
-- `pipelines.scoring.compute_rates`
-- `pipelines.scoring.evaluate_threshold`
-- `pipelines.scoring.get_roc_curve`
-- `pipelines.scoring.make_strictly_increasing`
-- `pipelines.visualise.set_style`
-- `pipelines.visualise.trellis_plot`
-- `pipelines.visualise.scoring_plot`
-- `pipelines.get_data`
+## Ready-made volcano datasets
 
-### aitana.testing
+```python
+from datetime import datetime, timezone
+from aitana.volcanoes import whakaari
 
-Synthetic seismic waveforms with known spectral content for testing aitana packages.
+df = whakaari.load_all(end_date=datetime.now(timezone.utc))  # daily Eqr, RSAM, CO2, H2S, SO2
+eruptions = whakaari.eruptions()                             # eruption catalogue, indexed by date
+```
 
-- `testing.synthetic.synthetic_trace`
+- `ruapehu` has the same `load_all` and `eruptions`, plus `CraterLake(start, end)` with
+  `temperature()`, `water_level()` and `water_analyte()`. Both modules have `Gas` and
+  `Seismicity` classes for the individual streams.
+- These download from Tilde and WFS (and Whakaari RSAM from Zenodo), so the first call is slow.
+  Results are cached as CSV files in `~/.aitana_cache`; delete them to force a refetch.
+- Pass `end_date` explicitly. The default `datetime.now(...)` is evaluated once at import, so
+  in a long-running process it goes stale.
 
-## Resources
+## Anomaly indices
 
-- [Full documentation](https://tsc-tools.github.io/aitana/)
-- [llms.txt](llms.txt) — Indexed API reference for LLMs
-- [llms-full.txt](llms-full.txt) — Comprehensive documentation for LLMs
+```python
+import numpy as np
+import pandas as pd
+from aitana.anomaly.matrix_profile import MatrixProfile
+
+x = np.log10(series.to_series())            # regular 10-min samples: history, then the period to score
+detector = MatrixProfile(window=36)         # subsequence length in samples: 6 h of 10-min data
+index = detector.compute_anomaly_index(x, score_start=pd.Timestamp("2022-03-02"))
+```
+
+- Everything before `score_start` is the reference history. The index is the percentile rank,
+  in [0, 1], of each new subsequence's distance to its nearest *earlier* subsequence. It is NaN
+  before `score_start` and wherever a subsequence contains NaN; `detector.profile_` holds the raw
+  distances. A series without finite history before `score_start` raises `ValueError`.
+- It is z-normalized, so it reacts to changes in shape, not level. Pair it with an amplitude
+  threshold when level matters.
+- `MatrixProfile` is the only detector that produces an anomaly index today. `SNet` computes
+  scattering-network coefficients (a feature, not a score), `PCA` is not usable yet, and
+  `AutoEncoder` needs the `pytorch` extra.
+- For a detector of your own, subclass `aitana.anomaly.anomaly_base.AnomalyDetectionBaseClass`,
+  implement `compute_anomaly_index`, and map raw scores to [0, 1] with
+  `normalize_score(raw_scores, reference_scores)` so the index is comparable with the others.
+
+## Evaluating a detector
+
+Real labelled anomalies are rare, so evaluate against synthetic faults with known positions:
+
+```python
+from aitana.anomaly.evaluation import inject_faults, score_detector
+
+corrupted, mask = inject_faults(df, columns=["rsam"], rate=0.06)  # mask: True where a fault was injected
+index = my_detector(corrupted)                                    # per-timestep scores in [0, 1]
+ok = index.notna()                                                # score_detector rejects NaN
+result = score_detector(index[ok], mask[ok], threshold=0.9)       # fpr, tpr, auc, tp, fp, tn, fn
+```
+
+Anomaly indices are NaN before `score_start` and around gaps, so drop those timesteps (from
+both the index and the mask) before scoring.
+
+`inject_change_points` (persistent regime shifts), `simulate_regime_series` (data with known
+states) and `quiet_series` cover other cases. Worked examples:
+https://tsc-tools.github.io/aitana/user-guide/evaluating-detectors.html
+
+## Workflows
+
+```bash
+aitana-pipelines list
+aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 4 --config end=2022-03-20T00:00
+aitana-pipelines clean ruapehu ~/rsam_mp --workflow ruapehu_mp
+```
+
+- The bundled workflows are `egu2026` (Whakaari), `ruapehu_mp` and `ruapehu_snet`. Pick one with
+  `--workflow` when a volcano has several, and give each its own output directory.
+- Extra arguments go to Snakemake (`--config key=value`, `-n` for a dry run). `--cron "<expr>"`
+  keeps running on a UTC crontab schedule.
+- Workflow rules run in the active environment, so install every package their scripts import
+  (the install command above covers the bundled ones).
+- Register your own workflow under the `aitana.pipelines.workflows` entry-point group with an
+  `aitana.pipelines.cli.WorkflowDescriptor(name, volcano, description, workflowdir, outputs)`;
+  `workflowdir` must contain a `Snakefile`. Details:
+  https://tsc-tools.github.io/aitana/user-guide/running-workflows.html
+
+## Testing without the network
+
+`aitana.testing.synthetic_trace(nsec=3600, sampling_rate=100.0, ...)` returns an ObsPy `Trace`
+of sinusoids at known frequencies (0.1, 3 and 10 Hz by default) plus noise and a chirp; set
+`starttime`, `station` etc. to match real data and `gaps=True` to exercise gap handling.
+`aitana.storage.generate_test_data(dim=1)` returns a Dataset ready for `Storage.save`.
+
+## Looking things up
+
+- API reference, one page per class and function:
+  https://tsc-tools.github.io/aitana/reference/
+- Some classes have no class docstring (e.g. `SeismicData`, `SDSWaveforms`). Their parameters
+  are often documented on `__init__` instead; use `help(Class.__init__)`, or read the source.

@@ -2,7 +2,7 @@
   "skills": [
     {
       "name": "aitana",
-      "description": "Validation and benchmarking framework for AI/ML in volcano monitoring. Use when writing Python code that uses the aitana package.",
+      "description": "Write Python code with Aitana, the `aitana.*` namespace packages for volcano monitoring: GeoNet Tilde and WFS data, seismic waveforms from GeoNet's S3 archive and FDSN services, RSAM, SSAM, DSAR and spectral features, NetCDF/Zarr feature storage, anomaly indices (matrix profile), detector evaluation with synthetic faults, and Snakemake workflows run by `aitana-pipelines`. Use this skill whenever code imports `aitana.` or the user mentions an `aitana-*` package, and also when they want to fetch New Zealand volcano monitoring data from GeoNet, compute seismic features such as RSAM from waveforms, store or query feature time series, or score volcanic unrest, even if they don't name Aitana. Aitana also provides utilities to generate graphs from raw data, feature time series, and anomaly scores.",
       "files": [
         "SKILL.md"
       ]

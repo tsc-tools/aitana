@@ -118,7 +118,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
   <link rel="alternate" type="text/markdown" href="storage.utils.get_dt.md">
   <link rel="canonical" href="https://tsc-tools.github.io/aitana/reference/storage.utils.get_dt.html">
-  <meta name="description" content="Infer the sampling of the time dimension.">
+  <meta name="description" content="Infer the sampling interval of a time axis.">
   <script type="application/ld+json">
 [
   {
@@ -147,12 +147,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="storage.utils.get_dt() – Aitana | Aitana">
-  <meta property="og:description" content="Infer the sampling of the time dimension.">
+  <meta property="og:description" content="Infer the sampling interval of a time axis.">
   <meta property="og:url" content="https://tsc-tools.github.io/aitana/reference/storage.utils.get_dt.html">
   <meta property="og:site_name" content="Aitana">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="storage.utils.get_dt() – Aitana | Aitana">
-  <meta name="twitter:description" content="Infer the sampling of the time dimension.">
+  <meta name="twitter:description" content="Infer the sampling interval of a time axis.">
 </head>
 
 <body class="gd-ref-sidebar nav-sidebar floating nav-fixed doc-api-page quarto-light">
@@ -702,14 +702,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.ZizouDataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.ZizouDataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.SliceBatchSampler</span></a>
+  <a href="../reference/anomaly.anomaly_base.MinMaxScale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">anomaly.anomaly_base.MinMaxScale</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -766,6 +760,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.storage.AitanaDataset.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.storage.AitanaDataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.storage.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.storage.SliceBatchSampler</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -844,6 +844,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.utils.get_dt.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">storage.utils.get_dt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.utils.snap_to_grid.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.utils.snap_to_grid</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -995,8 +1001,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h3 id="toc-title">On this page</h3>
+   
+  <ul class="collapse">
+  <li><a href="#parameters" id="toc-parameters" class="nav-link active" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
@@ -1021,17 +1034,42 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <div class="doc-subject">
-<p>Infer the sampling of the time dimension.</p>
+<p>Infer the sampling interval of a time axis.</p>
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/utils.py#L200-L212" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/utils.py#L217-L241" target="_blank" rel="noopener">Source</a></p>
 </div>
 <div class="doc-signature doc-Kind.FUNCTION">
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">storage</span><span class="op">.</span><span class="va">utils</span><span class="op">.</span><span class="va">get_dt</span>(<span class="va">times</span>)</span></code></pre></div>
 </div>
+<div class="doc-text">
+<p>The median spacing, rounded to whole seconds (whole milliseconds below a second), so that time stamps slightly off the grid don’t change the interval: times stored as float hours decode up to a microsecond off, and traces can start a few milliseconds late.</p>
+</div>
+<section id="parameters" class="level2 doc-parameters">
+<h2 class="doc-parameters">Parameters</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code><span class="doc-parameter-name">times</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">array-like of datetime64</span></code></dt>
+<dd>
+At least two sorted time stamps.
+</dd>
+</dl>
+</div>
+</section>
+<section id="returns" class="level2 doc-returns">
+<h2 class="doc-returns">Returns</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code> <span class="doc-parameter-annotation">pd.Timedelta</span></code></dt>
+<dd>
+The sampling interval.
+</dd>
+</dl>
+</div>
 
 
+</section>
 
 </main>
 <hr style="padding: 0; margin: 0;">

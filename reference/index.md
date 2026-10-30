@@ -224,9 +224,8 @@ Applies an tied-weight autoencoder to the incoming data.
 
 [anomaly.autoencoder.FuzzyCluster](anomaly.autoencoder.FuzzyCluster.md#aitana.anomaly.autoencoder.FuzzyCluster)  
 
-[anomaly.dataset.ZizouDataset](anomaly.dataset.ZizouDataset.md#aitana.anomaly.dataset.ZizouDataset)  
-
-[anomaly.dataset.SliceBatchSampler](anomaly.dataset.SliceBatchSampler.md#aitana.anomaly.dataset.SliceBatchSampler)  
+[anomaly.anomaly_base.MinMaxScale](anomaly.anomaly_base.MinMaxScale.md#aitana.anomaly.anomaly_base.MinMaxScale)  
+Fill gaps with the median and scale each feature column to \[0, 1\].
 
 [anomaly.evaluation.inject_faults()](anomaly.evaluation.inject_faults.md#aitana.anomaly.evaluation.inject_faults)  
 Inject synthetic faults into a DataFrame for anomaly detection evaluation.
@@ -256,7 +255,10 @@ Query computed features
 [storage.storage.Path](storage.storage.Path.md#aitana.storage.storage.Path)  
 
 [storage.storage.AitanaDataset](storage.storage.AitanaDataset.md#aitana.storage.storage.AitanaDataset)  
-PyTorch Dataset wrapper for Aitana Storage.
+PyTorch Dataset of features from a store.
+
+[storage.storage.SliceBatchSampler](storage.storage.SliceBatchSampler.md#aitana.storage.storage.SliceBatchSampler)  
+Batch sampler that yields slices of consecutive sample indices.
 
 [storage.ingest.IngestWorker](storage.ingest.IngestWorker.md#aitana.storage.ingest.IngestWorker)  
 
@@ -292,7 +294,10 @@ Find closest multiple of interval to given time.
 Floor a datetime to the latest multiple of a given interval.
 
 [storage.utils.get_dt()](storage.utils.get_dt.md#aitana.storage.utils.get_dt)  
-Infer the sampling of the time dimension.
+Infer the sampling interval of a time axis.
+
+[storage.utils.snap_to_grid()](storage.utils.snap_to_grid.md#aitana.storage.utils.snap_to_grid)  
+Round time stamps to the nearest point of a regular grid.
 
 [storage.utils.fill_time_gaps()](storage.utils.fill_time_gaps.md#aitana.storage.utils.fill_time_gaps)  
 Fill gaps in time series with NaN values by reindexing to a complete datetime range.

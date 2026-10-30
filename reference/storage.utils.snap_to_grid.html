@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>anomaly.dataset.ZizouDataset – Aitana | Aitana</title>
+<title>storage.utils.snap_to_grid() – Aitana | Aitana</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -116,9 +116,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../theme-init.js"></script>
 
 
-  <link rel="alternate" type="text/markdown" href="anomaly.dataset.ZizouDataset.md">
-  <link rel="canonical" href="https://tsc-tools.github.io/aitana/reference/anomaly.dataset.ZizouDataset.html">
-  <meta name="description" content="Validation and benchmarking framework for AI/ML in volcano monitoring.">
+  <link rel="alternate" type="text/markdown" href="storage.utils.snap_to_grid.md">
+  <link rel="canonical" href="https://tsc-tools.github.io/aitana/reference/storage.utils.snap_to_grid.html">
+  <meta name="description" content="Round time stamps to the nearest point of a regular grid.">
   <script type="application/ld+json">
 [
   {
@@ -136,23 +136,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "anomaly.dataset.ZizouDataset - Aitana",
+    "name": "storage.utils.snap_to_grid - Aitana",
     "isPartOf": {
       "@type": "WebSite",
       "name": "Aitana"
     },
-    "url": "https://tsc-tools.github.io/aitana/reference/anomaly.dataset.ZizouDataset.html"
+    "url": "https://tsc-tools.github.io/aitana/reference/storage.utils.snap_to_grid.html"
   }
 ]
 </script>
   <meta property="og:type" content="website">
-  <meta property="og:title" content="anomaly.dataset.ZizouDataset – Aitana | Aitana">
-  <meta property="og:description" content="Validation and benchmarking framework for AI/ML in volcano monitoring.">
-  <meta property="og:url" content="https://tsc-tools.github.io/aitana/reference/anomaly.dataset.ZizouDataset.html">
+  <meta property="og:title" content="storage.utils.snap_to_grid() – Aitana | Aitana">
+  <meta property="og:description" content="Round time stamps to the nearest point of a regular grid.">
+  <meta property="og:url" content="https://tsc-tools.github.io/aitana/reference/storage.utils.snap_to_grid.html">
   <meta property="og:site_name" content="Aitana">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="anomaly.dataset.ZizouDataset – Aitana | Aitana">
-  <meta name="twitter:description" content="Validation and benchmarking framework for AI/ML in volcano monitoring.">
+  <meta name="twitter:title" content="storage.utils.snap_to_grid() – Aitana | Aitana">
+  <meta name="twitter:description" content="Round time stamps to the nearest point of a regular grid.">
 </head>
 
 <body class="gd-ref-sidebar nav-sidebar floating nav-fixed doc-api-page quarto-light">
@@ -202,7 +202,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <h1 class="quarto-secondary-nav-title no-breadcrumbs gd-ref-title"><span class="gd-ref-title-prefix">API</span><span class="gd-ref-title-sep">/</span><span class="gd-ref-title-name">anomaly.dataset.ZizouDataset</span></h1>
+        <h1 class="quarto-secondary-nav-title no-breadcrumbs gd-ref-title"><span class="gd-ref-title-prefix">API</span><span class="gd-ref-title-sep">/</span><span class="gd-ref-title-name">storage.utils.snap_to_grid()</span></h1>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -702,14 +702,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.ZizouDataset.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">anomaly.dataset.ZizouDataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/anomaly.dataset.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">anomaly.dataset.SliceBatchSampler</span></a>
+  <a href="../reference/anomaly.anomaly_base.MinMaxScale.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">anomaly.anomaly_base.MinMaxScale</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -766,6 +760,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.storage.AitanaDataset.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.storage.AitanaDataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.storage.SliceBatchSampler.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">storage.storage.SliceBatchSampler</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -844,6 +844,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../reference/storage.utils.get_dt.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">storage.utils.get_dt</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/storage.utils.snap_to_grid.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">storage.utils.snap_to_grid</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -995,15 +1001,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h3 id="toc-title">On this page</h3>
+   
+  <ul class="collapse">
+  <li><a href="#parameters" id="toc-parameters" class="nav-link active" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h2 class="title" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 1.25rem;"><span class="doc-object-name doc-class doc-label doc-label-class">anomaly.dataset.ZizouDataset</span></h2>
+<h2 class="title" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 1.25rem;"><span class="doc-object-name doc-function doc-label doc-label-function">storage.utils.snap_to_grid()</span></h2>
 </div>
 
 
@@ -1021,19 +1034,56 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <div class="doc-subject">
-
+<p>Round time stamps to the nearest point of a regular grid.</p>
 </div>
 <div class="doc-usage-source">
 <p>Usage</p>
-<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-anomaly/src/aitana/anomaly/dataset.py#L41-L213" target="_blank" rel="noopener">Source</a></p>
+<p><a href="https://github.com/tsc-tools/aitana/blob/main/aitana-storage/src/aitana/storage/utils.py#L244-L287" target="_blank" rel="noopener">Source</a></p>
 </div>
-<div class="doc-signature doc-Kind.CLASS">
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">anomaly</span><span class="op">.</span><span class="va">dataset</span><span class="op">.</span><span class="va">ZizouDataset</span>(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">store</span>, <span class="va">features</span>, <span class="va">target_transform</span><span class="op">=</span><span class="cn-none">None</span>, <span class="va">feature_transforms</span><span class="op">=</span><span class="cn-none">None</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<div class="doc-signature doc-Kind.FUNCTION">
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">storage</span><span class="op">.</span><span class="va">utils</span><span class="op">.</span><span class="va">snap_to_grid</span>(
+    <span class="va">times</span>,
+    <span class="va">interval</span>,
+    <span class="va">origin</span><span class="op">=</span><span class="cn-none">None</span>,
+    <span class="va">check</span><span class="op">=</span><span class="cn-bool">False</span>,
+)</span></code></pre></div>
+</div>
+<section id="parameters" class="level2 doc-parameters">
+<h2 class="doc-parameters">Parameters</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code><span class="doc-parameter-name">times</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">array-like of datetime64</span></code></dt>
+<dd>
+<p>Time stamps to snap.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">interval</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">pd.Timedelta</span></code></dt>
+<dd>
+<p>Grid spacing.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">origin</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">datetime64 - like</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default">None</span></code></dt>
+<dd>
+<p>A point of the grid. By default the first time stamp, rounded to whole seconds (whole milliseconds for spacings below a second), so that the grid keeps the phase of the data, e.g.&nbsp;time stamps at window centres.</p>
+</dd>
+<dt><code><span class="doc-parameter-name">check</span><span class="doc-parameter-annotation-sep">:</span> <span class="doc-parameter-annotation">bool</span> <span class="doc-parameter-default-sep op">=</span> <span class="doc-parameter-default"><span class="va">False</span></span></code></dt>
+<dd>
+Raise a ValueError if a time stamp is further from its grid point than jitter explains: 1% of the interval, at most a second.
+</dd>
+</dl>
+</div>
+</section>
+<section id="returns" class="level2 doc-returns">
+<h2 class="doc-returns">Returns</h2>
+<div class="doc-definition-items">
+<dl>
+<dt><code> <span class="doc-parameter-annotation">np.ndarray</span></code></dt>
+<dd>
+datetime64[ns] time stamps <code>origin + k * interval</code>; halfway cases round up.
+</dd>
+</dl>
 </div>
 
 
+</section>
 
 </main>
 <hr style="padding: 0; margin: 0;">
