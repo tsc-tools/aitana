@@ -92,7 +92,7 @@ deploy-snet:
       "Image": "${IMAGE}",
       "Cmd": ["aitana-pipelines", "run", "ruapehu", "/home/bayes/data/ruapehu_snet",
               "--workflow", "ruapehu_snet",
-              "--cores", "8",
+              "--cores", "4",
               "--config", "start=2021-01-01"],
       "HostConfig": {
         "Binds": ["/scratch/VUMT/scatseisnet:/home/bayes/data"],
