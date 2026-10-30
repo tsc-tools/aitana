@@ -9,7 +9,7 @@ authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
 description = "Reproducible workflows that run and evaluate aitana components for volcano monitoring."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "aitana-volcanoes>=0.1.0",
     "snakemake>=9.16.3,<10",
@@ -22,6 +22,18 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
+
+[tool.hatch.envs.test]
+dependencies = [
+  "coverage[toml]",
+  "pytest",
+]
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.11", "3.12", "3.13"]
+
+[tool.hatch.envs.test.scripts]
+run-pytest = "pytest tests {args}"
 
 [project.scripts]
 aitana-pipelines = "aitana.pipelines.cli:app"
@@ -38,3 +50,4 @@ aitana-anomaly = { workspace = true }
 
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"
+
