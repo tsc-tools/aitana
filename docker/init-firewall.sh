@@ -1,40 +1,62 @@
 #!/usr/bin/env bash
 # Runs once, as root, before entrypoint.sh drops to the unprivileged
-# `claude` user. Locks down all outbound traffic behind a domain allowlist:
+# `bot` user. Locks down all outbound traffic behind a domain allowlist:
 # only `proxyuser` (running tinyproxy) may reach the network directly, and
 # tinyproxy refuses CONNECT/requests to anything not on the filter list.
-# `claude` can therefore only leave the container through that allowlist,
+# `bot` can therefore only leave the container through that allowlist,
 # matched by exact hostname (no subdomain/substring bypass).
 #
 # Fails closed: any error here aborts the container instead of leaving
 # egress unrestricted.
 set -euo pipefail
 
-# Domains Claude Code itself needs to function -- do not remove.
-# Source: https://code.claude.com/docs/en/network-config.md
-CORE_DOMAINS=(
+# Domains the bot itself needs: the Claude API, and Slack's Web API,
+# Socket Mode websockets and file uploads (for plots).
+BOT_DOMAINS=(
     api.anthropic.com
-    claude.ai
-    claude.com
-    platform.claude.com
-    mcp-proxy.anthropic.com
+    slack.com
+    wss-primary.slack.com
+    wss-backup.slack.com
+    files.slack.com
 )
 
-# Domains this workspace's tasks typically need (git remote, package
-# installs). Tune per project -- narrower is safer.
-DEV_DOMAINS=(
-    github.com
-    objects.githubusercontent.com
-    raw.githubusercontent.com
-    pypi.org
-    files.pythonhosted.org
+# GeoNet data the agent's aitana code fetches: Tilde, WFS, FDSN waveforms
+# and the open-data S3 archive.
+DATA_DOMAINS=(
+    tilde.geonet.org.nz
+    wfs.geonet.org.nz
+    service.geonet.org.nz
+    service-nrt.geonet.org.nz
+    geonet-open-data.s3.amazonaws.com
 )
+
+# The Grafana MCP server, if the bot uses one, from the URL it connects to. It
+# may listen on a port other than 80/443, so that port is opened below as well.
+GRAFANA_DOMAINS=()
+GRAFANA_PORT=""
+if [[ -n "${GRAFANA_MCP_URL:-}" ]]; then
+    grafana_url="$GRAFANA_MCP_URL"
+    grafana_hostport="${grafana_url#*://}"
+    grafana_hostport="${grafana_hostport%%/*}"
+    GRAFANA_DOMAINS=("${grafana_hostport%%:*}")
+    if [[ "$grafana_hostport" == *:* ]]; then
+        GRAFANA_PORT="${grafana_hostport##*:}"
+    elif [[ "$grafana_url" == https://* ]]; then
+        GRAFANA_PORT=443
+    else
+        GRAFANA_PORT=80
+    fi
+    [[ "$GRAFANA_PORT" =~ ^[0-9]+$ ]] || {
+        echo "init-firewall: can't read a port from GRAFANA_MCP_URL=${grafana_url}" >&2
+        exit 1
+    }
+fi
 
 # Additional space-separated domains from the run script, e.g.
-# `-e CLAUDE_EXTRA_DOMAINS="foo.example.com bar.example.com"`.
-read -ra EXTRA_DOMAINS <<< "${CLAUDE_EXTRA_DOMAINS:-}"
+# `-e BOT_EXTRA_DOMAINS="foo.example.com bar.example.com"`.
+read -ra EXTRA_DOMAINS <<< "${BOT_EXTRA_DOMAINS:-}"
 
-ALL_DOMAINS=("${CORE_DOMAINS[@]}" "${DEV_DOMAINS[@]}" "${EXTRA_DOMAINS[@]}")
+ALL_DOMAINS=("${BOT_DOMAINS[@]}" "${DATA_DOMAINS[@]}" "${GRAFANA_DOMAINS[@]}" "${EXTRA_DOMAINS[@]}")
 
 PROXY_PORT=8888
 RUNTIME_DIR=/run/init-firewall
@@ -54,6 +76,7 @@ FilterType fnmatch
 FilterDefaultDeny Yes
 ConnectPort 443
 ConnectPort 80
+${GRAFANA_PORT:+ConnectPort ${GRAFANA_PORT}}
 PidFile "${RUNTIME_DIR}/tinyproxy.pid"
 LogFile "${RUNTIME_DIR}/tinyproxy.log"
 CONF
@@ -81,6 +104,9 @@ iptables -A INPUT -i lo -j ACCEPT
 # Only proxyuser may leave the container directly (web ports + DNS).
 iptables -A OUTPUT -m owner --uid-owner proxyuser -p tcp --dport 443 -j ACCEPT
 iptables -A OUTPUT -m owner --uid-owner proxyuser -p tcp --dport 80 -j ACCEPT
+if [[ -n "$GRAFANA_PORT" ]]; then
+    iptables -A OUTPUT -m owner --uid-owner proxyuser -p tcp --dport "$GRAFANA_PORT" -j ACCEPT
+fi
 iptables -A OUTPUT -m owner --uid-owner proxyuser -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -m owner --uid-owner proxyuser -p tcp --dport 53 -j ACCEPT
 

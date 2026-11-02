@@ -9,16 +9,37 @@ authors = [
   { name="Yannik Behr", email="y.behr@gns.cri.nz" },
 ]
 description = "Interactive duty-officer companion for Aitana (planned)"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "typer>=0.25,<1",
+    "aitana-access>=0.1.0",
+    "aitana-features>=0.1.0",
+    "aitana-volcanoes>=0.1.0",
+    "aitana-pipelines>=0.1.0",
+    "aitana-anomaly>=0.1.0",
+    "aitana-storage>=0.1.0",
+    "aitana-testing>=0.1.0",
+    "deepagents>=0.7.32,<0.8",
+    "langchain-mcp-adapters>=0.3.2,<1",
+    "slack-bolt>=1.30,<2",
+    "aiohttp>=3.14,<4",
+    "pyproj>=3.7,<4",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
 
 [project.scripts]
-aitana-bot = "aitana.bot.cli:app"
+aitana-bot = "aitana.bot.slack_bot:run"
+
+[tool.uv.sources]
+aitana-access = { workspace = true }
+aitana-features = { workspace = true }
+aitana-volcanoes = { workspace = true }
+aitana-pipelines = { workspace = true }
+aitana-anomaly = { workspace = true }
+aitana-storage = { workspace = true }
+aitana-testing = { workspace = true }
 
 [project.urls]
 Homepage = "https://github.com/tsc-tools/aitana"
