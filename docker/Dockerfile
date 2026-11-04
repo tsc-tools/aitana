@@ -28,12 +28,14 @@ RUN groupadd -g $D_GID bayes && \
     mkdir $HOME/.venv && \
     mkdir $HOME/.claude && \
     mkdir $HOME/.cache && \
+    mkdir -p /scratch/VUMT && \
     fix-permissions $HOME && \
     fix-permissions $HOME/data && \
     fix-permissions $HOME/.venv && \
     fix-permissions $HOME/.claude && \
     fix-permissions $HOME/.cache && \
-    fix-permissions /opt/conda
+    fix-permissions /opt/conda && \
+    fix-permissions /scratch/VUMT
 
 RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
