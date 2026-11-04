@@ -1,9 +1,10 @@
 # End of the computed period (UTC): "now" or an ISO timestamp, e.g. 2022-03-20T00:00
 end: now
-# Start of the computed period, e.g. 2022-01-01 to backfill every day since then;
-# null computes the last lookback_hours before end
+# First day of the archive, e.g. 2022-01-01: while results/archive_<start>/ is
+# incomplete, a run covers every day since then instead of the last lookback_hours
+# (delete the directory to rebuild it). null builds no archive.
 start: null
-# Hours computed per run when start is null
+# Hours computed per run
 lookback_hours: 24
 # Three components, e.g. HH? for HHZ, HHN, HHE
 seed_id: NZ.FWVZ.10.HH?

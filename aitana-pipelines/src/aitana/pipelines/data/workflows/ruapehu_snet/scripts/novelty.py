@@ -27,12 +27,11 @@ alarm = (index >= cfg["threshold"]).astype(float).where(index.notna())
 # the threshold in force when each window was scored, so retunes stay traceable
 threshold = pd.Series(float(cfg["threshold"]), index=index.index)
 
-pd.DataFrame(
-    {"anomaly_index": index, "distance": distance, "alarm": alarm}
-).rename_axis("datetime").to_csv(snakemake.output[0])
-
 net, sta, loc, cha = cfg["seed_id"].split(".")
 store = Storage("ruapehu", cfg["storage_dir"]).get_substore(sta, loc, cha.replace("?", ""))
 for name, series in [("index", index), ("distance", distance), ("alarm", alarm),
                      ("threshold", threshold)]:
     store.save(series.rename_axis("datetime").to_xarray().to_dataset(name=f"snet_novelty_{name}"))
+pd.DataFrame(
+    {"anomaly_index": index, "distance": distance, "alarm": alarm}
+).rename_axis("datetime").to_csv(snakemake.output[0])

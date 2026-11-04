@@ -41,6 +41,10 @@ build:
 # on ~/data, which exists in the image, so a new volume is owned by bayes.
 # The first run also builds the archive since 2022-01-01 (~1,800 days of RSAM,
 # hence 8 cores); later runs find results/archive_20220101.csv and only update.
+# Only mtime triggers reruns: a new image's scripts are newer than the cached
+# days, so the 92 a run needs would otherwise be recomputed on every deploy. To
+# recompute days, e.g. after changing scripts/rsam.py, delete them from rsam/;
+# older ones need results/archive_20220101.csv deleted too.
 deploy-ruapehu-mp:
   extends: .deploy-default-branch
   script: |
@@ -50,6 +54,7 @@ deploy-ruapehu-mp:
       "Cmd": ["aitana-pipelines", "run", "ruapehu", "/home/bayes/data/ruapehu_mp",
               "--workflow", "ruapehu_mp",
               "--cron", "2-59/10 * * * *", "--cores", "8",
+              "--rerun-triggers", "mtime",
               "--config", "start=2022-01-01"],
       "HostConfig": {
         "Binds": ["${DATA_VOLUME}:/home/bayes/data"],
@@ -84,6 +89,13 @@ deploy-ruapehu-api:
     python3 ./gessp-operational/deploy-scripts/docker_deploy.py -a "aitana-ruapehu-api" -s "$APP_SERVER" -t "$TEAM" /tmp/docker_config.json
     rm /tmp/docker_config.json
 
+# Runs the ruapehu_snet workflow every 10 minutes, 2 minutes after each 10-min
+# boundary so GeoNet's near-real-time data has arrived. The first run also builds
+# the archive since 2021-01-01; later runs find results/archive_20210101/ and only
+# update. Only mtime triggers reruns: a new image's scripts are newer than the
+# cached days, which would otherwise all be recomputed (~26 h) on every deploy.
+# To recompute days, e.g. after changing scripts/snet.py, delete them from snet/
+# along with results/archive_20210101/.
 deploy-snet:
   extends: .deploy-default-branch
   script: |
@@ -92,7 +104,8 @@ deploy-snet:
       "Image": "${IMAGE}",
       "Cmd": ["aitana-pipelines", "run", "ruapehu", "/home/bayes/data/ruapehu_snet",
               "--workflow", "ruapehu_snet",
-              "--cores", "4",
+              "--cron", "2-59/10 * * * *", "--cores", "4",
+              "--rerun-triggers", "mtime",
               "--config", "start=2021-01-01"],
       "HostConfig": {
         "Binds": ["/scratch/VUMT/scatseisnet:/home/bayes/data"],

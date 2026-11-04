@@ -5,8 +5,13 @@ Computes first- and second-order scattering coefficients of ``seed_id`` from
 GeoNet waveforms with ``aitana.anomaly.snet.SNet`` (20-min windows every 10 min,
 each labelled by its first sample), one job per UTC day so that completed days
 are reused across runs, and stores them in aitana-storage. A run covers the last
-``lookback_hours`` before ``end``, or every day since ``start`` when that is set,
-e.g. ``--config start=2022-01-01`` to backfill.
+``lookback_hours`` before ``end``.
+
+With ``start`` set, e.g. ``--config start=2022-01-01``, the first run builds the
+archive instead: it covers every day since ``start`` and writes to
+``results/archive_<start>/``. Later runs find that directory and cover only the
+last ``lookback_hours``; delete it to rebuild, e.g. after an outage longer than
+``lookback_hours``, whose days no later run covers.
 
 It also stores a two-dimensional embedding of each window's coefficients
 (FastICA, then UMAP), fitted once on the days from ``fit_start`` to ``fit_end``,
@@ -19,6 +24,8 @@ aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
 workspace). Override config values on the command line, e.g.
 ``aitana-pipelines run ruapehu OUT --workflow ruapehu_snet --config end=2022-03-20T00:00``.
 """
+
+import os
 
 import pandas as pd
 
@@ -41,11 +48,17 @@ def naive(ts):
 
 
 END = utc("now" if str(config["end"]) == "now" else str(config["end"])).floor(STEP)
-if config["start"]:
-    START = utc(str(config["start"]))
-else:
-    START = END - pd.Timedelta(hours=config["lookback_hours"])
+START = END - pd.Timedelta(hours=config["lookback_hours"])
 TAG = END.strftime("%Y%m%dT%H%M")
+RESULTS = f"results/{TAG}"
+OUTPUTS = ["stored", "embedding.csv", "novelty.csv"]
+# Each rule writes its output last, so all three files mean the archive is stored.
+if config["start"]:
+    ARCHIVE_START = utc(str(config["start"]))
+    ARCHIVE = f"results/archive_{ARCHIVE_START:%Y%m%d}"
+    if not all(os.path.exists(f"{ARCHIVE}/{name}") for name in OUTPUTS):
+        START = ARCHIVE_START
+        RESULTS = ARCHIVE
 # A day is complete once the window starting at 23:50 has ended, 10 min into the
 # next day. The windows of the first incomplete day that have ended form the
 # partial day.
@@ -71,14 +84,13 @@ wildcard_constraints:
 
 rule all:
     input:
-        f"results/{TAG}/order1.png",
-        f"results/{TAG}/embedding.csv",
-        f"results/{TAG}/novelty.csv",
+        expand("{results}/{name}", results=RESULTS, name=OUTPUTS),
 
 
 # Coefficients of the windows starting on one complete UTC day, cached in
 # snet/<day>.nc: later runs reuse the file. Delete it to fetch and recompute that
-# day, e.g. after a data gap is filled.
+# day, e.g. after a data gap is filled; a day older than lookback_hours needs the
+# archive deleted too, as only building the archive covers it.
 rule snet_day:
     output:
         "snet/{day}.nc",
@@ -104,7 +116,7 @@ rule store:
     input:
         expand("snet/{day}.nc", day=DAYS) + PARTIAL,
     output:
-        plot=f"results/{TAG}/order1.png",
+        touch(f"{RESULTS}/stored"),
     script:
         "scripts/store.py"
 
@@ -126,7 +138,7 @@ rule embed:
         snet=expand("snet/{day}.nc", day=DAYS) + PARTIAL,
         model=MODEL,
     output:
-        f"results/{TAG}/embedding.csv",
+        f"{RESULTS}/embedding.csv",
     script:
         "scripts/embed.py"
 
@@ -145,6 +157,6 @@ rule novelty:
         snet=expand("snet/{day}.nc", day=DAYS) + PARTIAL,
         model=NOVELTY_MODEL,
     output:
-        f"results/{TAG}/novelty.csv",
+        f"{RESULTS}/novelty.csv",
     script:
         "scripts/novelty.py"

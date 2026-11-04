@@ -103,6 +103,29 @@ def test_job_graph(tmp_path, capfd, end, start, days, partial):
     assert jobs["novelty"] == 1
 
 
+@pytest.mark.parametrize(
+    "outputs, days",
+    [
+        # complete: only the last lookback_hours
+        (("stored", "embedding.csv", "novelty.csv"), 1),
+        # interrupted before its last rule finished: still every day since start
+        (("stored", "embedding.csv"), 13),
+    ],
+)
+def test_job_graph_with_archive(tmp_path, capfd, outputs, days):
+    archive = tmp_path / "results" / "archive_20220301"
+    archive.mkdir(parents=True)
+    for name in outputs:
+        (archive / name).touch()
+    SnakemakeBackend(workflow.workflowdir, tmp_path).execute(
+        cores=1,
+        extra=["-n", "--config", "end=2022-03-14T05:30", "start=2022-03-01",
+               "fit_start=2022-01-01", "fit_end=2022-01-03",
+               "novelty_start=2022-01-01", "novelty_end=2022-01-03"],
+    )
+    assert planned_jobs(capfd.readouterr().out)["snet_day"] == days + 2
+
+
 @pytest.mark.slow
 def test_store(tmp_path):
     """
@@ -118,8 +141,8 @@ def test_store(tmp_path):
                "fit_start=2022-03-11", "fit_end=2022-03-14",
                "novelty_start=2022-03-11", "novelty_end=2022-03-14", "threshold=0.9"],
     )
-    results = tmp_path / "results" / "20220314T0010"
-    assert (results / "order1.png").exists()
+    results = tmp_path / "results" / "archive_20220311"
+    assert not list(results.glob("*.png"))
 
     storage = Storage(
         "ruapehu", tmp_path / "storage", starttime=days[0], endtime=pd.Timestamp("2022-03-14")
@@ -165,3 +188,58 @@ def test_store(tmp_path):
         np.testing.assert_allclose(stored.reindex(csv.index).values, csv[column].values)
     threshold = store("snet_novelty_threshold").to_series()
     assert (threshold.dropna() == 0.9).all() and threshold.notna().sum() == len(csv)
+
+
+@pytest.mark.slow
+def test_update_after_archive(tmp_path):
+    """
+    A run after the archive stores only its own windows, keeps the stored
+    history, and scores the windows it shares with the archive identically.
+    """
+    days = pd.date_range("2022-03-11", "2022-03-14")
+    written = write_snet(tmp_path, days)
+    reference = ["start=2022-03-11", "fit_start=2022-03-11", "fit_end=2022-03-14",
+                 "novelty_start=2022-03-11", "novelty_end=2022-03-14"]
+    backend = SnakemakeBackend(workflow.workflowdir, tmp_path)
+    backend.execute(cores=1, extra=["--config", "end=2022-03-14T00:10", *reference])
+    # 48 h, so that the update shares 03-13 with the archive
+    backend.execute(
+        cores=1, extra=["--config", "end=2022-03-15T00:10", "lookback_hours=48", *reference]
+    )
+
+    def read(run, name):
+        return pd.read_csv(tmp_path / "results" / run / name, index_col=0, parse_dates=True)
+
+    archive = read("archive_20220311", "novelty.csv")
+    update = read("20220315T0010", "novelty.csv")
+    assert len(archive) == 3 * 144
+    assert len(read("20220315T0010", "embedding.csv")) == len(update) == 2 * 144
+    shared = archive.index.intersection(update.index)
+    assert len(shared) == 144
+    pd.testing.assert_frame_equal(archive.loc[shared], update.loc[shared])
+
+    storage = Storage(
+        "ruapehu", tmp_path / "storage", starttime=days[0], endtime=pd.Timestamp("2022-03-15")
+    )
+    store = storage.get_substore("FWVZ", "10", "HH")
+    stored = store("snet_order1")
+    stored["datetime"] = stored.indexes["datetime"].round("1min")
+    stored = stored.transpose(*written["2022-03-11"]["order1"].dims)
+    assert stored.sizes["datetime"] == 4 * 144
+    for day in ("2022-03-11", "2022-03-14"):
+        np.testing.assert_allclose(
+            stored.sel(datetime=day).values, written[day]["order1"].values
+        )
+
+    stored = store("snet_novelty_index").to_series()
+    stored.index = stored.index.round("1min")
+    expected = update["anomaly_index"].combine_first(archive["anomaly_index"])
+    assert len(expected) == 4 * 144
+    np.testing.assert_allclose(stored.reindex(expected.index).values, expected.values)
+
+    stored = store("snet_umap").transpose("datetime", "component")
+    stored["datetime"] = stored.indexes["datetime"].round("1min")
+    history = read("archive_20220311", "embedding.csv").loc[:"2022-03-13 00:00"]
+    np.testing.assert_allclose(
+        stored.sel(datetime=history.index).values, history[["umap0", "umap1"]].values
+    )
