@@ -1,7 +1,8 @@
 """
-Compute the scattering transform of three-component seismic data. The
-``ruapehu_snet`` workflow in aitana-pipelines fetches the data, runs it and
-stores the coefficients.
+Compute the scattering transform of three-component seismic data, embed its
+coefficients in two dimensions and score how novel they are. The ``ruapehu_snet``
+workflow in aitana-pipelines fetches the data, runs all three and stores the
+coefficients, the embedding and the novelty index.
 """
 import logging
 from obspy import UTCDateTime
@@ -11,9 +12,19 @@ import numpy as np
 from obspy import Stream, Trace
 import xarray as xr
 import pandas as pd
+from sklearn.decomposition import FastICA
+from sklearn.neighbors import NearestNeighbors
+from sklearn.pipeline import Pipeline
+import umap
+from aitana.anomaly.anomaly_base import AnomalyDetectionBaseClass
 from aitana.features.feature_base import FeatureBaseClass
 
 logger = logging.getLogger(__name__)
+
+# SNet windows span 20 min every 10 min: label scores and embedded windows by the
+# window's centre, which places a sustained change close to its onset. A score
+# can only be computed once its window has ended, 10 min after this label
+LABEL_OFFSET = pd.Timedelta("10min")
 
 class SNet(FeatureBaseClass):
     def __init__(self, max_gap_fraction=0.1):
@@ -122,3 +133,229 @@ class SNet(FeatureBaseClass):
         self.feature.attrs["endtime"] = st[0].stats.endtime.isoformat()
         self.feature.attrs["station"] = st[0].stats.station
         return self.feature
+
+
+def _features(snet):
+    """
+    Flatten the coefficients of each window into one feature vector.
+
+    Parameters
+    ----------
+    snet : xr.Dataset
+        ``order1`` and ``order2`` coefficients as ``SNet.compute`` returns them.
+
+    Returns
+    -------
+    np.ndarray
+        Shape (n_windows, n_features): the first-order, then the second-order
+        coefficients of all channels.
+    """
+    order1 = snet["order1"].transpose("datetime", "channel", "frequency").values
+    order2 = snet["order2"].transpose(
+        "datetime", "channel", "frequency", "order2 frequency"
+    ).values
+    n = snet.sizes["datetime"]
+    return np.hstack([order1.reshape(n, -1), order2.reshape(n, -1)])
+
+
+def fit_embedding(snet, n_sources=10, random_state=42):
+    """
+    Fit a two-dimensional embedding of scattering coefficients.
+
+    Following Steinmann et al. (2023, doi:10.1029/2023JB027167), the first- and
+    second-order coefficients of each window are reduced to ``n_sources``
+    independent components with FastICA, which UMAP then embeds in two
+    dimensions. Windows with missing coefficients are left out. Windows
+    embedded later with ``embed`` land on the manifold of this fit, so
+    behaviour unlike anything in ``snet`` is mapped onto its nearest
+    neighbours rather than apart from them.
+
+    Parameters
+    ----------
+    snet : xr.Dataset
+        ``order1`` and ``order2`` coefficients of the reference windows, as
+        ``SNet.compute`` returns them.
+    n_sources : int
+        Number of independent components.
+    random_state : int
+        Seed of FastICA and UMAP. A seeded UMAP fit runs single-threaded,
+        about 100 s for a year of windows.
+
+    Returns
+    -------
+    sklearn.pipeline.Pipeline
+        The fitted FastICA and UMAP steps, for ``embed``.
+    """
+    X = _features(snet)
+    model = Pipeline([
+        ("ica", FastICA(n_components=n_sources, random_state=random_state)),
+        ("umap", umap.UMAP(random_state=random_state, n_jobs=1)),
+    ])
+    return model.fit(X[np.isfinite(X).all(axis=1)])
+
+
+def embed(model, snet):
+    """
+    Embed windows of scattering coefficients with a fitted embedding.
+
+    Parameters
+    ----------
+    model : sklearn.pipeline.Pipeline
+        Embedding from ``fit_embedding``.
+    snet : xr.Dataset
+        ``order1`` and ``order2`` coefficients, as ``SNet.compute`` returns them.
+
+    Returns
+    -------
+    xr.DataArray
+        Embedding coordinates with dimensions (datetime, component), labelled by
+        each window's label plus ``LABEL_OFFSET``, NaN for windows with missing
+        coefficients.
+    """
+    X = _features(snet)
+    finite = np.isfinite(X).all(axis=1)
+    embedding = np.full((len(X), 2), np.nan)
+    if finite.any():
+        embedding[finite] = model.transform(X[finite])
+    return xr.DataArray(
+        embedding,
+        dims=["datetime", "component"],
+        coords={
+            "datetime": pd.DatetimeIndex(snet["datetime"].values) + LABEL_OFFSET,
+            "component": [0, 1],
+        },
+    )
+
+
+class SNetNovelty(AnomalyDetectionBaseClass):
+    """
+    Score how unlike a reference period each window of scattering coefficients is.
+
+    The coefficients of each window are reduced to ``n_sources`` independent
+    components with FastICA fitted on the reference windows, as in
+    ``fit_embedding``. The raw score of a window is its Euclidean distance in
+    that space to the nearest reference window more than ``exclusion`` away in
+    time. FastICA only rotates the whitened principal components, so these are
+    the distances between whitened principal components. The exclusion leaves out a reference window's overlapping neighbours,
+    so the reference windows' own scores, against which raw scores are ranked
+    to ``[0, 1]`` with ``normalize_score()``, are comparable to those of new
+    windows.
+
+    The reference is fixed, so a new state stays novel for as long as it lasts,
+    unlike a trailing history that adapts. That includes changes of the station
+    rather than the volcano: after FWVZ's sensor and datalogger swap on
+    2025-02-03 the horizontal coefficients roughly doubled, and a 2021
+    reference scores much of the later data as novel. A state seen in only one
+    reference window already counts as familiar. Each window is scored on its
+    own, so short transients such as regional earthquakes or storms can reach
+    high scores too.
+
+    Parameters
+    ----------
+    n_sources : int
+        Number of independent components.
+    exclusion : str or pd.Timedelta
+        Reference windows this close in time to a scored window are ignored.
+    random_state : int
+        Seed of FastICA.
+
+    Attributes
+    ----------
+    distance_ : pd.Series
+        Raw score from the last ``compute_anomaly_index`` call, on the same
+        index and NaN in the same places as the anomaly index.
+    """
+
+    def __init__(self, n_sources=10, exclusion="10min", random_state=42):
+        super().__init__(features=None)
+        self.n_sources = n_sources
+        self.exclusion = pd.Timedelta(exclusion)
+        self.random_state = random_state
+
+    def fit(self, snet):
+        """
+        Fit the independent components and the reference scores.
+
+        Unlike the base class, this takes the reference windows' coefficients
+        rather than a time span.
+
+        Parameters
+        ----------
+        snet : xr.Dataset
+            ``order1`` and ``order2`` coefficients of the reference windows, as
+            ``SNet.compute`` returns them. Windows with missing coefficients
+            are left out.
+
+        Returns
+        -------
+        SNetNovelty
+            The fitted detector.
+        """
+        X = _features(snet)
+        finite = np.isfinite(X).all(axis=1)
+        self.ica_ = FastICA(n_components=self.n_sources, random_state=self.random_state)
+        sources = self.ica_.fit_transform(X[finite])
+        self.times_ = snet["datetime"].values[finite].astype("datetime64[ns]").astype(np.int64)
+        self.nn_ = NearestNeighbors().fit(sources)
+        reference = self._distance(sources, self.times_)
+        self.reference_ = reference[np.isfinite(reference)]
+        return self
+
+    def _distance(self, sources, times):
+        """
+        Distance to the nearest reference window more than ``exclusion`` away.
+
+        Parameters
+        ----------
+        sources : np.ndarray
+            Independent components of the windows, (n_windows, n_sources).
+        times : np.ndarray
+            Labels of the windows in ns since the epoch.
+
+        Returns
+        -------
+        np.ndarray
+            One distance per window, NaN if every reference window is too close.
+        """
+        out = np.full(len(sources), np.nan)
+        todo = np.arange(len(sources))
+        k = 16
+        while len(todo):
+            k = min(k, len(self.times_))
+            dist, idx = self.nn_.kneighbors(sources[todo], n_neighbors=k)
+            far = np.abs(self.times_[idx] - times[todo, None]) > self.exclusion.value
+            found = far.any(axis=1)
+            out[todo[found]] = dist[found, far[found].argmax(axis=1)]
+            todo = todo[~found]
+            if k == len(self.times_):
+                break
+            k *= 4
+        return out
+
+    def compute_anomaly_index(self, snet):
+        """
+        Compute the novelty index of windows of scattering coefficients.
+
+        Parameters
+        ----------
+        snet : xr.Dataset
+            ``order1`` and ``order2`` coefficients, as ``SNet.compute`` returns
+            them, each window labelled by its first sample.
+
+        Returns
+        -------
+        pd.Series
+            Novelty index in ``[0, 1]`` labelled by each window's label plus
+            ``LABEL_OFFSET``, NaN for windows with missing coefficients.
+        """
+        X = _features(snet)
+        finite = np.isfinite(X).all(axis=1)
+        times = snet["datetime"].values.astype("datetime64[ns]").astype(np.int64)
+        distance = np.full(len(X), np.nan)
+        if finite.any():
+            distance[finite] = self._distance(self.ica_.transform(X[finite]), times[finite])
+        aindex = self.normalize_score(distance, self.reference_)
+        aindex[~np.isfinite(distance)] = np.nan
+        labels = pd.DatetimeIndex(snet["datetime"].values) + LABEL_OFFSET
+        self.distance_ = pd.Series(distance, index=labels, name="distance")
+        return pd.Series(aindex, index=labels, name="anomaly_index")

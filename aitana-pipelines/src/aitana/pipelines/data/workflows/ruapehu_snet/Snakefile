@@ -8,6 +8,12 @@ are reused across runs, and stores them in aitana-storage. A run covers the last
 ``lookback_hours`` before ``end``, or every day since ``start`` when that is set,
 e.g. ``--config start=2022-01-01`` to backfill.
 
+It also stores a two-dimensional embedding of each window's coefficients
+(FastICA, then UMAP), fitted once on the days from ``fit_start`` to ``fit_end``,
+and a novelty index with its alarm series, scored against the days from
+``novelty_start`` to ``novelty_end``. The first run therefore computes the
+reference days too.
+
 Rules run in the active Python environment, which must provide aitana-access,
 aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
 workspace). Override config values on the command line, e.g.
@@ -49,6 +55,14 @@ DAYS = pd.date_range(
     START.floor("D"), PARTIAL_START - pd.Timedelta(days=1), freq="D"
 ).strftime("%Y-%m-%d")
 PARTIAL = [f"snet/partial_{TAG}.nc"] if END - PARTIAL_START >= WINDOW else []
+FIT_DAYS = pd.date_range(
+    str(config["fit_start"]), str(config["fit_end"]), freq="D", inclusive="left"
+).strftime("%Y-%m-%d")
+MODEL = f"model/embedding_{FIT_DAYS[0]}_{FIT_DAYS[-1]}.joblib"
+NOVELTY_DAYS = pd.date_range(
+    str(config["novelty_start"]), str(config["novelty_end"]), freq="D", inclusive="left"
+).strftime("%Y-%m-%d")
+NOVELTY_MODEL = f"model/novelty_{NOVELTY_DAYS[0]}_{NOVELTY_DAYS[-1]}.joblib"
 
 
 wildcard_constraints:
@@ -58,6 +72,8 @@ wildcard_constraints:
 rule all:
     input:
         f"results/{TAG}/order1.png",
+        f"results/{TAG}/embedding.csv",
+        f"results/{TAG}/novelty.csv",
 
 
 # Coefficients of the windows starting on one complete UTC day, cached in
@@ -91,3 +107,44 @@ rule store:
         plot=f"results/{TAG}/order1.png",
     script:
         "scripts/store.py"
+
+
+# The embedding and the novelty detector are fitted once on their reference days
+# and cached in model/, named by the reference period: later runs reuse them, a
+# new reference period refits.
+rule fit_embedding:
+    input:
+        expand("snet/{day}.nc", day=FIT_DAYS),
+    output:
+        MODEL,
+    script:
+        "scripts/fit_embedding.py"
+
+
+rule embed:
+    input:
+        snet=expand("snet/{day}.nc", day=DAYS) + PARTIAL,
+        model=MODEL,
+    output:
+        f"results/{TAG}/embedding.csv",
+    script:
+        "scripts/embed.py"
+
+
+rule fit_novelty:
+    input:
+        expand("snet/{day}.nc", day=NOVELTY_DAYS),
+    output:
+        NOVELTY_MODEL,
+    script:
+        "scripts/fit_novelty.py"
+
+
+rule novelty:
+    input:
+        snet=expand("snet/{day}.nc", day=DAYS) + PARTIAL,
+        model=NOVELTY_MODEL,
+    output:
+        f"results/{TAG}/novelty.csv",
+    script:
+        "scripts/novelty.py"

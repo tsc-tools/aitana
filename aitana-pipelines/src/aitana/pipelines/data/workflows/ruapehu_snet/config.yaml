@@ -9,3 +9,14 @@ lookback_hours: 24
 seed_id: NZ.FWVZ.10.HH?
 # aitana-storage root for the coefficients, relative to the output directory
 storage_dir: storage
+# Reference period (end exclusive) the embedding of the coefficients is fitted
+# on, once; every run's windows are embedded into that fit. Quoted, as Snakemake
+# can't serialise YAML dates.
+fit_start: "2021-01-01"
+fit_end: "2023-01-01"
+# Reference period (end exclusive) of the novelty index, fitted once: a quiet
+# period, so that unrest like 2022's stays novel
+novelty_start: "2021-01-01"
+novelty_end: "2022-01-01"
+# Alarm when the novelty index of a window reaches this value
+threshold: 0.99

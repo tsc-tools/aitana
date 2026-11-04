@@ -85,25 +85,41 @@ def write_snet(outdir, days, empty=()):
     ],
 )
 def test_job_graph(tmp_path, capfd, end, start, days, partial):
-    config = [f"end={end}"] + ([f"start={start}"] if start else [])
+    # two reference days for the embedding and the novelty index, before the
+    # computed period
+    config = [f"end={end}", "fit_start=2022-01-01", "fit_end=2022-01-03",
+              "novelty_start=2022-01-01", "novelty_end=2022-01-03"]
+    config += [f"start={start}"] if start else []
     SnakemakeBackend(workflow.workflowdir, tmp_path).execute(
         cores=1, extra=["-n", "--config", *config]
     )
     jobs = planned_jobs(capfd.readouterr().out)
-    assert jobs.get("snet_day", 0) == days
+    assert jobs.get("snet_day", 0) == days + 2
     assert jobs.get("snet_partial", 0) == int(partial)
     assert jobs["store"] == 1
+    assert jobs["fit_embedding"] == 1
+    assert jobs["embed"] == 1
+    assert jobs["fit_novelty"] == 1
+    assert jobs["novelty"] == 1
 
 
 @pytest.mark.slow
 def test_store(tmp_path):
-    """Stored coefficients match the day files, NaN for a day without data."""
+    """
+    Stored coefficients match the day files and the stored embedding and
+    novelty series match embedding.csv and novelty.csv, NaN for a day without
+    data.
+    """
     days = pd.date_range("2022-03-11", "2022-03-13")
     written = write_snet(tmp_path, days, empty=days[1:2])
     SnakemakeBackend(workflow.workflowdir, tmp_path).execute(
-        cores=1, extra=["--config", "end=2022-03-14T00:10", "start=2022-03-11"]
+        cores=1,
+        extra=["--config", "end=2022-03-14T00:10", "start=2022-03-11",
+               "fit_start=2022-03-11", "fit_end=2022-03-14",
+               "novelty_start=2022-03-11", "novelty_end=2022-03-14", "threshold=0.9"],
     )
-    assert (tmp_path / "results" / "20220314T0010" / "order1.png").exists()
+    results = tmp_path / "results" / "20220314T0010"
+    assert (results / "order1.png").exists()
 
     storage = Storage(
         "ruapehu", tmp_path / "storage", starttime=days[0], endtime=pd.Timestamp("2022-03-14")
@@ -119,3 +135,33 @@ def test_store(tmp_path):
             np.testing.assert_allclose(
                 stored.sel(datetime=day).values, written[day][name].values
             )
+
+    stored = store("snet_umap")
+    # the layout aitana-api expects of a 2-D feature
+    assert stored.dims == ("component", "datetime")
+    stored = stored.transpose("datetime", "component")
+    stored["datetime"] = stored.indexes["datetime"].round("1min")
+    csv = pd.read_csv(results / "embedding.csv", index_col=0, parse_dates=True)
+    # labelled 10 min after each window's label
+    assert csv.index[0] == pd.Timestamp("2022-03-11 00:10")
+    stored = stored.sel(datetime=csv.index)
+    assert stored.sizes["datetime"] == 3 * 144
+    assert stored.sel(datetime=slice("2022-03-12 00:10", "2022-03-13 00:00")).isnull().all()
+    # the other two days are complete
+    assert int(stored.notnull().all("component").sum()) == 2 * 144
+    np.testing.assert_allclose(stored.values, csv[["umap0", "umap1"]].values)
+
+    csv = pd.read_csv(results / "novelty.csv", index_col=0, parse_dates=True)
+    # labelled 10 min after each window's label
+    assert csv.index[0] == pd.Timestamp("2022-03-11 00:10")
+    assert csv.loc["2022-03-12 00:10":"2022-03-13 00:00"].isna().all().all()
+    assert csv["anomaly_index"].notna().sum() == 2 * 144
+    scored = csv["anomaly_index"].notna()
+    assert (csv["alarm"][scored] == (csv["anomaly_index"][scored] >= 0.9)).all()
+    for name, column in [("index", "anomaly_index"), ("distance", "distance"),
+                         ("alarm", "alarm")]:
+        stored = store(f"snet_novelty_{name}").to_series()
+        stored.index = stored.index.round("1min")
+        np.testing.assert_allclose(stored.reindex(csv.index).values, csv[column].values)
+    threshold = store("snet_novelty_threshold").to_series()
+    assert (threshold.dropna() == 0.9).all() and threshold.notna().sum() == len(csv)

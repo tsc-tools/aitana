@@ -25,6 +25,7 @@ dependencies = [
     "scatseisnet",
     "tqdm",
     "stumpy",
+    "umap-learn",
 ]
 
 [project.optional-dependencies]

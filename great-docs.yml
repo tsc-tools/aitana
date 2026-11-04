@@ -117,6 +117,9 @@ reference:
       - anomaly.pca.ModelException
       - anomaly.matrix_profile.MatrixProfile
       - anomaly.snet.SNet
+      - anomaly.snet.fit_embedding
+      - anomaly.snet.embed
+      - anomaly.snet.SNetNovelty
       - anomaly.autoencoder.AutoEncoder
       - anomaly.autoencoder.TiedAutoEncoder
       - anomaly.autoencoder.FuzzyCluster

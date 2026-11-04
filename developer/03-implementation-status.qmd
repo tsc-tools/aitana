@@ -50,7 +50,8 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - Three bundled workflows: `egu2026`, a Bayesian network vs decision tree benchmark for
   Whakaari, `ruapehu_mp`, the Ruapehu RSAM matrix-profile alert (see
   [Running workflows](../user-guide/running-workflows.qmd#the-ruapehu-rsam-alert-end-to-end)), and `ruapehu_snet`, which stores
-  scattering-network coefficients of Ruapehu's three-component data.
+  scattering-network coefficients of Ruapehu's three-component data, their UMAP embedding and
+  a novelty index with alarm series.
 
 ## `aitana-anomaly`
 - `AnomalyDetectionBaseClass` — the shared contract every detector implements, including
@@ -64,7 +65,13 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `SNet` — scattering-network feature extraction (via `scatseisnet`): `preprocess()` puts
   three components on a common 25 Hz grid with an anti-alias filter, `compute()` gives first-
   and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a
-  component is missing. The `ruapehu_snet` workflow runs it.
+  component is missing. `fit_embedding()` fits a FastICA + UMAP embedding of the coefficients
+  on a reference period and `embed()` maps windows into it. The `ruapehu_snet` workflow runs
+  them and `SNetNovelty`.
+- `SNetNovelty` — novelty index of scattering coefficients: distance in FastICA components to
+  the nearest window of a fixed quiet reference period, mapped to `[0, 1]` with
+  `normalize_score()`. A fixed reference keeps new states novel, including station changes such
+  as FWVZ's 2025-02-03 sensor swap.
 - `MatrixProfile` — z-normalized left matrix profile (`stumpy`) of a single series, scored
   against its own trailing history and mapped to `[0, 1]` with `normalize_score()`. Sensitive
   to changes in *shape*, deliberately blind to amplitude.
@@ -74,6 +81,6 @@ stacking utilities and Matplotlib/Plotly visualisation.
   `score_detector()` (ROC/AUC against the injected ground-truth mask). Documented with
   worked examples in [Evaluating anomaly detectors](../user-guide/evaluating-detectors.qmd).
 
-**Not yet working in `aitana-anomaly`:** `MatrixProfile` is the only detector that implements
-`compute_anomaly_index()`. `pca.py` needs a rewrite (its test suite is entirely skipped), and
-`SNet` has no downstream scoring layer.
+**Not yet working in `aitana-anomaly`:** `MatrixProfile` and `SNetNovelty` are the only
+detectors that implement `compute_anomaly_index()`. `pca.py` needs a rewrite (its test suite is
+entirely skipped).
