@@ -80,10 +80,11 @@ def _record_info(feature_path, mtime_ns, feature, engine):
         if other_dims:
             has_data = has_data.any(dim=other_dims)
         times = _snap_time_axis(has_data['datetime'].values)[has_data.values]
+        dims = {dim: ds[dim].values.tolist() for dim in other_dims}
     if times.size == 0:
-        return 0, None, None
+        return 0, None, None, dims
     return (int(times.size), np.datetime_as_string(times[0], unit='s'),
-            np.datetime_as_string(times[-1], unit='s'))
+            np.datetime_as_string(times[-1], unit='s'), dims)
 
 
 class Path(object):
@@ -214,14 +215,17 @@ class Path(object):
         :rtype: dict
         """
         filename = self.feature_path(feature)
-        count, earliest, latest = _record_info(
+        count, earliest, latest, dims = _record_info(
             filename, os.stat(filename).st_mtime_ns, feature, self.engine)
-        return {
+        info = {
             'name': feature,
             'recordCount': count,
             'earliestRecord': earliest,
             'latestRecord': latest,
         }
+        if dims:
+            info['dims'] = dims
+        return info
 
     def to_pytorch(self, features, window_size=1, stride=1, transform=None,
                    lazy=False):
@@ -366,7 +370,7 @@ class Storage(Path):
 
     def _build_feature_dict_with_url(self, feature_path, feature_name, base_url=None):
         """Build a feature info dict with metadata and an optional pre-built request URL."""
-        count, earliest, latest = _record_info(
+        count, earliest, latest, dims = _record_info(
             feature_path, os.stat(feature_path).st_mtime_ns, feature_name, self.engine)
         info = {
             'name': feature_name,
@@ -374,6 +378,8 @@ class Storage(Path):
             'earliestRecord': earliest,
             'latestRecord': latest,
         }
+        if dims:
+            info['dims'] = dims
         if base_url is not None:
             feature_dir = os.path.dirname(feature_path)
             rel = os.path.relpath(feature_dir, self.path)

@@ -30,6 +30,50 @@ def parse_path(path: str):
     return parts[0], parts[1:]
 
 
+def select_slice(feat, sel):
+    """
+    Reduce a feature to time and at most one other dimension.
+
+    Parameters
+    ----------
+    feat : xr.DataArray
+        Feature with a ``datetime`` dimension.
+    sel : list of str
+        ``dimension:value`` items; each picks the nearest coordinate.
+
+    Returns
+    -------
+    xr.DataArray
+        ``feat`` with the selected dimensions dropped.
+
+    Raises
+    ------
+    HTTPException
+        422 for an unknown dimension, a value outside the coordinates, or
+        when more than one dimension besides time remains.
+    """
+    for item in sel:
+        dim, _, value = item.partition(':')
+        if dim not in feat.dims or dim == 'datetime':
+            raise HTTPException(status_code=422, detail=(
+                f"Cannot select {dim!r}, dimensions are {list(feat.dims)}."))
+        coord = feat[dim].values
+        try:
+            value = float(value)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Bad value in {item!r}.")
+        if not coord.min() <= value <= coord.max():
+            raise HTTPException(status_code=422, detail=(
+                f"{dim} has to be within {coord.min()} and {coord.max()}."))
+        feat = feat.sel({dim: value}, method='nearest')
+    free = [d for d in feat.dims if d != 'datetime']
+    if len(free) > 1:
+        raise HTTPException(status_code=422, detail=(
+            f"Feature has dimensions {free}: pick all but one with "
+            f"sel=<dimension>:<value>, e.g. sel={free[0]}:{feat[free[0]].values[0]}."))
+    return feat
+
+
 class StorageAPI:
 
     def __init__(self, rootdir, backend='netcdf') -> None:
@@ -72,7 +116,8 @@ class StorageAPI:
                       resolution: str = 'full',
                       verticalres: int = 10,
                       log: bool = False,
-                      normalise: bool = False):
+                      normalise: bool = False,
+                      sel: Annotated[List[str], Query()] = []):
         group, subdir = parse_path(path)
         _st = self.preprocess_datetime(starttime)
         _et = self.preprocess_datetime(endtime)
@@ -91,22 +136,19 @@ class StorageAPI:
             msg = f"Feature {name} not found in directory {c.path}:"
             msg += f"{e}"
             raise HTTPException(status_code=404, detail=msg)
+        feat = select_slice(feat, sel)
         if len(feat.shape) > 1:
-            # assume first dimension is frequency
+            # the backends order dimensions differently
+            feat = feat.transpose(..., 'datetime')
             nfreqs = feat.shape[0]
-            dates = feat.coords[feat.dims[1]].values
+            dates = feat.coords['datetime'].values
             if resolution != 'full':
                 freq, dates, spec = self.aggregate_feature(
                     resolution, verticalres, feat, nfreqs, dates)
             else:
                 spec = feat.values
                 freq = feat.coords[feat.dims[0]].values
-            vals = spec.ravel(order='C')
-            if log and feat.name != 'sonogram':
-                vals = 10*np.log10(vals)
-            if normalise:
-                vals = (vals - np.nanmin(vals)) / \
-                    (np.nanmax(vals) - np.nanmin(vals))
+            vals = self.scale(spec.ravel(order='C'), feat.name, log, normalise)
             freqs = freq.repeat(dates.size)
             dates = np.tile(dates, freq.size)
             df = pd.DataFrame(
@@ -116,8 +158,9 @@ class StorageAPI:
             output = df.to_csv(index=False,
                                columns=['dates', 'freqs', 'feature'])
         else:
-            # NOTE: `log` and `normalise` are currently ignored for 1D
-            # features; they are only applied in the 2D branch above.
+            # NOTE: `log` and `normalise` are ignored for features stored as
+            # 1D, which clients rely on; they only apply to slices of larger
+            # ones, the only 1D data that gets here with `sel`.
             df = pd.DataFrame(data=feat.to_pandas(), columns=[feat.name])
             df['dates'] = df.index
             if resolution != 'full':
@@ -130,6 +173,9 @@ class StorageAPI:
                     logger.warning(
                         f"Cannot resample {feat.name} to {resolution}: e")
             df.rename(columns={feat.name: 'feature'}, inplace=True)
+            if sel:
+                df['feature'] = self.scale(df['feature'].values, feat.name,
+                                           log, normalise)
             df['dates'] = df['dates'].dt.strftime('%Y-%m-%dT%H:%M:%SZ')
             output = df.to_csv(index=False, columns=['dates', 'feature'])
         return StreamingResponse(iter([output]),
@@ -137,6 +183,36 @@ class StorageAPI:
                                  headers={"Content-Disposition":
                                           "attachment;filename=<aitana_feature>.csv",
                                           'Content-Length': str(len(output))})
+
+    @staticmethod
+    def scale(vals, name, log, normalise):
+        """
+        Apply the `log` and `normalise` options of a request.
+
+        Parameters
+        ----------
+        vals : np.ndarray
+            Feature values.
+        name : str
+            Feature name; sonograms are already logarithmic.
+        log : bool
+            Convert to decibels.
+        normalise : bool
+            Scale to between 0 and 1.
+
+        Returns
+        -------
+        np.ndarray
+            The scaled values.
+        """
+        # TODO: store that a feature is logarithmic instead of naming it here,
+        # see developer/04-roadmap.qmd
+        if log and name != 'sonogram':
+            vals = 10*np.log10(vals)
+        if normalise:
+            vals = (vals - np.nanmin(vals)) / \
+                (np.nanmax(vals) - np.nanmin(vals))
+        return vals
 
     def aggregate_feature(self, resolution, verticalres, feat, nfreqs, dates):
         resolution = np.timedelta64(
@@ -147,12 +223,22 @@ class StorageAPI:
         dates = date2num(dates.astype('datetime64[us]').astype(datetime),
                          units='hours since 1970-01-01 00:00:00.0',
                          calendar='gregorian')
+        freq_dim = feat.dims[0]
         feat = feat.assign_coords({'datetime': dates})
+        # raster labels the rows it merges as if they were evenly spaced, so
+        # merge uneven ones by row number and look their coordinates up after
+        coords = feat.coords[freq_dim].values
+        steps = np.diff(coords)
+        relabel = canvas_y < nfreqs and not np.allclose(steps, steps[:1])
+        if relabel:
+            rows = np.arange(coords.size)
+            feat = feat.assign_coords({freq_dim: rows})
         cvs = dsh.Canvas(plot_width=canvas_x,
                          plot_height=canvas_y)
         agg = cvs.raster(source=feat)
-        freq_dim = feat.dims[0]
         freq, d, spec = agg.coords[freq_dim].values, agg.coords['datetime'].values, agg.data
+        if relabel:
+            freq = np.interp(freq, rows, coords)
         dates = num2pydate(
             d, units='hours since 1970-01-01 00:00:00.0', calendar='gregorian')
         return freq, dates, spec
