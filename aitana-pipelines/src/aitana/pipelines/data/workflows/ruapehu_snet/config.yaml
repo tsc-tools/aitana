@@ -1,20 +1,23 @@
 # End of the computed period (UTC): "now" or an ISO timestamp, e.g. 2022-03-20T00:00
 end: now
-# First day of the archive, e.g. 2022-01-01: while results/archive_<start>/ is
+# First day of the archive, e.g. 2022-01-01: while results/archive_<start>_ch<channels>/ is
 # incomplete, a run covers every day since then instead of the last lookback_hours
 # (delete the directory to rebuild it). null builds no archive.
 start: null
-# Hours computed per run
-lookback_hours: 24
+# Hours computed per run: longer than the time between runs, so that the next
+# run covers the days of a run that failed
+lookback_hours: 72
 # Three components, e.g. HH? for HHZ, HHN, HHE
 seed_id: NZ.FWVZ.10.HH?
 # aitana-storage root for the coefficients, relative to the output directory
 storage_dir: storage
-# Reference period (end exclusive) the embedding of the coefficients is fitted
-# on, once; every run's windows are embedded into that fit. Quoted, as Snakemake
-# can't serialise YAML dates.
+# Channels of the coefficients that the embedding and the novelty index use: 0 is
+# Z, 1 N, 2 E. Z alone for now: FWVZ's sensor swap on 2025-02-03 changed the
+# horizontals in a way that isn't explained yet. Changing this rebuilds the archive.
+channels: [0]
+# First day of the embedding, fitted anew on every complete day since then
+# whenever there is a new one. Quoted, as Snakemake can't serialise YAML dates.
 fit_start: "2021-01-01"
-fit_end: "2023-01-01"
 # Reference period (end exclusive) of the novelty index, fitted once: a quiet
 # period, so that unrest like 2022's stays novel
 novelty_start: "2021-01-01"

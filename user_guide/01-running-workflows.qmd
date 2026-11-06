@@ -102,49 +102,62 @@ anti-alias filter and computes first- and second-order scattering coefficients w
 (20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC
 day under `snet/` and stores `snet_order1` (datetime, channel, frequency) and `snet_order2`
 (datetime, channel, frequency, order2 frequency) under `ruapehu/FWVZ/10/HH` in
-`<outdir>/storage`; channel 0 is Z. A run covers the last 24 h. With `start` set, the first run
-builds the archive instead: it covers every day since `start` and writes to
-`results/archive_<start>/`.
-Later runs find that directory and cover only the last 24 h; delete it to rebuild, e.g. after an
-outage of more than 24 h, whose days no later run covers. A day takes about 2.5 CPU-minutes and
+`<outdir>/storage`; channel 0 is Z. It is deployed to run once a day, just after midnight UTC,
+and a run covers the last 72 h, so that the next run covers the days of a run that failed. With
+`start` set, the first run builds the archive instead: it covers every day since `start` and
+writes to `results/archive_<start>_ch<channels>/`.
+Later runs find that directory and cover only the last 72 h; delete it to rebuild, e.g. after an
+outage of more than 72 h, whose days no later run covers. A day takes about 2.5 CPU-minutes and
 ~27 MB of waveforms.
 
 The workflow also embeds each window in two dimensions, following Steinmann et al. (2023): the
-first- and second-order coefficients of all channels are reduced to 10 independent components
-(FastICA), which UMAP embeds. The embedding is fitted once on the days from `fit_start` to
-`fit_end` (2021–2022 by default; the first run computes those days too) and cached in `model/`
-(~60 MB). Each run stores its windows' coordinates as `snet_umap` (component, datetime) next to
-the coefficients and writes them to `results/<end>/embedding.csv`; windows with missing
-coefficients are NaN. Coordinates are labelled at each window's centre, 10 min after the
-coefficients' label, like the novelty scores below.
+first- and second-order coefficients of `channels` (Z alone by default, see below) are reduced
+to 10 independent components (FastICA), which UMAP embeds. The embedding is fitted on every
+complete day since `fit_start` (2021 by default; the first run computes those days too), anew
+whenever there is a new day, which takes about 7 minutes and 4 GB for six years of windows. Each
+fit replaces the last one, in `snet_umap` (component, datetime) next to the coefficients and in
+`results/embedding.csv`; nothing of earlier fits is kept. Windows with missing coefficients are
+NaN. Coordinates are labelled at each window's centre, 10 min after the coefficients' label, like
+the novelty scores below. A refit keeps the overall layout but reshuffles each window's
+neighbours, so read the map's large-scale shape, not a window's exact position.
 
-`SNetNovelty` scores each window against a quiet reference, `novelty_start` to `novelty_end`
-(2021 by default): the raw score is the distance, in FastICA components fitted on the
+`SNetNovelty` scores each window's coefficients of `channels` against a quiet reference,
+`novelty_start` to `novelty_end` (2021 by default): the raw score is the distance, in FastICA
+components fitted on the
 reference, to the nearest reference window more than 10 min away, and the index is its
 percentile rank among the reference windows' own scores. Each run stores `snet_novelty_index`,
 the raw `snet_novelty_distance`, `snet_novelty_alarm` (1 where the index reaches `threshold`,
 0.99 by default) and `snet_novelty_threshold`, and writes them to `results/<end>/novelty.csv`.
 Each score is labelled at the centre of its 20-min window, 10 min after the window's label,
 which places a sustained change close to its onset. A score can only be computed once its
-window has ended, so it is available 10 min after its timestamp at the earliest.
+window has ended, and deployed runs are daily, so it can be up to a day old. No alert uses these
+series; a workflow run more often would give fresher scores without refitting the embedding, which
+waits for a new day.
 
-Replaying Jan–Jun 2022 at FWVZ: the first alarm after the 2022-03-13 onset is at 09:30 UTC.
-The alarm fires on 81 of the 99 days from 03-13 to 06-19 (41 % of windows) and on 11 of the
-60 days of Jan–Feb (4 % of windows); across 2021–2024 it fires on 4–8 days a month. The
-2021–2022 map places the unrest phases of Bramwell et al. (2025) on an island of their own
-(8-phase 15-nearest-neighbour balanced accuracy 0.55). A map fitted on 2021 alone squeezed
-them into the 2021 cloud (0.26): UMAP links new windows only to their nearest reference
-windows, so states unlike the reference never form islands of their own. The map shows which
-reference states a window resembles; the novelty index shows how unlike the reference it is.
+Replaying the archive at FWVZ with Z alone: the first alarm after the 2022-03-13 onset is at
+09:30 UTC. The alarm fires on 74 of the 99 days from 03-13 to 06-19 (31 % of windows) and on 10 of
+the 59 days of Jan–Feb (4 % of windows); in a typical month of 2021–2024 it fires on 4–6 days.
+The map separates the 2022 unrest from Jan–Feb (15-nearest-neighbour balanced accuracy 0.83,
+against 0.60 for the same dates in 2021). It is fitted on all windows because states have to be
+part of the fit to stand apart: a map fitted on 2021 alone squeezed the unrest phases of Bramwell
+et al. (2025) into the 2021 cloud (8-phase accuracy 0.26, against 0.55 for a 3-component map
+fitted on 2021–2022), as UMAP links new windows only to their nearest reference windows. The
+quiet years form one cloud either way: 2023 and 2024 cover as much of the map as 2021. The map
+shows which windows resemble each other; the novelty index shows how unlike the reference a
+window is.
 
-**FWVZ's sensor and datalogger swap on 2025-02-03 breaks the 3-component features.** The
-metadata give all channels the same sensitivity, yet from the swap onward the HHE coefficients
-are 1.8–2.8 times larger at every frequency and HHN up to 2.2 times; HHZ stays within its
-seasonal range. Against the 2021 reference, the alarm fires on about 24 days a month from the
-swap onward (about 3 in January 2025), and windows from 2026-11-01 land on the map next to the
-2022 unrest. Treat FWVZ alarms after 2025-02-03 as unvalidated until the horizontal channels are
-explained. Scoring HHZ alone, the alarm fires on about 9 days a month after the swap, against 4–6
-before it.
+**FWVZ's sensor and datalogger swap on 2025-02-03 breaks the 3-component features,** so the
+embedding and the novelty index use Z alone (`channels: [0]`) until that is explained; changing
+`channels` rebuilds the archive. The metadata give all channels the same sensitivity, yet from
+the swap onward the HHE coefficients are 1.8–2.8 times larger at every frequency and HHN up to
+2.2 times; HHZ stays within its seasonal range. Against the 2021 reference, the 3-component alarm
+fires on about 26 days a month from the swap onward (3 in January 2025), and a 3-component map of
+all windows splits on the swap: every later window sits on an island of its own, so 2025 can't be
+compared with earlier years (balanced accuracy 1.00 between 2024 and 2025; 0.57 with Z alone).
+With Z alone the alarm fires on about 10 days a month after the swap, against 4–6 before it, and
+16–22 % of later windows fall where the 2022 unrest lies on the map, against 0.5–3.9 % in
+2021–2024. Whether that is the volcano isn't known, so treat FWVZ alarms after 2025-02-03 as
+unvalidated.
 
 `scripts/fwvz_horizontal_check.py` reproduces the change from GeoNet's FDSN service alone (ObsPy,
 full response removed, 14 night-time hours on either side). Relative to HHZ, FWVZ's horizontals

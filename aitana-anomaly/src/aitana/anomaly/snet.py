@@ -158,52 +158,31 @@ def _features(snet):
     return np.hstack([order1.reshape(n, -1), order2.reshape(n, -1)])
 
 
-def fit_embedding(snet, n_sources=10, random_state=42):
+def embed(snet, n_sources=10, random_state=42):
     """
-    Fit a two-dimensional embedding of scattering coefficients.
+    Embed windows of scattering coefficients in two dimensions.
 
     Following Steinmann et al. (2023, doi:10.1029/2023JB027167), the first- and
     second-order coefficients of each window are reduced to ``n_sources``
     independent components with FastICA, which UMAP then embeds in two
-    dimensions. Windows with missing coefficients are left out. Windows
-    embedded later with ``embed`` land on the manifold of this fit, so
-    behaviour unlike anything in ``snet`` is mapped onto its nearest
-    neighbours rather than apart from them.
+    dimensions. Both are fitted on ``snet`` itself, so a state unlike the rest
+    can form an island of its own, which it can't when windows are projected
+    onto an earlier fit. Windows with missing coefficients are left out.
+
+    The coordinates belong to this fit: embedding again with more windows keeps
+    the overall layout, but not each window's neighbours on the map. Anything
+    that sets windows apart shapes the map, so a change of instrument can
+    split it as readily as a change of the volcano.
 
     Parameters
     ----------
     snet : xr.Dataset
-        ``order1`` and ``order2`` coefficients of the reference windows, as
-        ``SNet.compute`` returns them.
+        ``order1`` and ``order2`` coefficients, as ``SNet.compute`` returns them.
     n_sources : int
         Number of independent components.
     random_state : int
-        Seed of FastICA and UMAP. A seeded UMAP fit runs single-threaded,
-        about 100 s for a year of windows.
-
-    Returns
-    -------
-    sklearn.pipeline.Pipeline
-        The fitted FastICA and UMAP steps, for ``embed``.
-    """
-    X = _features(snet)
-    model = Pipeline([
-        ("ica", FastICA(n_components=n_sources, random_state=random_state)),
-        ("umap", umap.UMAP(random_state=random_state, n_jobs=1)),
-    ])
-    return model.fit(X[np.isfinite(X).all(axis=1)])
-
-
-def embed(model, snet):
-    """
-    Embed windows of scattering coefficients with a fitted embedding.
-
-    Parameters
-    ----------
-    model : sklearn.pipeline.Pipeline
-        Embedding from ``fit_embedding``.
-    snet : xr.Dataset
-        ``order1`` and ``order2`` coefficients, as ``SNet.compute`` returns them.
+        Seed of FastICA and UMAP. A seeded UMAP fit runs single-threaded, about
+        7 min for six years of windows.
 
     Returns
     -------
@@ -214,9 +193,12 @@ def embed(model, snet):
     """
     X = _features(snet)
     finite = np.isfinite(X).all(axis=1)
+    model = Pipeline([
+        ("ica", FastICA(n_components=n_sources, random_state=random_state)),
+        ("umap", umap.UMAP(random_state=random_state, n_jobs=1)),
+    ])
     embedding = np.full((len(X), 2), np.nan)
-    if finite.any():
-        embedding[finite] = model.transform(X[finite])
+    embedding[finite] = model.fit_transform(X[finite])
     return xr.DataArray(
         embedding,
         dims=["datetime", "component"],
@@ -233,7 +215,7 @@ class SNetNovelty(AnomalyDetectionBaseClass):
 
     The coefficients of each window are reduced to ``n_sources`` independent
     components with FastICA fitted on the reference windows, as in
-    ``fit_embedding``. The raw score of a window is its Euclidean distance in
+    ``embed``. The raw score of a window is its Euclidean distance in
     that space to the nearest reference window more than ``exclusion`` away in
     time. FastICA only rotates the whitened principal components, so these are
     the distances between whitened principal components. The exclusion leaves out a reference window's overlapping neighbours,
@@ -245,7 +227,8 @@ class SNetNovelty(AnomalyDetectionBaseClass):
     unlike a trailing history that adapts. That includes changes of the station
     rather than the volcano: after FWVZ's sensor and datalogger swap on
     2025-02-03 the horizontal coefficients roughly doubled, and a 2021
-    reference scores much of the later data as novel. A state seen in only one
+    reference scores much of the later data as novel, which is why
+    ``ruapehu_snet`` scores Z alone for now. A state seen in only one
     reference window already counts as familiar. Each window is scored on its
     own, so short transients such as regional earthquakes or storms can reach
     high scores too.

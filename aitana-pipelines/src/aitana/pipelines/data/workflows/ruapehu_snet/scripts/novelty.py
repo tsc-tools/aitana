@@ -12,7 +12,7 @@ from aitana.storage import Storage
 cfg = snakemake.config
 
 frames = [xr.load_dataset(f) for f in snakemake.input.snet]
-frames = [f for f in frames if "order1" in f]
+frames = [f.sel(channel=cfg["channels"]) for f in frames if "order1" in f]
 if not frames:
     raise ValueError("No three-component data in any day of this run.")
 snet = xr.concat(frames, dim="datetime")

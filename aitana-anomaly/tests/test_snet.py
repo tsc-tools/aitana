@@ -10,7 +10,7 @@ import pandas as pd
 import xarray as xr
 from obspy import Stream, Trace, UTCDateTime
 
-from aitana.anomaly.snet import SNet, SNetNovelty, embed, fit_embedding
+from aitana.anomaly.snet import SNet, SNetNovelty, embed
 
 START = UTCDateTime(2022, 3, 13)
 
@@ -132,33 +132,27 @@ def coefficients(regimes, rng=0):
 
 def test_embedding():
     """
-    New windows embed next to reference windows of their regime, labelled 10 min
-    after each window's label, gaps as NaN.
+    A rare regime forms a group of its own, as it is part of the fit; windows are
+    labelled 10 min after each window's label, gaps are NaN.
     """
-    reference = np.repeat([0, 1], 200)
-    ref = coefficients(reference)
+    regimes = np.repeat([0, 1], [360, 40])
+    snet = coefficients(regimes)
     # a gap, which the fit must leave out
-    ref["order1"][0] = np.nan
-    ref["order2"][0] = np.nan
-    model = fit_embedding(ref)
-
-    regimes = np.tile([0, 1], 50)
-    new = coefficients(regimes, rng=1)
-    new["order1"][3] = np.nan
-    new["order2"][3] = np.nan
-    embedding = embed(model, new)
+    snet["order1"][3] = np.nan
+    snet["order2"][3] = np.nan
+    embedding = embed(snet)
     assert embedding.dims == ("datetime", "component")
     np.testing.assert_array_equal(
-        embedding.datetime.values, new.indexes["datetime"] + pd.Timedelta("10min")
+        embedding.datetime.values, snet.indexes["datetime"] + pd.Timedelta("10min")
     )
     assert embedding[3].isnull().all()
 
     points = np.delete(embedding.values, 3, axis=0)
     assert np.isfinite(points).all()
-    fitted = model.named_steps["umap"].embedding_
-    distance = np.linalg.norm(points[:, None] - fitted[None], axis=-1)
-    nearest = reference[1:][distance.argmin(axis=1)]
-    assert (nearest == np.delete(regimes, 3)).mean() >= 0.95
+    regimes = np.delete(regimes, 3)
+    distance = np.linalg.norm(points[:, None] - points[None], axis=-1)
+    np.fill_diagonal(distance, np.inf)
+    assert (regimes[distance.argmin(axis=1)] == regimes)[regimes == 1].mean() >= 0.95
 
 
 def test_novelty_contract():

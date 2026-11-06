@@ -1,9 +1,8 @@
 """
-Embed the windows of this run's days with the fitted embedding and store the
-coordinates in aitana-storage.
+Embed the windows of every complete day and store the coordinates in
+aitana-storage, replacing those of the last fit.
 """
 
-import joblib
 import pandas as pd
 import xarray as xr
 from aitana.anomaly.snet import embed
@@ -11,16 +10,16 @@ from aitana.storage import Storage
 
 cfg = snakemake.config
 
-frames = [xr.load_dataset(f) for f in snakemake.input.snet]
-frames = [f for f in frames if "order1" in f]
+frames = [xr.load_dataset(f) for f in snakemake.input]
+frames = [f.sel(channel=cfg["channels"]) for f in frames if "order1" in f]
 if not frames:
-    raise ValueError("No three-component data in any day of this run.")
+    raise ValueError("No three-component data in any day.")
 snet = xr.concat(frames, dim="datetime")
 # as in store.py: days without data become NaN rather than a hole in the time axis
 snet = snet.reindex(
     datetime=pd.date_range(snet.datetime.values[0], snet.datetime.values[-1], freq="10min")
 )
-embedding = embed(joblib.load(snakemake.input.model), snet)
+embedding = embed(snet)
 
 net, sta, loc, cha = cfg["seed_id"].split(".")
 store = Storage("ruapehu", cfg["storage_dir"]).get_substore(sta, loc, cha.replace("?", ""))

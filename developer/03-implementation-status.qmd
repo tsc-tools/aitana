@@ -65,9 +65,10 @@ stacking utilities and Matplotlib/Plotly visualisation.
 - `SNet` — scattering-network feature extraction (via `scatseisnet`): `preprocess()` puts
   three components on a common 25 Hz grid with an anti-alias filter, `compute()` gives first-
   and second-order coefficients of 20-min windows every 10 min, NaN where more than 10 % of a
-  component is missing. `fit_embedding()` fits a FastICA + UMAP embedding of the coefficients
-  on a reference period and `embed()` maps windows into it. The `ruapehu_snet` workflow runs
-  them and `SNetNovelty`.
+  component is missing. `embed()` fits a FastICA + UMAP embedding of the coefficients it is
+  given and returns their coordinates. The `ruapehu_snet` workflow runs it on every complete
+  day, once a day, and `SNetNovelty`, both on Z alone until FWVZ's 2025 sensor swap is
+  explained.
 - `SNetNovelty` — novelty index of scattering coefficients: distance in FastICA components to
   the nearest window of a fixed quiet reference period, mapped to `[0, 1]` with
   `normalize_score()`. A fixed reference keeps new states novel, including station changes such

@@ -9,15 +9,15 @@ are reused across runs, and stores them in aitana-storage. A run covers the last
 
 With ``start`` set, e.g. ``--config start=2022-01-01``, the first run builds the
 archive instead: it covers every day since ``start`` and writes to
-``results/archive_<start>/``. Later runs find that directory and cover only the
-last ``lookback_hours``; delete it to rebuild, e.g. after an outage longer than
-``lookback_hours``, whose days no later run covers.
+``results/archive_<start>_ch<channels>/``. Later runs find that directory and
+cover only the last ``lookback_hours``; delete it to rebuild, e.g. after an outage
+longer than ``lookback_hours``, whose days no later run covers.
 
-It also stores a two-dimensional embedding of each window's coefficients
-(FastICA, then UMAP), fitted once on the days from ``fit_start`` to ``fit_end``,
-and a novelty index with its alarm series, scored against the days from
-``novelty_start`` to ``novelty_end``. The first run therefore computes the
-reference days too.
+It also stores a novelty index with its alarm series, scored against the days
+from ``novelty_start`` to ``novelty_end``, and a two-dimensional embedding
+(FastICA, then UMAP) of every complete day since ``fit_start``, fitted anew
+whenever there is a new day and replacing the last one. Both use the coefficients
+of ``channels`` only. The first run therefore computes all of those days too.
 
 Rules run in the active Python environment, which must provide aitana-access,
 aitana-features, aitana-storage and aitana-anomaly (``uv sync`` in the aitana
@@ -50,12 +50,17 @@ def naive(ts):
 END = utc("now" if str(config["end"]) == "now" else str(config["end"])).floor(STEP)
 START = END - pd.Timedelta(hours=config["lookback_hours"])
 TAG = END.strftime("%Y%m%dT%H%M")
+# --config passes a list's items as strings
+config["channels"] = [int(c) for c in config["channels"]]
+CHANNELS = "".join(str(c) for c in config["channels"])
 RESULTS = f"results/{TAG}"
-OUTPUTS = ["stored", "embedding.csv", "novelty.csv"]
-# Each rule writes its output last, so all three files mean the archive is stored.
+OUTPUTS = ["stored", "novelty.csv"]
+# Each rule writes its output last, so both files mean the archive is stored.
 if config["start"]:
     ARCHIVE_START = utc(str(config["start"]))
-    ARCHIVE = f"results/archive_{ARCHIVE_START:%Y%m%d}"
+    # named by its channels too: other channels must rebuild the stored scores,
+    # or a series would hold scores of both
+    ARCHIVE = f"results/archive_{ARCHIVE_START:%Y%m%d}_ch{CHANNELS}"
     if not all(os.path.exists(f"{ARCHIVE}/{name}") for name in OUTPUTS):
         START = ARCHIVE_START
         RESULTS = ARCHIVE
@@ -68,14 +73,13 @@ DAYS = pd.date_range(
     START.floor("D"), PARTIAL_START - pd.Timedelta(days=1), freq="D"
 ).strftime("%Y-%m-%d")
 PARTIAL = [f"snet/partial_{TAG}.nc"] if END - PARTIAL_START >= WINDOW else []
-FIT_DAYS = pd.date_range(
-    str(config["fit_start"]), str(config["fit_end"]), freq="D", inclusive="left"
+EMBEDDING_DAYS = pd.date_range(
+    utc(str(config["fit_start"])), PARTIAL_START - pd.Timedelta(days=1), freq="D"
 ).strftime("%Y-%m-%d")
-MODEL = f"model/embedding_{FIT_DAYS[0]}_{FIT_DAYS[-1]}.joblib"
 NOVELTY_DAYS = pd.date_range(
     str(config["novelty_start"]), str(config["novelty_end"]), freq="D", inclusive="left"
 ).strftime("%Y-%m-%d")
-NOVELTY_MODEL = f"model/novelty_{NOVELTY_DAYS[0]}_{NOVELTY_DAYS[-1]}.joblib"
+NOVELTY_MODEL = f"model/novelty_{NOVELTY_DAYS[0]}_{NOVELTY_DAYS[-1]}_ch{CHANNELS}.joblib"
 
 
 wildcard_constraints:
@@ -85,6 +89,7 @@ wildcard_constraints:
 rule all:
     input:
         expand("{results}/{name}", results=RESULTS, name=OUTPUTS),
+        "results/embedding.csv",
 
 
 # Coefficients of the windows starting on one complete UTC day, cached in
@@ -121,28 +126,20 @@ rule store:
         "scripts/store.py"
 
 
-# The embedding and the novelty detector are fitted once on their reference days
-# and cached in model/, named by the reference period: later runs reuse them, a
-# new reference period refits.
-rule fit_embedding:
-    input:
-        expand("snet/{day}.nc", day=FIT_DAYS),
-    output:
-        MODEL,
-    script:
-        "scripts/fit_embedding.py"
-
-
+# Every complete day, fitted anew once a day file is newer than the output, which
+# it then replaces, in storage too: nothing of an earlier fit is kept.
 rule embed:
     input:
-        snet=expand("snet/{day}.nc", day=DAYS) + PARTIAL,
-        model=MODEL,
+        expand("snet/{day}.nc", day=EMBEDDING_DAYS),
     output:
-        f"{RESULTS}/embedding.csv",
+        "results/embedding.csv",
     script:
         "scripts/embed.py"
 
 
+# The novelty detector is fitted once on its reference days and cached in model/,
+# named by the reference period and channels: later runs reuse it, a new reference
+# period or other channels refit.
 rule fit_novelty:
     input:
         expand("snet/{day}.nc", day=NOVELTY_DAYS),
