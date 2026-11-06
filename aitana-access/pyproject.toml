@@ -26,6 +26,9 @@ dependencies = [
     "aitana-testing>=0.1.0",
 ]
 
+[project.scripts]
+aitana-access-api = "aitana.access.api:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/aitana"]
 

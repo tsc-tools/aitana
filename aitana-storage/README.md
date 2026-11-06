@@ -59,10 +59,10 @@ dataloader = DataLoader(dataset, batch_sampler=sampler)
 ### FastAPI service
 
 `aitana.storage.api.StorageAPI` exposes `/feature` and `/inventory` endpoints over
-HTTP. `aitana-api` runs it.
+HTTP. `aitana-storage-api` runs it.
 
 ```bash
-aitana-api --rootdir /data --port 8003
+aitana-storage-api --rootdir /data --port 8003
 ```
 
 ### Labelling in Grafana

@@ -76,7 +76,7 @@ deploy-ruapehu-api:
     cat > /tmp/docker_config.json <<EOF
     {
       "Image": "${IMAGE}",
-      "Cmd": ["aitana-api", "--rootdir", "/home/bayes/data/ruapehu_mp/storage"],
+      "Cmd": ["aitana-storage-api", "--rootdir", "/home/bayes/data/ruapehu_mp/storage"],
       "HostConfig": {
         "Binds": ["${DATA_VOLUME}:/home/bayes/data:ro"],
         "PortBindings": { "8003/tcp": [{ "HostPort": "${API_PORT}" }] },
@@ -127,7 +127,7 @@ deploy-snet-api:
     cat > /tmp/docker_config.json <<EOF
     {
       "Image": "${IMAGE}",
-      "Cmd": ["aitana-api", "--rootdir", "/home/bayes/data/ruapehu_snet/storage"],
+      "Cmd": ["aitana-access-api", "--rootdir", "/home/bayes/data/ruapehu_snet/storage"],
       "HostConfig": {
         "Binds": ["/scratch/VUMT/scatseisnet:/home/bayes/data:ro"],
         "PortBindings": { "8003/tcp": [{ "HostPort": "${API_PORT}" }] },

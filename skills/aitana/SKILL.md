@@ -123,7 +123,7 @@ series = store("rsam")                             # DataArray sliced to the roo
   `None`.
 - To save a pandas Series, convert it first:
   `s.rename_axis("datetime").to_xarray().to_dataset(name="my_feature")`.
-- `aitana-api --rootdir /data/aitana --port 8003` serves stored features over HTTP (`/feature`,
+- `aitana-storage-api --rootdir /data/aitana --port 8003` serves stored features over HTTP (`/feature`,
   `/inventory`), e.g. for Grafana's Infinity data source.
 
 ## Tilde and WFS

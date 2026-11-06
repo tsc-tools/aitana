@@ -75,11 +75,11 @@ Other waveform clients: `SDSWaveforms` (local SDS archive), `MockSDSWaveforms`
 
 ### FastAPI service
 
-`aitana.access.api.AitanaAPI` exposes `/waveform` and `/spectrogram` endpoints
+`aitana.access.api.AccessAPI` exposes `/waveform` and `/spectrogram` endpoints
 over HTTP.
 
 ```bash
-python -m aitana.access.api --rootdir /data --port 8003
+aitana-access-api --rootdir /data --port 8003
 ```
 
 ## License

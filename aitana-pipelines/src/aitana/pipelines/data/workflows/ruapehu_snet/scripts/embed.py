@@ -24,6 +24,6 @@ embedding = embed(joblib.load(snakemake.input.model), snet)
 
 net, sta, loc, cha = cfg["seed_id"].split(".")
 store = Storage("ruapehu", cfg["storage_dir"]).get_substore(sta, loc, cha.replace("?", ""))
-# (component, datetime): aitana-api serves a 2-D feature's first dimension as freqs
+# (component, datetime): aitana-storage-api serves a 2-D feature's first dimension as freqs
 store.save(embedding.transpose("component", "datetime").to_dataset(name="snet_umap"))
 embedding.to_pandas().add_prefix("umap").to_csv(snakemake.output[0])

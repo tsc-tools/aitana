@@ -126,4 +126,4 @@ RUN uv sync --frozen --no-dev --all-packages --no-install-workspace
 COPY --chown=bayes:bayes . /home/bayes/aitana
 RUN uv sync --frozen --no-dev --all-packages
 
-CMD ["aitana-api"]
+CMD ["aitana-storage-api"]

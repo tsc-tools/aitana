@@ -70,10 +70,10 @@ def setup_temporary_sds(tmp_path_factory):
 
 @pytest.fixture
 def setup_api(tmp_path_factory, monkeypatch):
-    from aitana.access.api import AitanaAPI
+    from aitana.access.api import AccessAPI
 
-    savedir = tmp_path_factory.mktemp("aitana_api_test_tmp", numbered=True)
-    api = AitanaAPI(rootdir=savedir)
+    savedir = tmp_path_factory.mktemp("access_api_test_tmp", numbered=True)
+    api = AccessAPI(rootdir=savedir)
 
     def mockreturn(net, sta, loc, chan, start, end):
         T_x, N = 1 / 100, 60000  # 20 Hz sampling rate for 50 s signal

@@ -44,7 +44,7 @@ reference:
       - access.seismic.PostProcess
       - access.seismic.PostProcessException
       - access.seismic.get_instrument_response
-      - access.api.AitanaAPI
+      - access.api.AccessAPI
       - access.util.get_defaults_with_names
       - access.util.generate_cache_key
       - access.util.cache_dataframe

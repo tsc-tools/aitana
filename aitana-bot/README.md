@@ -8,7 +8,7 @@ follow-ups can refer to earlier messages. The plan, including eruption confirmat
 [PLAN.md](PLAN.md).
 
 Alarms are not sent by the bot. Workflows such as `ruapehu_mp` store an alarm series in
-`aitana-storage`, `aitana-api` serves it, and Grafana alerting posts to Slack when it is raised
+`aitana-storage`, `aitana-storage-api` serves it, and Grafana alerting posts to Slack when it is raised
 (see the root [README](../README.md)).
 
 ## Using the bot

@@ -11,7 +11,7 @@ title: "Implementation status"
   configurable stride; 2D features become one column per frequency, features must share
   time stamps, and an optional transform preprocesses the data. With `lazy=True` it reads
   from disk per batch; `SliceBatchSampler` makes each batch one contiguous read.
-- `aitana-api` — FastAPI service exposing `/feature` and `/inventory`.
+- `aitana-storage-api` — FastAPI service exposing `/feature` and `/inventory`.
 - `grafana_annotations` — sync the labels drawn on any Grafana dashboard with one label
   file; restores them to a freshly deployed Grafana.
 - Background `IngestWorker` for queued dataset writes.
@@ -25,7 +25,7 @@ title: "Implementation status"
   validation, gap filling and instrument-response removal.
 - `cache_dataframe()` — transparent disk caching with incremental date-range updates.
 - `eqRate()` / `gradient()` — moving-window earthquake rate and trend estimation.
-- `AitanaAPI` — FastAPI service adding `/waveform` and `/spectrogram`.
+- `AccessAPI` — FastAPI service adding `/waveform` and `/spectrogram`.
 
 ## `aitana-features`
 RSAM (with wideband energy ratio), SSAM (filterbank and sonogram), DSAR, spectral features

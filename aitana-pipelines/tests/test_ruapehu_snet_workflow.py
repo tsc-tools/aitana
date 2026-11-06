@@ -160,7 +160,7 @@ def test_store(tmp_path):
             )
 
     stored = store("snet_umap")
-    # the layout aitana-api expects of a 2-D feature
+    # the layout aitana-storage-api expects of a 2-D feature
     assert stored.dims == ("component", "datetime")
     stored = stored.transpose("datetime", "component")
     stored["datetime"] = stored.indexes["datetime"].round("1min")

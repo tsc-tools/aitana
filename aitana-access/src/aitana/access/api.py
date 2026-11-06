@@ -16,10 +16,10 @@ import xarray as xr
 from .seismic import SeismicData as DataSource, S3Waveforms, FDSNWaveforms
 
 
-class AitanaAPI(StorageAPI):
+class AccessAPI(StorageAPI):
     def __init__(self, rootdir: str, backend: str = "netcdf",
                  fdsn_urls: Iterable[str] = ("https://service.geonet.org.nz", "https://service-nrt.geonet.org.nz")):
-        super(AitanaAPI, self).__init__(rootdir, backend)
+        super(AccessAPI, self).__init__(rootdir, backend)
         datasources = []
         datasources.append(S3Waveforms())
         for url in fdsn_urls:
@@ -137,7 +137,7 @@ def main(argv=None):
     parser.add_argument("-p", "--port", default=8003, type=int)
     parser.add_argument("--host", default='0.0.0.0')
     args = parser.parse_args(argv)
-    za = AitanaAPI(args.rootdir, backend=args.backend)
+    za = AccessAPI(args.rootdir, backend=args.backend)
     uvicorn.run(za.app, host=args.host, port=args.port)
 
 

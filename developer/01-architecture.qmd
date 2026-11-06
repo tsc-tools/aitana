@@ -28,7 +28,7 @@ contracts in [pyproject.toml](https://github.com/tsc-tools/aitana/blob/main/pypr
 reproducible pipelines: its Snakemake workflows *run* the lower layers in the active
 environment but `aitana.pipelines` never imports them (it depends on `aitana-volcanoes` and
 `aitana-storage` only). Grafana reads workflow results from `aitana-storage` through
-`aitana-api`. `aitana-bot` is a stub so far and imports no aitana package.)
+`aitana-storage-api`. `aitana-bot` is a stub so far and imports no aitana package.)
 
 `aitana-testing` provides synthetic waveforms for the package tests and is a dependency of `aitana-access`.
 
