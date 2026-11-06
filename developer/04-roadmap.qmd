@@ -46,3 +46,9 @@ Two capabilities, deliberately different architectures, both Ruapehu-first:
   reliability diagrams).
 - Semantic versioning of datasets and evaluation protocols.
 - Integration with community tools (SeisBench, WOVOdat formats).
+- Per-feature metadata in `aitana-storage`, so that the API knows which features are already
+  logarithmic instead of naming `sonogram` in `StorageAPI.scale`; `log=true` on its negative
+  values gives NaN. `aitana-features` has to set it, and `visualise.py` hardcodes the name too.
+  Today both backends drop attributes set on a variable, netcdf shares Dataset attributes
+  between `ssam`, `filterbank` and `sonogram`, zarr drops those too, and appending doesn't
+  update existing files, so the archive needs a backfill before the check can go.

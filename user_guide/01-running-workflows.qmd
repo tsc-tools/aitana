@@ -44,7 +44,7 @@ aitana-pipelines clean whakaari ./results
 |---|---|---|
 | `egu2026` | whakaari | Bayesian network vs decision tree benchmark for Whakaari/White Island (EGU 2026) |
 | `ruapehu_mp` | ruapehu | Matrix-profile anomaly index and alarm series of Ruapehu RSAM, stored for Grafana |
-| `ruapehu_snet` | ruapehu | Scattering-network coefficients of three-component Ruapehu seismic data, stored for detectors |
+| `ruapehu_snet` | ruapehu | Scattering-network coefficients of three-component Ruapehu seismic data, their UMAP embedding and novelty index, stored for Grafana |
 
 ## The Ruapehu RSAM alert, end to end
 
@@ -74,10 +74,10 @@ aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cores 8 --config 
 
 # Keep scoring every 10 min and serve the stored series for Grafana
 aitana-pipelines run ruapehu ~/rsam_mp --workflow ruapehu_mp --cron "2-59/10 * * * *" &
-aitana-api --rootdir ~/rsam_mp/storage --port 8003
+aitana-storage-api --rootdir ~/rsam_mp/storage --port 8003
 ```
 
-Grafana reads the series from `aitana-api` with the Infinity data source (CSV, **Backend**
+Grafana reads the series from `aitana-storage-api` with the Infinity data source (CSV, **Backend**
 parser, which alerting requires), e.g.
 `/feature?path=ruapehu,FWVZ,10,HHZ&name=rsam_mp_alarm&starttime=${__from:date:iso}&endtime=${__to:date:iso}`.
 An alert rule on the maximum of `rsam_mp_alarm` posts to Slack, and a No Data rule on
@@ -102,9 +102,57 @@ anti-alias filter and computes first- and second-order scattering coefficients w
 (20-min windows every 10 min, each labelled by its first sample). It caches one file per UTC
 day under `snet/` and stores `snet_order1` (datetime, channel, frequency) and `snet_order2`
 (datetime, channel, frequency, order2 frequency) under `ruapehu/FWVZ/10/HH` in
-`<outdir>/storage`; channel 0 is Z. Each run plots the vertical first-order coefficients to
-`results/<end>/order1.png`. A run covers the last 24 h, or every day since `start`. A day takes
-about 2.5 CPU-minutes and ~27 MB of waveforms. No detector consumes the coefficients yet.
+`<outdir>/storage`; channel 0 is Z. A run covers the last 24 h. With `start` set, the first run
+builds the archive instead: it covers every day since `start` and writes to
+`results/archive_<start>/`.
+Later runs find that directory and cover only the last 24 h; delete it to rebuild, e.g. after an
+outage of more than 24 h, whose days no later run covers. A day takes about 2.5 CPU-minutes and
+~27 MB of waveforms.
+
+The workflow also embeds each window in two dimensions, following Steinmann et al. (2023): the
+first- and second-order coefficients of all channels are reduced to 10 independent components
+(FastICA), which UMAP embeds. The embedding is fitted once on the days from `fit_start` to
+`fit_end` (2021–2022 by default; the first run computes those days too) and cached in `model/`
+(~60 MB). Each run stores its windows' coordinates as `snet_umap` (component, datetime) next to
+the coefficients and writes them to `results/<end>/embedding.csv`; windows with missing
+coefficients are NaN. Coordinates are labelled at each window's centre, 10 min after the
+coefficients' label, like the novelty scores below.
+
+`SNetNovelty` scores each window against a quiet reference, `novelty_start` to `novelty_end`
+(2021 by default): the raw score is the distance, in FastICA components fitted on the
+reference, to the nearest reference window more than 10 min away, and the index is its
+percentile rank among the reference windows' own scores. Each run stores `snet_novelty_index`,
+the raw `snet_novelty_distance`, `snet_novelty_alarm` (1 where the index reaches `threshold`,
+0.99 by default) and `snet_novelty_threshold`, and writes them to `results/<end>/novelty.csv`.
+Each score is labelled at the centre of its 20-min window, 10 min after the window's label,
+which places a sustained change close to its onset. A score can only be computed once its
+window has ended, so it is available 10 min after its timestamp at the earliest.
+
+Replaying Jan–Jun 2022 at FWVZ: the first alarm after the 2022-03-13 onset is at 09:30 UTC.
+The alarm fires on 81 of the 99 days from 03-13 to 06-19 (41 % of windows) and on 11 of the
+60 days of Jan–Feb (4 % of windows); across 2021–2024 it fires on 4–8 days a month. The
+2021–2022 map places the unrest phases of Bramwell et al. (2025) on an island of their own
+(8-phase 15-nearest-neighbour balanced accuracy 0.55). A map fitted on 2021 alone squeezed
+them into the 2021 cloud (0.26): UMAP links new windows only to their nearest reference
+windows, so states unlike the reference never form islands of their own. The map shows which
+reference states a window resembles; the novelty index shows how unlike the reference it is.
+
+**FWVZ's sensor and datalogger swap on 2025-02-03 breaks the 3-component features.** The
+metadata give all channels the same sensitivity, yet from the swap onward the HHE coefficients
+are 1.8–2.8 times larger at every frequency and HHN up to 2.2 times; HHZ stays within its
+seasonal range. Against the 2021 reference, the alarm fires on about 24 days a month from the
+swap onward (about 3 in January 2025), and windows from 2026-11-01 land on the map next to the
+2022 unrest. Treat FWVZ alarms after 2025-02-03 as unvalidated until the horizontal channels are
+explained. Scoring HHZ alone, the alarm fires on about 9 days a month after the swap, against 4–6
+before it.
+
+`scripts/fwvz_horizontal_check.py` reproduces the change from GeoNet's FDSN service alone (ObsPy,
+full response removed, 14 night-time hours on either side). Relative to HHZ, FWVZ's horizontals
+grow by up to 4 times at the swap, most at 1–1.5 Hz, while the same days a year earlier and MAVZ
+(1.4 km from the crater, no swap) stay within 0.5–1.3. The change depends on frequency, so it is not a wrong
+sensitivity, and rescaling the coefficients (one factor per channel, per coefficient, or per
+coefficient including HHZ) leaves the alarm at 17–20 days a month. HHZ's rise at 1–2 Hz in
+February 2025 is seen at MAVZ too.
 
 ```bash
 # Replay the 2022-03-13 onset
