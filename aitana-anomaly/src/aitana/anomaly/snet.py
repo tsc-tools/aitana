@@ -169,10 +169,11 @@ def embed(snet, n_sources=10, random_state=42):
     can form an island of its own, which it can't when windows are projected
     onto an earlier fit. Windows with missing coefficients are left out.
 
-    The coordinates belong to this fit: embedding again with more windows keeps
-    the overall layout, but not each window's neighbours on the map. Anything
-    that sets windows apart shapes the map, so a change of instrument can
-    split it as readily as a change of the volcano.
+    The coordinates belong to this fit: embedding again with more windows moves
+    windows and their neighbours on the map, and can turn a map without islands,
+    while what the map separates stays the same. Anything that sets windows
+    apart shapes the map, so a change of instrument can split it as readily as
+    a change of the volcano.
 
     Parameters
     ----------

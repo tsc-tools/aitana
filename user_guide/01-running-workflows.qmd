@@ -118,8 +118,10 @@ whenever there is a new day, which takes about 7 minutes and 4 GB for six years 
 fit replaces the last one, in `snet_umap` (component, datetime) next to the coefficients and in
 `results/embedding.csv`; nothing of earlier fits is kept. Windows with missing coefficients are
 NaN. Coordinates are labelled at each window's centre, 10 min after the coefficients' label, like
-the novelty scores below. A refit keeps the overall layout but reshuffles each window's
-neighbours, so read the map's large-scale shape, not a window's exact position.
+the novelty scores below. Each refit shifts the map: from one day to the next it turned by up to
+13°, the median window moved by 2.5–4.5 % of the map's width and only 3–4 % of a window's
+neighbours on the map stayed the same, with no further drift over three days. What the map
+separates held across those fits, so read its large-scale shape, not a window's position.
 
 `SNetNovelty` scores each window's coefficients of `channels` against a quiet reference,
 `novelty_start` to `novelty_end` (2021 by default): the raw score is the distance, in FastICA
@@ -155,7 +157,7 @@ fires on about 26 days a month from the swap onward (3 in January 2025), and a 3
 all windows splits on the swap: every later window sits on an island of its own, so 2025 can't be
 compared with earlier years (balanced accuracy 1.00 between 2024 and 2025; 0.57 with Z alone).
 With Z alone the alarm fires on about 10 days a month after the swap, against 4–6 before it, and
-16–22 % of later windows fall where the 2022 unrest lies on the map, against 0.5–3.9 % in
+16–22 % of later windows fall where the 2022 unrest lies on the map, against at most 5 % in
 2021–2024. Whether that is the volcano isn't known, so treat FWVZ alarms after 2025-02-03 as
 unvalidated.
 
