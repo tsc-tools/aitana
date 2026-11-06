@@ -149,8 +149,9 @@ def run(
             cores=cores, extra=ctx.args
         )
 
+    # Run the workflow once immediately before setting up the cron schedule.
+    run_workflow()
     if cron is None:
-        run_workflow()
         return
     scheduler = BlockingScheduler(timezone="UTC")
     scheduler.add_job(run_workflow, CronTrigger.from_crontab(cron, timezone="UTC"))
